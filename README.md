@@ -1,8 +1,8 @@
 # HealthFlow
 
 > 🟢 **Live demo:** [healthflow.work](https://healthflow.work)
-> Broker login: `demo@healthflow.com` / `Healthflow123!` — 18 demo clients across 11 cities are pre-seeded.
-> Admin login: `admin@healthflow.com` / `Healthflow123!` — opens the `/admin` workspace (team management, forensics replay, audit log).
+> Broker login: `demo@healthflow.work` / `Healthflow123!` — 18 demo clients across 11 cities are pre-seeded.
+> Admin login: `admin@healthflow.work` / `Healthflow123!` — opens the `/admin` workspace (team management, forensics replay, audit log).
 > Logged-out visitors land on a public marketing page — agent showcase, compliance overview, and a product walkthrough video ("See it in action").
 
 **An AI-powered health insurance brokerage platform** designed and built by [Saidu Kamara](https://github.com/saikamara59) to solve a real industry problem: health insurance is confusing, comparisons are manual, and brokers waste hours on paperwork that should be automated.
@@ -79,7 +79,7 @@ python -m healthflow.main                     # API at http://localhost:8000
 cd frontend && npm install && npm run dev     # Dashboard at http://localhost:5173
 
 # Seed demo data (18 clients with real doctors)
-python seed.py                                # Login: demo@healthflow.com / Healthflow123!
+python seed.py                                # Login: demo@healthflow.work / Healthflow123!
 ```
 
 ### Option 3: Docker
