@@ -139,7 +139,7 @@ export default function Sidebar({ open, onClose }) {
                 {display}
               </div>
               <div style={{ fontSize: 11, color: 'var(--ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user?.email || 'broker@healthflow.com'}
+                {user?.email || 'broker@healthflow.work'}
               </div>
             </div>
             <span

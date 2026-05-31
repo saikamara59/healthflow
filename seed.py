@@ -7,7 +7,7 @@ import sys
 BASE_URL = "http://localhost:8000"
 
 BROKER = {
-    "email": "demo@healthflow.com",
+    "email": "demo@healthflow.work",
     "password": "Healthflow123!",
     "full_name": "Dr. Sarah Vance",
 }

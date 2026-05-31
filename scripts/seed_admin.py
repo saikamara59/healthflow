@@ -1,10 +1,10 @@
 """Bootstrap the demo admin account.
 
-Registers admin@healthflow.com via /auth/register (always defaults role=broker
+Registers admin@healthflow.work via /auth/register (always defaults role=broker
 and is_active=False), then:
-  1. activates the demo broker (demo@healthflow.com) so the pre-seeded
+  1. activates the demo broker (demo@healthflow.work) so the pre-seeded
      account is immediately usable without admin approval
-  2. activates + promotes the admin (admin@healthflow.com) to role=admin
+  2. activates + promotes the admin (admin@healthflow.work) to role=admin
 
 Idempotent: re-running on a deploy that already has the account is a no-op
 (promotion of an already-admin row is a write but not a state change; same
@@ -23,7 +23,7 @@ from healthflow.database.models import Broker
 from scripts.promote_admin import _promote
 
 ADMIN = {
-    "email": "admin@healthflow.com",
+    "email": "admin@healthflow.work",
     "password": "Healthflow123!",
     "full_name": "HealthFlow Admin",
 }
@@ -58,7 +58,7 @@ def main() -> None:
     # seed.py registered earlier in demo_entrypoint.sh. Production
     # /auth/register now creates accounts as pending, so without this step
     # neither pre-seeded login would work on first boot.
-    asyncio.run(_activate([ADMIN["email"], "demo@healthflow.com"]))
+    asyncio.run(_activate([ADMIN["email"], "demo@healthflow.work"]))
     print(f"  activated: admin + demo broker")
 
     exit_code = asyncio.run(_promote(ADMIN["email"], async_session_factory))

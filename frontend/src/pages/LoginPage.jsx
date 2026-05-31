@@ -168,7 +168,7 @@ export default function LoginPage() {
                   <input
                     className="w-full bg-surface-container-low border-none border-b-2 border-transparent focus:border-primary focus:ring-0 rounded-lg px-4 py-4 font-body transition-all group-hover:bg-surface-container placeholder:text-outline/50"
                     id="email"
-                    placeholder="dr.smith@healthflow.com"
+                    placeholder="dr.smith@healthflow.work"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
