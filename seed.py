@@ -1,4 +1,13 @@
-"""Seed script — creates a test broker and sample clients with real doctor data."""
+"""Seed script — creates a demo broker and sample clients with real doctor data.
+
+This provisions a single NON-privileged sandbox broker (role=broker) for the
+public demo. It does NOT create an admin account — admins are provisioned
+out-of-band via scripts/promote_admin.py with a deployment-specific password.
+
+The demo password is read from DEMO_BROKER_PASSWORD (default below) so a prod
+deploy can override it with a Fly secret instead of shipping the value here.
+"""
+import asyncio
 import json
 import os
 import httpx
@@ -6,11 +15,35 @@ import sys
 
 BASE_URL = "http://localhost:8000"
 
+# Local/dev default; override in any real deploy via the DEMO_BROKER_PASSWORD
+# env var (a Fly secret on the public demo). Never an admin account.
+DEMO_BROKER_PASSWORD = os.getenv("DEMO_BROKER_PASSWORD", "Healthflow123!")
+
 BROKER = {
     "email": "demo@healthflow.work",
-    "password": "Healthflow123!",
+    "password": DEMO_BROKER_PASSWORD,
     "full_name": "Dr. Sarah Vance",
 }
+
+
+async def _activate_demo_broker(email: str) -> None:
+    """Flip is_active=True for the demo broker so it can log in without admin
+    approval. /auth/register creates accounts as pending (is_active=False), so
+    this DB write is required before the broker can authenticate. Scoped to the
+    brokers table (not tenant-scoped); uses system_context for the audit trail.
+    """
+    from sqlalchemy import update as sa_update
+
+    from healthflow.auth.tenant_context import system_context
+    from healthflow.database.config import async_session_factory
+    from healthflow.database.models import Broker
+
+    async with async_session_factory() as session:
+        with system_context("seed: activate demo broker"):
+            await session.execute(
+                sa_update(Broker).where(Broker.email == email).values(is_active=True)
+            )
+            await session.commit()
 
 # Load real doctors if available
 REAL_DOCTORS_PATH = os.path.join(os.path.dirname(__file__), "scripts", "real_doctors.json")
@@ -219,6 +252,11 @@ def main():
         print(f"  Failed to register broker: {resp.status_code} {resp.text}")
         sys.exit(1)
 
+    # Activate the demo broker (registration creates it as pending) so the
+    # login below succeeds on first boot.
+    asyncio.run(_activate_demo_broker(BROKER["email"]))
+    print(f"  Demo broker activated: {BROKER['email']}")
+
     # Login
     resp = httpx.post(
         f"{BASE_URL}/auth/login",
@@ -265,9 +303,7 @@ def main():
         print(f"  Skipped: {skipped} (already exist)")
     print(f"  Total clients: {len(CLIENTS)}")
     print()
-    print("  Login credentials:")
-    print(f"    Email:    {BROKER['email']}")
-    print(f"    Password: {BROKER['password']}")
+    print(f"  Demo broker: {BROKER['email']} (password from DEMO_BROKER_PASSWORD)")
     print()
 
 
