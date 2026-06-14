@@ -1,8 +1,7 @@
 # HealthFlow
 
 > 🟢 **Live demo:** [healthflow.work](https://healthflow.work)
-> Broker login: `demo@healthflow.work` / `Healthflow123!` — 18 demo clients across 11 cities are pre-seeded.
-> Admin login: `admin@healthflow.work` / `Healthflow123!` — opens the `/admin` workspace (team management, forensics replay, audit log).
+> Broker login: `demo@healthflow.work` / `Healthflow123!` — a shared, non-privileged sandbox account with fake data; 18 demo clients across 11 cities are pre-seeded. (Admin tooling — team management, forensics replay, audit log — is not exposed on the public demo; admins are provisioned per-deploy via `scripts/promote_admin.py`.)
 > Logged-out visitors land on a public marketing page — agent showcase, compliance overview, and a product walkthrough video ("See it in action").
 
 **An AI-powered health insurance brokerage platform** designed and built by [Saidu Kamara](https://github.com/saikamara59) to solve a real industry problem: health insurance is confusing, comparisons are manual, and brokers waste hours on paperwork that should be automated.

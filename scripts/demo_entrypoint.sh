@@ -3,8 +3,14 @@
 #
 # 1. Start uvicorn in the background.
 # 2. Wait for /health to return 200 (lifespan create_all has run).
-# 3. Run seed.py — idempotent; skips broker registration on 409 (already exists).
+# 3. If SEED_DEMO=1, run seed.py — idempotent; skips broker registration on
+#    409 (already exists). Seeding is OFF by default so a deploy never
+#    auto-provisions accounts unless explicitly opted in.
 # 4. Wait on uvicorn so the container stays alive + Fly sees the process.
+#
+# No admin account is ever auto-provisioned. seed.py creates only a single
+# non-privileged demo broker; admins are created out-of-band via
+# scripts/promote_admin.py with a deployment-specific password.
 #
 # seed.py only runs ONCE on first boot since broker registration is idempotent
 # and add_client checks for duplicates. Re-runs across deploys cost ~2s and
@@ -33,14 +39,12 @@ if [ "$i" -ge 30 ]; then
     exit 1
 fi
 
-echo "[entrypoint] seeding demo data (idempotent)"
-python seed.py || echo "[entrypoint] seed.py exited non-zero — broker probably already exists; continuing"
-
-echo "[entrypoint] seeding admin account (idempotent)"
-# Run as a module so `healthflow.*` and `scripts.promote_admin` resolve against
-# /app on sys.path (Python only adds the script's dir to sys.path when invoked
-# as `python scripts/seed_admin.py`, which is why the previous form 404'd).
-python -m scripts.seed_admin || echo "[entrypoint] seed_admin.py exited non-zero; continuing"
+if [ "${SEED_DEMO:-0}" = "1" ]; then
+    echo "[entrypoint] SEED_DEMO=1 — seeding demo data (idempotent)"
+    python seed.py || echo "[entrypoint] seed.py exited non-zero — broker probably already exists; continuing"
+else
+    echo "[entrypoint] SEED_DEMO not set — skipping demo seeding"
+fi
 
 echo "[entrypoint] handing off to uvicorn (pid=$UVICORN_PID)"
 wait "$UVICORN_PID"

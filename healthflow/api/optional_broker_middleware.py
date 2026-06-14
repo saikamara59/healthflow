@@ -22,6 +22,7 @@ are LIFO.
 """
 import uuid
 
+from sqlalchemy import select
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
@@ -30,6 +31,12 @@ from healthflow.auth.tenant_context import current_broker_id
 
 
 class OptionalBrokerContextMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app, session_factory=None):
+        """`session_factory` is injectable so tests can supply a hermetic DB;
+        production passes nothing and the module-level factory is used."""
+        super().__init__(app)
+        self._session_factory = session_factory
+
     async def dispatch(self, request: Request, call_next):
         token_value: object = None
         auth = request.headers.get("authorization") or ""
@@ -39,7 +46,26 @@ class OptionalBrokerContextMiddleware(BaseHTTPMiddleware):
                 payload = decode_token(raw)
                 if payload.get("type") == "access":
                     broker_id = uuid.UUID(str(payload["sub"]))
-                    token_value = current_broker_id.set(broker_id)
+                    # Only trust the token if the broker still exists and is
+                    # active — mirrors get_current_broker. A deactivated broker
+                    # whose access token is still within its lifetime must not
+                    # retain tenant context. Imported lazily to avoid a circular
+                    # import at module load (config installs ORM listeners).
+                    factory = self._session_factory
+                    if factory is None:
+                        from healthflow.database.config import (
+                            async_session_factory as factory,
+                        )
+                    from healthflow.database.models import Broker
+
+                    async with factory() as session:
+                        broker = (
+                            await session.execute(
+                                select(Broker).where(Broker.id == broker_id)
+                            )
+                        ).scalar_one_or_none()
+                    if broker is not None and broker.is_active:
+                        token_value = current_broker_id.set(broker_id)
             except Exception:
                 # Malformed/expired token — swallow. Protected routes still
                 # 401 via their Depends(get_current_broker).
