@@ -14,6 +14,11 @@ primary_region = 'iad'
   DATABASE_URL = 'sqlite+aiosqlite:////data/healthflow.db'
   EMAIL_PROVIDER = 'console'
   FRONTEND_BASE_URL = 'https://healthflow.work'
+  # This is a public sandbox demo with fake data — opt in to seeding the single
+  # non-privileged demo broker. No admin is auto-provisioned. The demo password
+  # defaults to the value published in the README; override out-of-repo with
+  #   fly secrets set DEMO_BROKER_PASSWORD=...
+  SEED_DEMO = '1'
 
 [http_service]
   internal_port = 8000

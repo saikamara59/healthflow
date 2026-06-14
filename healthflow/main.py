@@ -43,9 +43,27 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Explicit CORS allowlist. A wildcard origin must never be paired with
+# allow_credentials=True — that combination lets any site make credentialed
+# cross-origin requests. Origins come from FRONTEND_BASE_URL (the deployed UI)
+# plus the local Vite/CRA dev servers. Extra comma-separated origins can be
+# supplied via CORS_EXTRA_ORIGINS.
+_cors_origins = [
+    os.getenv("FRONTEND_BASE_URL", "http://localhost:5173").rstrip("/"),
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+]
+_cors_origins += [
+    o.strip().rstrip("/")
+    for o in os.getenv("CORS_EXTRA_ORIGINS", "").split(",")
+    if o.strip()
+]
+ALLOWED_ORIGINS = list(dict.fromkeys(_cors_origins))  # de-dup, preserve order
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
