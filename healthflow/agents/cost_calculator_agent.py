@@ -1,6 +1,6 @@
 import anthropic
 
-from healthflow.agents.harness import CLAUDE_MODEL, extract_text
+from healthflow.agents.harness import CLAUDE_MODEL_HAIKU as CLAUDE_MODEL, extract_text
 from healthflow.agents.prompt_inputs import CostPromptInput
 from healthflow.logs.audit import AuditLogger
 from healthflow.logs.invocation import invocation

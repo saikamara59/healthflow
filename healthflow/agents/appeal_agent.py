@@ -1,6 +1,6 @@
 import anthropic
 
-from healthflow.agents.harness import CLAUDE_MODEL, extract_text
+from healthflow.agents.harness import CLAUDE_MODEL_OPUS as CLAUDE_MODEL, extract_text
 from healthflow.logs.audit import AuditLogger
 from healthflow.logs.invocation import invocation
 from healthflow.models.schemas import CoverageArgument, DenialAnalysis
