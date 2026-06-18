@@ -1,6 +1,6 @@
 import anthropic
 
-from healthflow.agents.harness import CLAUDE_MODEL, extract_text
+from healthflow.agents.harness import CLAUDE_MODEL_SONNET as CLAUDE_MODEL, extract_text
 from healthflow.agents.prompt_inputs import RedactedSection, TranslationPromptInput
 from healthflow.logs.audit import AuditLogger
 from healthflow.logs.invocation import invocation
