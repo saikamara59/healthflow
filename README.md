@@ -12,6 +12,8 @@ HealthFlow gives insurance brokers a single platform to manage client portfolios
 
 ## For engineers reviewing this
 
+> 📊 **Start here:** [`docs/security-architecture.html`](docs/security-architecture.html) — a visual walkthrough of the security model (open it in a browser). Explains how tenant isolation, PHI redaction, encryption at rest, and the audit log are enforced by the database session and type system rather than developer discipline.
+
 Every non-trivial decision has a written design doc in [`docs/superpowers/specs/`](docs/superpowers/specs/) and an implementation plan in [`docs/superpowers/plans/`](docs/superpowers/plans/), committed alongside the code. Greatest-hits, in shipping order:
 
 - **[Forensics replay tool](docs/superpowers/specs/2026-05-24-forensics-replay-tool-design.md)** — spec'd as one PR, recon surfaced six architectural gaps in the codebase → split into two PRs (foundation table + `case_id` ContextVar propagation first; then the replay tool reads it). Multi-PR ownership of a real compliance feature.
