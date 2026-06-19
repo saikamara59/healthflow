@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HealthFlow — Security by Construction</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300..800&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#F4F1EA;
+    --paper-2:#ECE6D8;
+    --ink:#211C16;
+    --ink-soft:#574E42;
+    --rust:#A8533A;
+    --rust-soft:#C97A5E;
+    --teal:#2F6F6A;
+    --line:#D9D0BE;
+  }
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Bricolage Grotesque',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .serif{font-family:'Instrument Serif',Georgia,serif;font-weight:400;}
+  .eyebrow{letter-spacing:.22em;text-transform:uppercase;font-size:.72rem;font-weight:600;color:var(--rust);}
+  .section{border-top:1px solid var(--line);}
+  .card{background:var(--paper-2);border:1px solid var(--line);}
+  .chip{background:#fff;border:1px solid var(--line);}
+  .code{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:.86rem;line-height:1.6;}
+  .codeblock{background:#221d17;color:#EDE6D6;border-radius:14px;overflow-x:auto;}
+  .codeblock .k{color:#C97A5E;}
+  .codeblock .c{color:#8b8170;}
+  .codeblock .g{color:#7FB4AD;}
+  .rule{color:var(--rust);}
+  .teal{color:var(--teal);}
+  .underline-rust{text-decoration:underline;text-decoration-color:var(--rust-soft);text-underline-offset:5px;text-decoration-thickness:2px;}
+  svg text{font-family:'Bricolage Grotesque',sans-serif;}
+  .mono-tag{font-family:ui-monospace,monospace;font-size:.78rem;background:#fff;border:1px solid var(--line);padding:.12rem .45rem;border-radius:6px;color:var(--ink-soft);overflow-wrap:anywhere;word-break:break-word;}
+  /* grid children must be allowed to shrink below their content's intrinsic width */
+  .grid > *{min-width:0;}
+  /* On phones the wide SVG diagrams would shrink until labels are unreadable.
+     Let them keep a legible size and pan horizontally instead. Desktop is unaffected. */
+  @media (max-width:767px){
+    .diagram-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px dashed var(--line);border-radius:12px;}
+    .diagram-scroll svg{min-width:660px;}
+    .diagram-scroll::after{content:"› swipe diagrams";display:block;text-align:right;font-size:.66rem;color:var(--ink-soft);padding:2px 8px 4px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ HERO ============ -->
+<header class="section border-t-0 min-h-screen flex flex-col justify-center">
+  <div class="max-w-5xl mx-auto px-6 py-20 md:py-28 w-full">
+    <p class="eyebrow mb-6">HealthFlow · Security Architecture</p>
+    <h1 class="serif leading-[1.02] text-5xl md:text-7xl mb-8">
+      The safest check is the one a developer <span class="rule italic">cannot forget</span>.
+    </h1>
+    <p class="text-lg md:text-2xl text-[color:var(--ink-soft)] max-w-3xl leading-relaxed">
+      HealthFlow handles patient health data — medications, conditions, doctors. The dangerous
+      failure isn't a clever attack; it's a missing <span class="mono-tag">WHERE&nbsp;broker_id</span>
+      clause one tired afternoon. So the protections that matter aren't left to memory. They are
+      enforced <span class="underline-rust">once, centrally</span> — in the database session, the
+      type system, and listeners installed at startup — and they hold even when someone forgets.
+    </p>
+    <div class="mt-12 flex flex-wrap gap-3 text-sm">
+      <span class="chip rounded-full px-4 py-2">Tenant isolation</span>
+      <span class="chip rounded-full px-4 py-2">PHI redaction</span>
+      <span class="chip rounded-full px-4 py-2">Encryption at rest</span>
+      <span class="chip rounded-full px-4 py-2">Append-only audit log</span>
+      <span class="chip rounded-full px-4 py-2">Auth hardening</span>
+    </div>
+    <p class="mt-14 text-sm text-[color:var(--ink-soft)]">A walkthrough for a smart engineer new to the codebase. ↓</p>
+  </div>
+</header>
+
+<!-- ============ WHY THE OLD WAY FAILS ============ -->
+<section class="section min-h-screen flex items-center">
+  <div class="max-w-6xl mx-auto px-6 py-20 md:py-24 w-full">
+    <p class="eyebrow mb-4">The problem</p>
+    <h2 class="serif text-4xl md:text-6xl mb-6 leading-tight">Memory is the leak.</h2>
+    <p class="text-lg md:text-xl text-[color:var(--ink-soft)] max-w-3xl mb-12 leading-relaxed">
+      A multi-tenant health app asks every route to do the same chores by hand. Each one is a place
+      to slip — and a single slip exposes one patient's record to the wrong broker.
+    </p>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="card rounded-2xl p-7">
+        <p class="eyebrow mb-4" style="color:var(--ink-soft)">The old way — every route remembers</p>
+        <ul class="space-y-4 text-[15px] md:text-base">
+          <li class="flex gap-3"><span class="rule font-bold">✕</span> Add <span class="mono-tag">WHERE broker_id = me</span> to <em>every</em> query that touches patient data.</li>
+          <li class="flex gap-3"><span class="rule font-bold">✕</span> Strip names and conditions by hand <em>before every</em> call to the AI model.</li>
+          <li class="flex gap-3"><span class="rule font-bold">✕</span> Hope no one logs a raw patient record while debugging.</li>
+          <li class="flex gap-3"><span class="rule font-bold">✕</span> Remember to write an audit row for who-saw-what.</li>
+        </ul>
+        <p class="mt-6 text-sm text-[color:var(--ink-soft)]">The guarantee lives in human discipline. Discipline does not scale.</p>
+      </div>
+      <div class="card rounded-2xl p-7" style="border-color:var(--teal)">
+        <p class="eyebrow mb-4" style="color:var(--teal)">The HealthFlow way — the system remembers</p>
+        <ul class="space-y-4 text-[15px] md:text-base">
+          <li class="flex gap-3"><span class="teal font-bold">✓</span> The filter is a property of the database <em>session</em>, not of each route.</li>
+          <li class="flex gap-3"><span class="teal font-bold">✓</span> PHI is redacted once by a typed object before any text can reach the model.</li>
+          <li class="flex gap-3"><span class="teal font-bold">✓</span> Sensitive columns are ciphertext on disk — the app never handles raw bytes.</li>
+          <li class="flex gap-3"><span class="teal font-bold">✓</span> Every PHI read and write logs itself, automatically.</li>
+        </ul>
+        <p class="mt-6 text-sm text-[color:var(--ink-soft)]">Forgetting becomes <span class="teal">structurally impossible</span>, not merely discouraged.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ MENTAL MODEL ============ -->
+<section class="section min-h-screen flex items-center">
+  <div class="max-w-6xl mx-auto px-6 py-20 md:py-24 w-full">
+    <p class="eyebrow mb-4">The one idea to keep</p>
+    <h2 class="serif text-4xl md:text-6xl mb-6 leading-tight">Put the guard at the chokepoint.</h2>
+    <p class="text-lg md:text-xl text-[color:var(--ink-soft)] max-w-3xl mb-12 leading-relaxed">
+      Dozens of routes write queries, but every query — no matter who wrote it — flows through one
+      object: the SQLAlchemy <strong>session</strong>. Attach the rule there once and every query
+      inherits it. You stop guarding a hundred doors and start guarding the one hallway they all use.
+    </p>
+
+    <div class="card rounded-2xl p-5 md:p-8">
+      <div class="diagram-scroll"><svg viewBox="0 0 920 360" class="w-full h-auto" role="img" aria-label="Many routes funnel through one database session that injects the broker filter before reaching the PHI tables">
+        <!-- routes -->
+        <g>
+          <rect x="20" y="40" width="200" height="46" rx="10" fill="#fff" stroke="var(--line)"/>
+          <text x="120" y="63" text-anchor="middle" dominant-baseline="middle" font-size="15" fill="var(--ink)">GET /clients</text>
+          <rect x="20" y="106" width="200" height="46" rx="10" fill="#fff" stroke="var(--line)"/>
+          <text x="120" y="129" text-anchor="middle" dominant-baseline="middle" font-size="15" fill="var(--ink)">POST /history</text>
+          <rect x="20" y="172" width="200" height="46" rx="10" fill="#fff" stroke="var(--line)"/>
+          <text x="120" y="195" text-anchor="middle" dominant-baseline="middle" font-size="15" fill="var(--ink)">GET /feedback</text>
+          <rect x="20" y="238" width="200" height="46" rx="10" fill="#fff" stroke="var(--line)"/>
+          <text x="120" y="261" text-anchor="middle" dominant-baseline="middle" font-size="15" fill="var(--ink-soft)">…any future route</text>
+        </g>
+        <!-- arrows to gate -->
+        <g stroke="var(--rust-soft)" stroke-width="2" fill="none">
+          <path d="M220 63 C 300 63, 320 150, 388 168"/>
+          <path d="M220 129 C 300 129, 330 160, 388 176"/>
+          <path d="M220 195 C 300 195, 330 184, 388 184"/>
+          <path d="M220 261 C 300 261, 320 210, 388 192"/>
+        </g>
+        <!-- gate -->
+        <rect x="390" y="120" width="232" height="120" rx="16" fill="var(--paper)" stroke="var(--rust)" stroke-width="2.5"/>
+        <text x="506" y="158" text-anchor="middle" dominant-baseline="middle" font-size="17" font-weight="700" fill="var(--ink)">DB session</text>
+        <text x="506" y="182" text-anchor="middle" dominant-baseline="middle" font-size="12.5" fill="var(--ink-soft)" font-family="ui-monospace,monospace">do_orm_execute</text>
+        <text x="506" y="206" text-anchor="middle" dominant-baseline="middle" font-size="12.5" fill="var(--rust)">+ WHERE broker_id = you</text>
+        <!-- arrow to db -->
+        <path d="M622 180 L 712 180" stroke="var(--teal)" stroke-width="2.5" fill="none" marker-end="url(#arrow)"/>
+        <!-- db cylinder -->
+        <g>
+          <ellipse cx="800" cy="132" rx="60" ry="16" fill="var(--paper-2)" stroke="var(--teal)" stroke-width="2"/>
+          <path d="M740 132 L740 228 A60 16 0 0 0 860 228 L860 132" fill="var(--paper-2)" stroke="var(--teal)" stroke-width="2"/>
+          <text x="800" y="186" text-anchor="middle" dominant-baseline="middle" font-size="14" fill="var(--ink)">PHI tables</text>
+        </g>
+        <defs>
+          <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0 0 L9 4.5 L0 9 z" fill="var(--teal)"/>
+          </marker>
+        </defs>
+      </svg></div>
+      <p class="text-center text-sm text-[color:var(--ink-soft)] mt-3">
+        One listener on the session filters every read. The route author doesn't ask for it and can't opt out.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LAYER 1: TENANT ISOLATION ============ -->
+<section class="section min-h-screen flex items-center">
+  <div class="max-w-6xl mx-auto px-6 py-20 md:py-24 w-full">
+    <div class="grid md:grid-cols-2 gap-12 items-center">
+      <div>
+        <p class="eyebrow mb-4">Layer 1 · Tenant isolation</p>
+        <h2 class="serif text-4xl md:text-5xl mb-6 leading-tight">The query you wrote is not the query that runs.</h2>
+        <p class="text-base md:text-lg text-[color:var(--ink-soft)] mb-6 leading-relaxed">
+          A <span class="mono-tag">do_orm_execute</span> event listener in
+          <span class="mono-tag">database/tenant_filter.py</span> inspects every statement. If it targets a
+          tenant-scoped table, it appends <span class="rule">WHERE broker_id = current_broker</span> before the
+          database ever sees it. The current broker comes from a request-scoped
+          <span class="mono-tag">ContextVar</span> that the auth dependency sets on every authenticated request.
+        </p>
+        <ul class="space-y-3 text-[15px] md:text-base">
+          <li class="flex gap-3"><span class="teal">●</span> Scoped models: <span class="mono-tag">Client</span>, <span class="mono-tag">ActionHistory</span>, <span class="mono-tag">Feedback</span>.</li>
+          <li class="flex gap-3"><span class="teal">●</span> Covers entity reads <em>and</em> column-selects like <span class="mono-tag">select(Client.id, Client.full_name)</span>.</li>
+          <li class="flex gap-3"><span class="teal">●</span> A separate guard rejects raw SQL that tries to slip past the ORM.</li>
+        </ul>
+      </div>
+      <div>
+        <div class="codeblock p-5 md:p-6 code">
+          <div class="c">— what the route author writes —</div>
+          <div><span class="k">select</span>(Client).where(Client.id == cid)</div>
+          <div class="my-3 text-center" style="color:var(--rust-soft)">▼ &nbsp;session listener rewrites it&nbsp; ▼</div>
+          <div class="c">— what actually hits the database —</div>
+          <div><span class="k">select</span>(Client).where(</div>
+          <div>&nbsp;&nbsp;Client.id == cid,</div>
+          <div>&nbsp;&nbsp;<span class="g">Client.broker_id == current_broker</span>,</div>
+          <div>)</div>
+        </div>
+        <p class="text-sm text-[color:var(--ink-soft)] mt-4">
+          A route that forgets the broker clause still cannot read another broker's patients — the result
+          is simply <span class="mono-tag">None</span>, and the route returns 404.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LAYER 2: PHI REDACTION ============ -->
+<section class="section min-h-screen flex items-center">
+  <div class="max-w-6xl mx-auto px-6 py-20 md:py-24 w-full">
+    <p class="eyebrow mb-4">Layer 2 · The LLM boundary</p>
+    <h2 class="serif text-4xl md:text-6xl mb-6 leading-tight">Redact once, at the door to the model.</h2>
+    <p class="text-lg md:text-xl text-[color:var(--ink-soft)] max-w-3xl mb-12 leading-relaxed">
+      Five agents send data to Claude. None of them hand it a raw patient record. Each builds a frozen
+      <span class="mono-tag">PromptInput</span> dataclass that redacts free-text in its constructor — and a
+      static AST test guarantees there is <em>no code path</em> from a raw string to a prompt body that skips it.
+    </p>
+
+    <div class="card rounded-2xl p-5 md:p-8">
+      <div class="diagram-scroll"><svg viewBox="0 0 940 320" class="w-full h-auto" role="img" aria-label="A client record passes through a PromptInput that redacts free text while structured fields pass through, before reaching Claude">
+        <!-- record -->
+        <rect x="20" y="60" width="250" height="200" rx="14" fill="#fff" stroke="var(--line)"/>
+        <text x="145" y="88" text-anchor="middle" font-size="14" font-weight="700" fill="var(--ink)">Client record</text>
+        <text x="40" y="124" font-size="13" fill="var(--rust)">• denial letter text  (PHI)</text>
+        <text x="40" y="152" font-size="13" fill="var(--rust)">• free-text notes  (PHI)</text>
+        <text x="40" y="180" font-size="13" fill="var(--teal)">• drug names</text>
+        <text x="40" y="208" font-size="13" fill="var(--teal)">• procedure names</text>
+        <text x="40" y="236" font-size="13" fill="var(--teal)">• doctor NPIs (public)</text>
+
+        <!-- promptinput gate -->
+        <rect x="350" y="40" width="250" height="240" rx="16" fill="var(--paper)" stroke="var(--ink)" stroke-width="2"/>
+        <text x="475" y="70" text-anchor="middle" font-size="15" font-weight="700" fill="var(--ink)">PromptInput</text>
+        <text x="475" y="90" text-anchor="middle" font-size="11.5" fill="var(--ink-soft)" font-family="ui-monospace,monospace">__post_init__</text>
+        <!-- redact row -->
+        <rect x="372" y="112" width="206" height="64" rx="10" fill="#fff" stroke="var(--rust)"/>
+        <text x="475" y="134" text-anchor="middle" font-size="12.5" fill="var(--rust)">free text → PHIRedactor</text>
+        <text x="475" y="156" text-anchor="middle" font-size="12.5" fill="var(--rust)" font-family="ui-monospace,monospace">[NAME] [DOB] [ID]</text>
+        <!-- passthrough row -->
+        <rect x="372" y="188" width="206" height="64" rx="10" fill="#fff" stroke="var(--teal)"/>
+        <text x="475" y="210" text-anchor="middle" font-size="12.5" fill="var(--teal)">structured fields</text>
+        <text x="475" y="232" text-anchor="middle" font-size="12.5" fill="var(--teal)">pass through by design</text>
+
+        <!-- arrows -->
+        <path d="M270 160 L 348 160" stroke="var(--ink-soft)" stroke-width="2" fill="none" marker-end="url(#a2)"/>
+        <path d="M600 160 L 690 160" stroke="var(--ink-soft)" stroke-width="2" fill="none" marker-end="url(#a2)"/>
+
+        <!-- claude -->
+        <rect x="692" y="116" width="228" height="88" rx="16" fill="var(--paper-2)" stroke="var(--teal)" stroke-width="2"/>
+        <text x="806" y="150" text-anchor="middle" font-size="16" font-weight="700" fill="var(--ink)">Claude</text>
+        <text x="806" y="174" text-anchor="middle" font-size="12" fill="var(--ink-soft)">sees de-identified content only</text>
+
+        <defs>
+          <marker id="a2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+            <path d="M0 0 L9 4.5 L0 9 z" fill="var(--ink-soft)"/>
+          </marker>
+        </defs>
+      </svg></div>
+      <p class="text-center text-sm text-[color:var(--ink-soft)] mt-3">
+        Drug/procedure names and doctor NPIs are not patient identifiers under this threat model, so they
+        pass through deliberately. The audit event records only <em>counts and types</em> of what was redacted — never the text.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LAYER 3: ENCRYPTION ============ -->
+<section class="section min-h-screen flex items-center">
+  <div class="max-w-6xl mx-auto px-6 py-20 md:py-24 w-full">
+    <div class="grid md:grid-cols-2 gap-12 items-center">
+      <div class="order-2 md:order-1">
+        <div class="codeblock p-5 md:p-6 code">
+          <div class="c">— on disk, a PHI column looks like —</div>
+          <div class="break-all"><span class="k">v1</span>:<span class="g">8Qf2…nonce…</span>:<span class="g">b6Tz…ciphertext+tag…</span></div>
+          <div class="mt-4 c">— the app only ever sees plaintext —</div>
+          <div>client.full_name  <span class="c"># "Eleanor Rigby"</span></div>
+          <div class="mt-2 c"># EncryptedString TypeDecorator</div>
+          <div class="c"># encrypts on write, decrypts on read</div>
+        </div>
+      </div>
+      <div class="order-1 md:order-2">
+        <p class="eyebrow mb-4">Layer 3 · Encryption at rest</p>
+        <h2 class="serif text-4xl md:text-5xl mb-6 leading-tight">Ciphertext on disk, plaintext in code.</h2>
+        <p class="text-base md:text-lg text-[color:var(--ink-soft)] mb-6 leading-relaxed">
+          Eight PHI columns are stored as AES-256-GCM ciphertext. SQLAlchemy
+          <span class="mono-tag">TypeDecorator</span>s do the work at the boundary, so application code never
+          touches raw bytes. The wire format <span class="mono-tag">vN:nonce:ciphertext</span> carries a key
+          <em>version</em>, which makes key rotation additive rather than a migration.
+        </p>
+        <ul class="space-y-3 text-[15px] md:text-base">
+          <li class="flex gap-3"><span class="teal">●</span> A fresh random nonce per write — so the same name encrypts differently every time.</li>
+          <li class="flex gap-3"><span class="teal">●</span> That randomness is the point: you can't equality-search an encrypted column, by design.</li>
+          <li class="flex gap-3"><span class="teal">●</span> The key is read fail-loud at import — a missing or placeholder key crashes startup, loudly.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ LAYER 4: AUDIT LOG ============ -->
+<section class="section min-h-screen flex items-center">
+  <div class="max-w-6xl mx-auto px-6 py-20 md:py-24 w-full">
+    <p class="eyebrow mb-4">Layer 4 · The audit trail</p>
+    <h2 class="serif text-4xl md:text-6xl mb-6 leading-tight">Every patient record explains who touched it.</h2>
+    <p class="text-lg md:text-xl text-[color:var(--ink-soft)] max-w-3xl mb-12 leading-relaxed">
+      Every query against a PHI table writes an append-only row to <span class="mono-tag">phi_access_log</span> —
+      automatically, via two more session listeners. You never call an audit function; it fires on its own.
+    </p>
+
+    <div class="grid md:grid-cols-5 gap-4">
+      <div class="card rounded-xl p-5 text-center"><div class="serif text-3xl rule">who</div><p class="text-sm mt-2 text-[color:var(--ink-soft)]">which broker</p></div>
+      <div class="card rounded-xl p-5 text-center"><div class="serif text-3xl rule">what</div><p class="text-sm mt-2 text-[color:var(--ink-soft)]">table + operation</p></div>
+      <div class="card rounded-xl p-5 text-center"><div class="serif text-3xl rule">whom</div><p class="text-sm mt-2 text-[color:var(--ink-soft)]">patient row IDs</p></div>
+      <div class="card rounded-xl p-5 text-center"><div class="serif text-3xl rule">why</div><p class="text-sm mt-2 text-[color:var(--ink-soft)]">request endpoint</p></div>
+      <div class="card rounded-xl p-5 text-center"><div class="serif text-3xl rule">when</div><p class="text-sm mt-2 text-[color:var(--ink-soft)]">timestamp</p></div>
+    </div>
+
+    <div class="card rounded-2xl p-6 md:p-7 mt-8 flex flex-col md:flex-row md:items-center gap-5">
+      <div class="shrink-0 chip rounded-xl px-4 py-3 text-center">
+        <div class="mono-tag" style="border:0;background:transparent;padding:0">install order</div>
+      </div>
+      <p class="text-[15px] md:text-base text-[color:var(--ink-soft)] leading-relaxed">
+        The order is load-bearing: the audit listener is installed <strong>after</strong> the tenant filter,
+        so it observes the query already scoped to the broker. The patient IDs it records are exactly the
+        ones the broker was actually allowed to see — nothing more.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DEFENSE IN DEPTH ============ -->
+<section class="section min-h-screen flex items-center">
+  <div class="max-w-6xl mx-auto px-6 py-20 md:py-24 w-full">
+    <p class="eyebrow mb-4">The whole picture</p>
+    <h2 class="serif text-4xl md:text-6xl mb-8 leading-tight">A request runs a gauntlet.</h2>
+
+    <div class="card rounded-2xl p-5 md:p-8">
+      <div class="diagram-scroll"><svg viewBox="0 0 960 420" class="w-full h-auto" role="img" aria-label="A request passes through auth, tenant filter, audit, and encryption to reach the PHI database; a separate path redacts data before it reaches the LLM">
+        <defs>
+          <marker id="a3" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9 z" fill="var(--ink-soft)"/></marker>
+        </defs>
+        <!-- request -->
+        <rect x="30" y="40" width="150" height="56" rx="12" fill="var(--ink)"/>
+        <text x="105" y="68" text-anchor="middle" dominant-baseline="middle" font-size="15" fill="#fff">Request</text>
+
+        <!-- stages -->
+        <g>
+          <rect x="220" y="34" width="200" height="68" rx="12" fill="#fff" stroke="var(--line)"/>
+          <text x="320" y="60" text-anchor="middle" font-size="14.5" font-weight="700" fill="var(--ink)">Auth gate</text>
+          <text x="320" y="82" text-anchor="middle" font-size="11.5" fill="var(--ink-soft)">JWT · lockout · RBAC</text>
+
+          <rect x="220" y="124" width="200" height="68" rx="12" fill="#fff" stroke="var(--rust)"/>
+          <text x="320" y="150" text-anchor="middle" font-size="14.5" font-weight="700" fill="var(--ink)">Tenant filter</text>
+          <text x="320" y="172" text-anchor="middle" font-size="11.5" fill="var(--rust)">+ WHERE broker_id</text>
+
+          <rect x="220" y="214" width="200" height="68" rx="12" fill="#fff" stroke="var(--teal)"/>
+          <text x="320" y="240" text-anchor="middle" font-size="14.5" font-weight="700" fill="var(--ink)">Audit log</text>
+          <text x="320" y="262" text-anchor="middle" font-size="11.5" fill="var(--teal)">append-only row</text>
+
+          <rect x="220" y="304" width="200" height="68" rx="12" fill="#fff" stroke="var(--line)"/>
+          <text x="320" y="330" text-anchor="middle" font-size="14.5" font-weight="700" fill="var(--ink)">Encryption</text>
+          <text x="320" y="352" text-anchor="middle" font-size="11.5" fill="var(--ink-soft)">AES-256-GCM</text>
+        </g>
+
+        <!-- request to stack -->
+        <path d="M180 68 C 196 68, 200 68, 218 68" stroke="var(--ink-soft)" stroke-width="2" fill="none" marker-end="url(#a3)"/>
+        <!-- chain down -->
+        <g stroke="var(--ink-soft)" stroke-width="2" fill="none" marker-end="url(#a3)">
+          <path d="M320 102 L 320 122"/>
+          <path d="M320 192 L 320 212"/>
+          <path d="M320 282 L 320 302"/>
+        </g>
+
+        <!-- db -->
+        <ellipse cx="600" cy="324" rx="58" ry="15" fill="var(--paper-2)" stroke="var(--teal)" stroke-width="2"/>
+        <path d="M542 324 L542 372 A58 15 0 0 0 658 372 L658 324" fill="var(--paper-2)" stroke="var(--teal)" stroke-width="2"/>
+        <text x="600" y="352" text-anchor="middle" font-size="13" fill="var(--ink)">healthflow.db</text>
+        <path d="M420 338 L 540 338" stroke="var(--teal)" stroke-width="2" fill="none" marker-end="url(#a3)"/>
+
+        <!-- redaction branch to LLM -->
+        <rect x="500" y="120" width="190" height="64" rx="12" fill="var(--paper)" stroke="var(--ink)" stroke-width="2"/>
+        <text x="595" y="146" text-anchor="middle" font-size="14" font-weight="700" fill="var(--ink)">PHI redaction</text>
+        <text x="595" y="167" text-anchor="middle" font-size="11.5" fill="var(--ink-soft)">PromptInput boundary</text>
+        <path d="M420 158 C 450 158, 470 152, 498 152" stroke="var(--ink-soft)" stroke-width="2" fill="none" marker-end="url(#a3)"/>
+
+        <rect x="740" y="116" width="190" height="72" rx="14" fill="var(--paper-2)" stroke="var(--teal)" stroke-width="2"/>
+        <text x="835" y="146" text-anchor="middle" font-size="15" font-weight="700" fill="var(--ink)">Claude</text>
+        <text x="835" y="168" text-anchor="middle" font-size="11.5" fill="var(--ink-soft)">de-identified only</text>
+        <path d="M690 152 L 738 152" stroke="var(--teal)" stroke-width="2" fill="none" marker-end="url(#a3)"/>
+
+        <!-- separate db note -->
+        <ellipse cx="835" cy="312" rx="74" ry="15" fill="#fff" stroke="var(--line)"/>
+        <path d="M761 312 L761 356 A74 15 0 0 0 909 356 L909 312" fill="#fff" stroke="var(--line)"/>
+        <text x="835" y="338" text-anchor="middle" font-size="12" fill="var(--ink-soft)">healthflow_data.db</text>
+        <text x="835" y="388" text-anchor="middle" font-size="11" fill="var(--ink-soft)">public reference data — never joined to PHI</text>
+      </svg></div>
+    </div>
+    <p class="text-sm text-[color:var(--ink-soft)] mt-4 max-w-3xl">
+      Two databases, deliberately unjoined: patient data in <span class="mono-tag">healthflow.db</span>,
+      public plan/ZIP reference data in <span class="mono-tag">healthflow_data.db</span>. Keeping them
+      separate is the data-classification boundary.
+    </p>
+  </div>
+</section>
+
+<!-- ============ CONCRETE EXAMPLE ============ -->
+<section class="section min-h-screen flex items-center">
+  <div class="max-w-5xl mx-auto px-6 py-20 md:py-24 w-full">
+    <p class="eyebrow mb-4">Proof it holds — a true story from this codebase</p>
+    <h2 class="serif text-4xl md:text-6xl mb-8 leading-tight">A whole pull request became unnecessary.</h2>
+    <div class="space-y-6 text-lg md:text-xl text-[color:var(--ink-soft)] leading-relaxed max-w-3xl">
+      <p>
+        A branch proposed careful fixes: hand-add <span class="mono-tag">Client.broker_id == broker.id</span>
+        to the history routes so one broker couldn't read another's patient names, and validate ownership
+        before writing a history row.
+      </p>
+      <p>
+        By the time it was reviewed, it was <span class="underline-rust">already redundant</span>. The session
+        filter had shipped — and it covers the exact column-select the branch was worried about
+        (<span class="mono-tag">select(Client.id, Client.full_name)</span>), and 404s a write that references
+        another broker's client.
+      </p>
+      <p class="text-ink" style="color:var(--ink)">
+        That is the architecture paying off: the protection was so thoroughly built into the foundation that
+        a targeted, hand-written fix had nothing left to do.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ WHAT TO DO NEXT ============ -->
+<section class="section min-h-screen flex items-center">
+  <div class="max-w-5xl mx-auto px-6 py-20 md:py-24 w-full">
+    <p class="eyebrow mb-4">If you add a new PHI table</p>
+    <h2 class="serif text-4xl md:text-6xl mb-6 leading-tight">Register it in three places.</h2>
+    <p class="text-lg md:text-xl text-[color:var(--ink-soft)] max-w-3xl mb-12 leading-relaxed">
+      The whole model rests on a table opting into the foundation. Miss a registry and the table silently
+      bypasses a protection — so this is the one checklist worth memorizing.
+    </p>
+
+    <ol class="space-y-5">
+      <li class="card rounded-2xl p-6 flex gap-5 items-start">
+        <span class="serif text-4xl rule leading-none">1</span>
+        <div>
+          <p class="font-semibold text-lg">Tenant scope</p>
+          <p class="text-[15px] md:text-base text-[color:var(--ink-soft)] mt-1">Add it to <span class="mono-tag">TENANT_SCOPED_MODELS</span> in <span class="mono-tag">tenant_filter.py</span> so its reads are auto-filtered by broker.</p>
+        </div>
+      </li>
+      <li class="card rounded-2xl p-6 flex gap-5 items-start">
+        <span class="serif text-4xl rule leading-none">2</span>
+        <div>
+          <p class="font-semibold text-lg">Audit it</p>
+          <p class="text-[15px] md:text-base text-[color:var(--ink-soft)] mt-1">Add it to <span class="mono-tag">_AUDITED_MODELS</span> in <span class="mono-tag">phi_audit.py</span> so every access lands in the append-only log.</p>
+        </div>
+      </li>
+      <li class="card rounded-2xl p-6 flex gap-5 items-start">
+        <span class="serif text-4xl rule leading-none">3</span>
+        <div>
+          <p class="font-semibold text-lg">Encrypt the sensitive columns</p>
+          <p class="text-[15px] md:text-base text-[color:var(--ink-soft)] mt-1">Wrap PHI columns in <span class="mono-tag">EncryptedString</span> / <span class="mono-tag">EncryptedJSON</span> and list them in the re-encryption sweep. Decide explicitly: encrypted, or a queryable quasi-identifier.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="mt-14 border-t pt-8" style="border-color:var(--line)">
+      <p class="serif text-2xl md:text-3xl leading-snug max-w-3xl">
+        The takeaway: <span class="rule italic">good security here is something you opt out of, not something you remember to opt into.</span>
+      </p>
+      <p class="text-sm text-[color:var(--ink-soft)] mt-6">HealthFlow · security-by-construction · explainer artifact</p>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
