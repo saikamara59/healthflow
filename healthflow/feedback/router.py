@@ -1,15 +1,20 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from healthflow.auth.dependencies import get_current_broker
+from healthflow.auth.dependencies import get_current_broker, require_admin
 from healthflow.database.config import get_db
 from healthflow.database.models import Broker
 from healthflow.feedback.collector import FeedbackCollector
+from healthflow.feedback.prompt_updater import PromptUpdater
 from healthflow.feedback.reward_model import RewardModel
 from healthflow.models.schemas import (
+    CreateVariantRequest,
     FeedbackAnalytics,
     FeedbackCreate,
     FeedbackResponse,
+    GeneratePromptRequest,
+    GeneratePromptResponse,
+    PromptVariantResponse,
     WeeklyReport,
 )
 
@@ -17,6 +22,7 @@ feedback_router = APIRouter(prefix="/feedback", tags=["feedback"])
 
 collector = FeedbackCollector()
 reward_model = RewardModel()
+prompt_updater = PromptUpdater()
 
 
 @feedback_router.post("", response_model=FeedbackResponse, status_code=201)
@@ -105,3 +111,47 @@ async def get_weekly_report(
 ):
     """Get the weekly feedback summary report."""
     return await reward_model.score_outputs(db=db, days=7)
+
+
+@feedback_router.post("/generate-prompt", response_model=GeneratePromptResponse)
+async def generate_prompt(
+    body: GeneratePromptRequest,
+    _admin: Broker = Depends(require_admin),  # cross-broker read → admin only
+    db: AsyncSession = Depends(get_db),
+):
+    """Assemble few-shot examples from the top-rated outputs for an agent.
+
+    Read-only: builds the example block but does NOT change any live prompt.
+    The admin reviews the output, then feeds it into POST /feedback/variants.
+    """
+    few_shot = await prompt_updater.generate_few_shot(
+        db, body.agent_type, top_n=body.top_n
+    )
+    return GeneratePromptResponse(
+        agent_type=body.agent_type,
+        top_n=body.top_n,
+        few_shot=few_shot,
+    )
+
+
+@feedback_router.post("/variants", response_model=PromptVariantResponse, status_code=201)
+async def create_variant(
+    body: CreateVariantRequest,
+    _admin: Broker = Depends(require_admin),  # mutates global routing → admin only
+    db: AsyncSession = Depends(get_db),
+):
+    """Roll out a new prompt variant at `traffic_pct`%, shrinking existing
+    active variants proportionally. Affects ALL brokers' traffic for this agent.
+    """
+    variant = await prompt_updater.create_variant(
+        db, body.agent_type, body.prompt_template, traffic_pct=body.traffic_pct
+    )
+    await db.commit()  # persist new row + the re-weighted siblings
+    return PromptVariantResponse(
+        id=str(variant.id),
+        agent_type=variant.agent_type,
+        variant_name=variant.variant_name,
+        traffic_pct=variant.traffic_pct,
+        is_active=variant.is_active,
+        created_at=variant.created_at.isoformat(),
+    )

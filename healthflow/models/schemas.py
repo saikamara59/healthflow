@@ -566,6 +566,56 @@ class WeeklyReport(BaseModel):
     bottom_output_ids: list[str]
 
 
+# ── RLHF prompt-update schemas (admin-only) ────────────────────────────────
+
+
+class GeneratePromptRequest(BaseModel):
+    agent_type: str = Field(..., description="Agent to build few-shot examples for")
+    top_n: int = Field(default=3, ge=1, le=10, description="How many top-rated outputs to include")
+
+    @field_validator("agent_type")
+    @classmethod
+    def validate_agent_type(cls, v: str) -> str:
+        if v not in VALID_AGENT_TYPES:
+            raise ValueError(
+                f"agent_type must be one of: {', '.join(sorted(VALID_AGENT_TYPES))}"
+            )
+        return v
+
+
+class GeneratePromptResponse(BaseModel):
+    agent_type: str
+    top_n: int
+    few_shot: str  # assembled examples block; "" when no rated outputs exist yet
+
+
+class CreateVariantRequest(BaseModel):
+    agent_type: str = Field(..., description="Agent this prompt variant serves")
+    prompt_template: str = Field(..., min_length=1, max_length=20000)
+    # 1–95: a variant at 0% never routes; at 100% it isn't an A/B test.
+    traffic_pct: int = Field(default=20, ge=1, le=95, description="Share of traffic for the new variant")
+
+    @field_validator("agent_type")
+    @classmethod
+    def validate_agent_type(cls, v: str) -> str:
+        if v not in VALID_AGENT_TYPES:
+            raise ValueError(
+                f"agent_type must be one of: {', '.join(sorted(VALID_AGENT_TYPES))}"
+            )
+        return v
+
+
+class PromptVariantResponse(BaseModel):
+    id: str
+    agent_type: str
+    variant_name: str
+    traffic_pct: int
+    is_active: bool
+    created_at: str
+    # prompt_template intentionally omitted to keep the response lightweight;
+    # add a detail endpoint if the UI needs the full text.
+
+
 class DrugMatchModel(BaseModel):
     rxcui: str = Field(..., description="RxNorm canonical drug identifier")
     name: str = Field(..., description="Human-readable drug name")
