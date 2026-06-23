@@ -164,7 +164,7 @@ async def test_reward_score_forbidden_for_non_admin(
 
 @pytest.mark.anyio
 async def test_weekly_report(client: AsyncClient, db_session: AsyncSession):
-    _, token = await _create_broker_and_token(db_session)
+    _, token = await _create_broker_and_token(db_session, role="admin")
 
     resp = await client.get(
         "/feedback/weekly-report",
@@ -174,6 +174,18 @@ async def test_weekly_report(client: AsyncClient, db_session: AsyncSession):
     data = resp.json()
     assert "worst_agent" in data
     assert "best_agent" in data
+
+
+@pytest.mark.anyio
+async def test_weekly_report_forbidden_for_non_admin(
+    client: AsyncClient, db_session: AsyncSession
+):
+    _, token = await _create_broker_and_token(db_session, role="broker")
+    resp = await client.get(
+        "/feedback/weekly-report",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 403
 
 
 @pytest.mark.anyio

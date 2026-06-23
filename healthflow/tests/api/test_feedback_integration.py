@@ -111,7 +111,8 @@ async def test_ab_variant_routing(db_session: AsyncSession):
 @pytest.mark.anyio
 async def test_weekly_report_with_mixed_feedback(client: AsyncClient, db_session: AsyncSession):
     """Weekly report with a mix of high and low feedback across agents."""
-    broker, token = await _create_broker_and_token(db_session)
+    # admin: weekly-report is admin-gated; admins can also submit feedback.
+    broker, token = await _create_broker_and_token(db_session, role="admin")
     headers = {"Authorization": f"Bearer {token}"}
 
     # High-quality compare feedback
