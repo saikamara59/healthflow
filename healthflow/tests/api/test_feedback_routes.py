@@ -7,7 +7,7 @@ from healthflow.database.models import Broker
 from healthflow.auth.security import hash_password, create_access_token
 
 
-async def _create_broker_and_token(db: AsyncSession):
+async def _create_broker_and_token(db: AsyncSession, role: str = "broker"):
     """Helper: create a broker and return (broker, access_token)."""
     broker_id = uuid.uuid4()
     broker = Broker(
@@ -15,6 +15,7 @@ async def _create_broker_and_token(db: AsyncSession):
         email=f"route-{broker_id.hex[:6]}@test.com",
         hashed_password=hash_password("testpass123"),
         full_name="Route Tester",
+        role=role,
     )
     db.add(broker)
     await db.commit()
@@ -132,7 +133,7 @@ async def test_get_analytics(client: AsyncClient, db_session: AsyncSession):
 
 @pytest.mark.anyio
 async def test_reward_score(client: AsyncClient, db_session: AsyncSession):
-    _, token = await _create_broker_and_token(db_session)
+    _, token = await _create_broker_and_token(db_session, role="admin")
     await client.post(
         "/feedback",
         json={"output_id": "r1", "agent_type": "compare", "accuracy": 5, "clarity": 5, "helpfulness": 5},
@@ -147,6 +148,18 @@ async def test_reward_score(client: AsyncClient, db_session: AsyncSession):
     data = resp.json()
     assert "agents" in data
     assert "overall_avg" in data
+
+
+@pytest.mark.anyio
+async def test_reward_score_forbidden_for_non_admin(
+    client: AsyncClient, db_session: AsyncSession
+):
+    _, token = await _create_broker_and_token(db_session, role="broker")
+    resp = await client.post(
+        "/feedback/reward-score",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 403
 
 
 @pytest.mark.anyio

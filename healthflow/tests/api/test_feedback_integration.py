@@ -8,13 +8,14 @@ from healthflow.auth.security import hash_password, create_access_token
 from healthflow.feedback.prompt_updater import PromptUpdater
 
 
-async def _create_broker_and_token(db: AsyncSession):
+async def _create_broker_and_token(db: AsyncSession, role: str = "broker"):
     broker_id = uuid.uuid4()
     broker = Broker(
         id=broker_id,
         email=f"integ-{broker_id.hex[:6]}@test.com",
         hashed_password=hash_password("testpass123"),
         full_name="Integration Tester",
+        role=role,
     )
     db.add(broker)
     await db.commit()
@@ -25,7 +26,8 @@ async def _create_broker_and_token(db: AsyncSession):
 @pytest.mark.anyio
 async def test_end_to_end_feedback_to_report(client: AsyncClient, db_session: AsyncSession):
     """Submit feedback -> get analytics -> run reward score -> verify report."""
-    broker, token = await _create_broker_and_token(db_session)
+    # admin: reward-score is admin-gated; admins can also submit feedback.
+    broker, token = await _create_broker_and_token(db_session, role="admin")
     headers = {"Authorization": f"Bearer {token}"}
 
     # Step 1: Submit feedback for multiple agents

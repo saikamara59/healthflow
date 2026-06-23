@@ -97,7 +97,7 @@ async def get_analytics(
 @feedback_router.post("/reward-score", response_model=WeeklyReport)
 async def trigger_reward_score(
     days: int = Query(7, ge=1, le=365),
-    broker: Broker = Depends(get_current_broker),
+    _admin: Broker = Depends(require_admin),  # aggregates feedback cross-broker
     db: AsyncSession = Depends(get_db),
 ):
     """Trigger the reward model scoring pipeline."""
