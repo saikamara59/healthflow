@@ -106,7 +106,7 @@ async def trigger_reward_score(
 
 @feedback_router.get("/weekly-report", response_model=WeeklyReport)
 async def get_weekly_report(
-    broker: Broker = Depends(get_current_broker),
+    _admin: Broker = Depends(require_admin),  # same cross-broker read as reward-score
     db: AsyncSession = Depends(get_db),
 ):
     """Get the weekly feedback summary report."""
