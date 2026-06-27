@@ -76,6 +76,10 @@ dev: ## Start backend dev server
 frontend: ## Start frontend dev server
 	cd frontend && npm run dev
 
+frontend-restart: ## Kill any stale vite server on :5173 then start fresh
+	-lsof -ti:5173 | xargs kill 2>/dev/null || true
+	cd frontend && npm run dev
+
 build: ## Build frontend for production
 	cd frontend && npm run build
 
