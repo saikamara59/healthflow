@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import BrandLogo from '../components/ui/BrandLogo'
-import '../home.css'
+import BrandWordmark from '../components/ui/BrandWordmark'
+import '../home-v2.css'
+import '../login-v2.css'
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -18,10 +20,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [remember, setRemember] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const switchMode = (register) => {
+    setIsRegisterMode(register)
+    setError('')
+    setInfo('')
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -56,244 +63,186 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative min-h-screen flex items-stretch bg-surface font-body text-on-surface overflow-hidden">
-      {/* Left Hero Panel — Full bleed image with gradient overlay */}
-      <div className="hidden lg:flex lg:w-7/12 relative overflow-hidden items-end p-20">
-        <div className="absolute inset-0 z-0">
-          <img
-            className="w-full h-full object-cover"
-            alt="Modern clinical research laboratory with soft blue ambient lighting"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuD225ctF3FHD6AVLvzEyrb5yp0zvYv-YLH7SuMFTzxiBvP0JUOQjy-hOWLDBfLf52WR3GCPH_6f2eVNAprPK1Gt1MoL4-29BXCxmPCDadtJHsK8kKwjP9ej7DAC5cPAuWcbhzbNBBhjqLxDpqSnzP8pW-3hiewkm965x0DrTyi4pXql9xOvib_9WzaVlU7QeIMKBelVhBOvtqGQtytul5S50AHViU--CQe_HLOnstl1CWRimZGb-RD502KLYdnC-CvR5AFJHw66-og"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-primary/90 via-primary/20 to-transparent"></div>
-        </div>
-
-        <div className="relative z-10 max-w-xl">
-          <div className="flex items-center gap-3 mb-8">
-            <BrandLogo size={48} />
-            <span className="font-logo text-3xl tracking-tighter text-white">HealthFlow</span>
-          </div>
-
-          <h1 className="font-headline text-5xl font-bold text-white leading-tight mb-6 tracking-tight">
-            Advancing precision medicine with editorial clarity.
-          </h1>
-
-          <p className="text-white/80 text-xl font-light leading-relaxed mb-8">
-            Access the institutional HealthFlow gateway for clinical curation, patient management, and diagnostic oversight.
-          </p>
-
-          <div className="flex gap-4 items-center text-white/90 text-sm tracking-widest font-label">
-            <span className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-xs">verified_user</span> INSTITUTIONAL GRADE
-            </span>
-            <span className="w-1.5 h-1.5 rounded-full bg-secondary"></span>
-            <span className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-xs">encrypted</span> END-TO-END SECURE
-            </span>
-          </div>
-        </div>
+    <div className="lp glassui auth-stage">
+      {/* aurora backdrop — same engine as the v2 landing */}
+      <div className="aurora" aria-hidden="true">
+        <span className="blob b1"></span>
+        <span className="blob b2"></span>
+        <span className="blob b3"></span>
+        <span className="blob b4"></span>
+        <span className="grain"></span>
       </div>
 
-      {/* Right Form Panel */}
-      <div className="w-full lg:w-5/12 flex items-center justify-center p-8 bg-surface-container-lowest">
-        <div className="w-full max-w-md space-y-12">
-          {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-3 mb-12">
-            <BrandLogo size={32} />
-            <span className="font-logo text-2xl tracking-tighter text-primary">HealthFlow</span>
+      {/* top bar */}
+      <nav className="auth-topbar">
+        <Link className="lp-logo" to="/">
+          <BrandLogo size={30} className="mk" />
+          <BrandWordmark className="wm" />
+        </Link>
+        <Link className="auth-back" to="/">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M11 19l-7-7 7-7" /></svg>
+          Back to site
+        </Link>
+      </nav>
+
+      <main className="auth-main">
+        <div className="auth-card glass-panel">
+          {/* mode toggle */}
+          <div className="auth-switch">
+            <span
+              className="auth-switch-pill"
+              style={{ transform: isRegisterMode ? 'translateX(100%)' : 'translateX(0)' }}
+            />
+            <button
+              type="button"
+              className={`auth-switch-btn ${!isRegisterMode ? 'on' : ''}`}
+              onClick={() => switchMode(false)}
+            >
+              Sign in
+            </button>
+            <button
+              type="button"
+              className={`auth-switch-btn ${isRegisterMode ? 'on' : ''}`}
+              onClick={() => switchMode(true)}
+            >
+              Sign up
+            </button>
           </div>
 
-          {/* Heading */}
-          <div className="space-y-4">
-            <h2 className="font-headline text-4xl font-bold text-primary tracking-tight">
-              {isRegisterMode ? 'Create Account' : 'Sign In'}
-            </h2>
-            <p className="text-on-surface-variant font-body">
-              {isRegisterMode
-                ? 'Set up your broker account to get started.'
-                : 'Welcome to HealthFlow Institutional Access.'}
-            </p>
-          </div>
-
-          {/* Error */}
           {error && (
-            <div className="p-4 bg-error-container rounded-xl">
-              <p className="text-sm text-on-error-container">{error}</p>
+            <div className="auth-alert err" role="alert">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="M12 8v5M12 16h.01" /></svg>
+              <span>{error}</span>
             </div>
           )}
-
-          {/* Info (e.g. account-pending-approval after register) */}
           {info && (
-            <div className="p-4 bg-primary-container rounded-xl">
-              <p className="text-sm text-on-primary-container">{info}</p>
+            <div className="auth-alert ok" role="status">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+              <span>{info}</span>
             </div>
           )}
 
-          {/* Form */}
-          <form className="space-y-8" onSubmit={handleSubmit}>
-            <div className="space-y-6">
-              {isRegisterMode && (
-                <div className="relative group">
-                  <label
-                    className="block text-xs font-label uppercase tracking-[0.05em] text-on-surface-variant mb-2 ml-1"
-                    htmlFor="fullName"
-                  >
-                    Full Name
-                  </label>
-                  <div className="relative flex items-center">
-                    <input
-                      className="w-full bg-surface-container-low border-none border-b-2 border-transparent focus:border-primary focus:ring-0 rounded-lg px-4 py-4 font-body transition-all group-hover:bg-surface-container placeholder:text-outline/50"
-                      id="fullName"
-                      placeholder="Dr. Sarah Vance"
-                      type="text"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      required
-                    />
-                    <span className="material-symbols-outlined absolute right-4 text-outline group-hover:text-primary transition-colors">
-                      person
-                    </span>
-                  </div>
-                </div>
-              )}
+          <form className="auth-form" onSubmit={handleSubmit}>
+            <div className="auth-eyebrow">{isRegisterMode ? 'Request access' : 'Welcome back'}</div>
+            <h1 className="auth-title">
+              {isRegisterMode ? 'Create your workspace' : 'Sign in to your workspace'}
+            </h1>
+            <p className="auth-sub">
+              {isRegisterMode
+                ? 'For licensed Medicare brokers and agencies.'
+                : 'Pick up right where you left off.'}
+            </p>
 
-              <div className="relative group">
-                <label
-                  className="block text-xs font-label uppercase tracking-[0.05em] text-on-surface-variant mb-2 ml-1"
-                  htmlFor="email"
-                >
-                  Work Email
-                </label>
-                <div className="relative flex items-center">
+            {isRegisterMode && (
+              <div className="g-field">
+                <label htmlFor="su-name">Full name</label>
+                <div className="g-input">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 20a8 8 0 0 1 16 0" /></svg>
                   <input
-                    className="w-full bg-surface-container-low border-none border-b-2 border-transparent focus:border-primary focus:ring-0 rounded-lg px-4 py-4 font-body transition-all group-hover:bg-surface-container placeholder:text-outline/50"
-                    id="email"
-                    placeholder="dr.smith@healthflow.work"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    id="su-name"
+                    type="text"
+                    placeholder="Jordan Avery"
+                    autoComplete="name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
                     required
                   />
-                  <span className="material-symbols-outlined absolute right-4 text-outline group-hover:text-primary transition-colors">
-                    alternate_email
-                  </span>
                 </div>
               </div>
+            )}
 
-              <div className="relative group">
-                <div className="flex justify-between items-end mb-2 ml-1">
-                  <label
-                    className="block text-xs font-label uppercase tracking-[0.05em] text-on-surface-variant"
-                    htmlFor="password"
-                  >
-                    Credentials
-                  </label>
-                  {!isRegisterMode && (
-                    <a className="text-xs font-medium text-secondary hover:text-primary transition-colors" href="#">
-                      Recover Password
-                    </a>
-                  )}
-                </div>
-                <div className="relative flex items-center">
-                  <input
-                    className="w-full bg-surface-container-low border-none border-b-2 border-transparent focus:border-primary focus:ring-0 rounded-lg px-4 py-4 font-body transition-all group-hover:bg-surface-container placeholder:text-outline/50"
-                    id="password"
-                    placeholder="••••••••••••"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={8}
-                  />
-                  <span
-                    className="material-symbols-outlined absolute right-4 text-outline group-hover:text-primary transition-colors cursor-pointer"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? 'visibility_off' : 'visibility'}
-                  </span>
-                </div>
-
-                {isRegisterMode && (
-                  <div className="mt-3 ml-1 text-xs text-on-surface-variant">
-                    <p className="mb-1.5 font-medium">Password requirements</p>
-                    <ul className="space-y-1 list-disc list-inside">
-                      <li>At least 12 characters long</li>
-                      <li>Mix of letters and at least one number</li>
-                      <li>At least one symbol (e.g. ! ? @ # $)</li>
-                      <li>Not a commonly used password</li>
-                    </ul>
-                  </div>
-                )}
+            <div className="g-field">
+              <label htmlFor="email">Work email</label>
+              <div className="g-input">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg>
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="you@agency.com"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
               </div>
             </div>
 
-            {/* Remember checkbox */}
-            <div className="flex items-center gap-3">
-              <input
-                className="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary/20"
-                id="remember"
-                type="checkbox"
-                checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
-              />
-              <label className="text-sm text-on-surface-variant font-medium cursor-pointer" htmlFor="remember">
-                Remember this workstation for 30 days
+            <div className="g-field">
+              <label htmlFor="password">
+                Password
+                {!isRegisterMode && <a href="#">Forgot?</a>}
               </label>
+              <div className="g-input">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder={isRegisterMode ? 'Create a password' : '••••••••••'}
+                  autoComplete={isRegisterMode ? 'new-password' : 'current-password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={isRegisterMode ? 12 : 8}
+                />
+                <button
+                  type="button"
+                  className="g-eye"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => setShowPassword((s) => !s)}
+                >
+                  {showPassword ? (
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9.9 4.24A9 9 0 0 1 12 4c7 0 10 8 10 8a18 18 0 0 1-2.16 3.19M6.6 6.6A18 18 0 0 0 2 12s3 8 10 8a9 9 0 0 0 5.4-1.6" /><path d="m2 2 20 20" /></svg>
+                  ) : (
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-8 10-8 10 8 10 8-3 8-10 8-10-8-10-8Z" /><circle cx="12" cy="12" r="3" /></svg>
+                  )}
+                </button>
+              </div>
             </div>
 
-            {/* Submit — uses the same gradient CTA as the landing page */}
-            <div className="space-y-4">
-              <button
-                className="brand-btn brand-btn-lg"
-                style={{ width: '100%', justifyContent: 'center' }}
-                type="submit"
-                disabled={loading}
-              >
-                {loading ? (
-                  'Processing…'
-                ) : (
-                  <>
-                    {isRegisterMode ? 'Create account' : 'Sign in'}
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M5 12h14M13 5l7 7-7 7" />
-                    </svg>
-                  </>
-                )}
-              </button>
-            </div>
+            {isRegisterMode && (
+              <div className="auth-reqs">
+                <p>Password requirements</p>
+                <ul>
+                  <li>At least 12 characters long</li>
+                  <li>Mix of letters and at least one number</li>
+                  <li>At least one symbol (e.g. ! ? @ # $)</li>
+                  <li>Not a commonly used password</li>
+                </ul>
+              </div>
+            )}
+
+            {isRegisterMode && (
+              <label className="g-check">
+                <input type="checkbox" required />
+                <span>I'm a licensed agent and agree to the <a href="#">Terms</a> &amp; <a href="#">Privacy Policy</a>.</span>
+              </label>
+            )}
+
+            <button className="lp-btn lg auth-submit" type="submit" disabled={loading}>
+              {loading ? (
+                'Processing…'
+              ) : (
+                <>
+                  {isRegisterMode ? 'Create workspace' : 'Sign in'}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
+                </>
+              )}
+            </button>
           </form>
 
-          {/* Toggle register/login */}
-          <div className="pt-8 text-center">
-            <p className="text-sm text-on-surface-variant">
-              {isRegisterMode ? 'Already have an account? ' : 'New institutional client? '}
-              <button
-                className="text-secondary font-bold hover:underline"
-                onClick={() => {
-                  setIsRegisterMode(!isRegisterMode)
-                  setError('')
-                }}
-              >
-                {isRegisterMode ? 'Sign in' : 'Request access'}
-              </button>
-            </p>
-          </div>
-
-          {/* Footer links */}
-          <div className="pt-12 flex flex-wrap gap-x-6 gap-y-2 opacity-50">
-            <a className="text-[10px] font-label uppercase tracking-widest hover:opacity-100" href="#">Privacy Protocol</a>
-            <a className="text-[10px] font-label uppercase tracking-widest hover:opacity-100" href="#">Security Terms</a>
-            <a className="text-[10px] font-label uppercase tracking-widest hover:opacity-100" href="#">Help Desk</a>
-            <span className="text-[10px] font-label uppercase tracking-widest ml-auto">V.2.4.0</span>
+          {/* trust footer inside card */}
+          <div className="auth-trust">
+            <span className="stars" aria-hidden="true">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <svg key={i} width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
+              ))}
+            </span>
+            <span>4.9 from 1,200+ brokers</span>
+            <span className="sep"></span>
+            <span>SOC&nbsp;2 · HIPAA</span>
           </div>
         </div>
-      </div>
-
-      {/* Network status indicator */}
-      <div className="fixed bottom-12 right-12 flex items-center gap-4 bg-white/85 backdrop-blur-[16px] p-3 rounded-full border border-white/20 shadow-2xl z-50">
-        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-        <span className="text-xs font-medium text-primary tracking-wide pr-2">HealthFlow Network: Active</span>
-      </div>
-    </main>
+      </main>
+    </div>
   )
 }
