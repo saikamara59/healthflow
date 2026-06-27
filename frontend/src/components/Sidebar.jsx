@@ -5,6 +5,7 @@ import api from '../api/client';
 import Icon from './ui/Icon';
 import Avatar from './ui/Avatar';
 import BrandLogo from './ui/BrandLogo';
+import BrandWordmark from './ui/BrandWordmark';
 
 const NAV = [
   {
@@ -100,7 +101,7 @@ export default function Sidebar({ open, onClose }) {
       <aside className={`side ${open ? 'open' : ''}`}>
         <div className="brand">
           <BrandLogo size={28} />
-          <span className="brand-name">HealthFlow</span>
+          <BrandWordmark className="brand-name" />
           <span className="brand-tag">v3</span>
         </div>
 
