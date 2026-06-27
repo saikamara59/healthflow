@@ -378,7 +378,24 @@ html[data-mode="dark"] .brand-mark {
 }
 .brand-mark svg { display: block; }
 .brand-name {
-  font-family: var(--serif); font-size: 22px; letter-spacing: -0.015em;
+  font-size: 19px;
+}
+
+/* v2 wordmark — "Health" inherits color, "Flow" carries the brand gradient.
+   Rendered by the BrandWordmark component; reused in sidebar, login, landing. */
+.hf-wordmark {
+  font-family: 'Space Grotesk', var(--sans);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: inherit;
+  white-space: nowrap;
+  filter: drop-shadow(0 1px 2px oklch(0.3 0.04 230 / 0.22));
+}
+.hf-wordmark-flow {
+  background: linear-gradient(135deg, oklch(0.65 0.15 185) 0%, oklch(0.55 0.14 200) 55%, oklch(0.46 0.13 215) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .brand-tag {
   font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.14em;

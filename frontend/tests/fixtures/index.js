@@ -71,12 +71,12 @@ export const test = base.extend({
       const credsToUse = creds ?? workerBroker
       await page.goto('/login')
       await page.getByLabel(/work email/i).fill(credsToUse.email)
-      await page.getByLabel(/credentials/i).fill(credsToUse.password)
-      // Submit label was "Authenticate" — renamed to "Sign in" with the
-      // brand-button refresh. Wait for /dashboard since / now serves the
-      // public landing page when logged out and redirects to the workspace
-      // when logged in.
-      await page.getByRole('button', { name: /^sign in$/i }).click()
+      await page.locator('#password').fill(credsToUse.password)
+      // Scope to the form: the v2 glass login also renders a "Sign in" tab in
+      // the sign in / sign up toggle (outside the form), so a page-level
+      // getByRole would match two buttons. Wait for /dashboard since / now
+      // serves the public landing page when logged out.
+      await page.locator('form').getByRole('button', { name: /^sign in$/i }).click()
       await page.waitForURL(/\/dashboard$/)
     })
   },
