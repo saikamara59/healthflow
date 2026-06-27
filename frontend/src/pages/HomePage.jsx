@@ -69,6 +69,30 @@ function IoRows({ rows }) {
   ));
 }
 
+// A short history of the insurance claim — milestone cards on a timeline rail.
+const HISTORY = [
+  {
+    year: '1752', title: 'The first policies',
+    desc: 'Benjamin Franklin co-founds the Philadelphia Contributionship — the oldest U.S. insurer still operating. Homes earned a metal "fire mark"; that badge was the original proof of claim.',
+  },
+  {
+    year: '1850', title: 'Health enters the picture',
+    desc: 'The Franklin Health Assurance Co. of Massachusetts writes the first accident-and-health policies in America — coverage for the body, not just the building.',
+  },
+  {
+    year: '1929', title: 'The Blue Cross blueprint',
+    desc: 'A Dallas hospital offers 1,500 schoolteachers 21 days of care for 50¢ a month. That experiment became the group-health model the entire industry still runs on.',
+  },
+  {
+    year: '1965', title: 'Medicare & Medicaid',
+    desc: 'Signed into law in a single afternoon. Former president Harry Truman receives the very first Medicare card — and 19 million Americans gain coverage in one year.',
+  },
+  {
+    year: '2010', title: 'No more "pre-existing"', accent: true,
+    desc: <>The Affordable Care Act bars insurers from denying coverage for prior conditions — and makes documenting <em>why</em> a claim was decided a legal expectation, not a courtesy.</>,
+  },
+];
+
 // Vimeo video ID for the product demo (the number in vimeo.com/123456789).
 const VIMEO_ID = '1197158139';
 
@@ -166,10 +190,10 @@ export default function HomePage() {
           </a>
           <div className="lp-navlinks">
             <a href="#system" onClick={(e) => scrollToId(e, 'system')}>System</a>
+            <a href="#history" onClick={(e) => scrollToId(e, 'history')}>History</a>
             <a href="#agents" onClick={(e) => scrollToId(e, 'agents')}>Agents</a>
             <a href="#regulated" onClick={(e) => scrollToId(e, 'regulated')}>Compliance</a>
             <a href="#demo" onClick={(e) => scrollToId(e, 'demo')}>Demo</a>
-            <a href="#how" onClick={(e) => scrollToId(e, 'how')}>How it works</a>
           </div>
           <div className="lp-nav-cta">
             <Link to="/login">Sign in</Link>
@@ -298,10 +322,38 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ================= HISTORY OF THE CLAIM ================= */}
+      <section className="lp-section lp-history" id="history">
+        <div className="lp-wrap">
+          <div className="sec-marker reveal"><span className="idx">02</span> <span className="ln"></span> A short history of the claim</div>
+          <h2 className="sec-title reveal">The insurance claim is 270 years old. The paperwork shows it.</h2>
+          <p className="sec-lead reveal">Every safeguard in modern coverage was written after something went wrong. Knowing how we got here is the fastest way to understand why a recommendation needs a paper trail.</p>
+
+          <div className="hist-rail reveal">
+            <div className="hist-line" aria-hidden="true"></div>
+            {HISTORY.map((h) => (
+              <article className={`hist-card glass-panel ${h.accent ? 'accent' : ''}`} key={h.year}>
+                <div className="hc-year">{h.year}</div>
+                <div className="hc-dot" aria-hidden="true"></div>
+                <div className="hc-title">{h.title}</div>
+                <p className="hc-desc">{h.desc}</p>
+              </article>
+            ))}
+          </div>
+
+          <div className="hist-memo glass-panel reveal">
+            <div className="hm-mark" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M12 8v4l3 2" /><circle cx="12" cy="12" r="9" /></svg>
+            </div>
+            <p className="hm-text"><strong>The takeaway:</strong> for 270 years, the hard part was never the recommendation — it was proving, later, that the recommendation was sound. That's the exact problem HealthFlow is built to solve.</p>
+          </div>
+        </div>
+      </section>
+
       {/* ================= AGENT SYSTEM ================= */}
       <section className="lp-section" id="agents">
         <div className="lp-wrap">
-          <div className="sec-marker reveal"><span className="idx">02</span> <span className="ln"></span> The agent system</div>
+          <div className="sec-marker reveal"><span className="idx">03</span> <span className="ln"></span> The agent system</div>
           <h2 className="sec-title reveal">Five specialized agents. One orchestrated workflow.</h2>
           <p className="sec-lead reveal">Each agent does one job well and hands off through the orchestrator — not a single model guessing at everything. Every input and output is typed, grounded, and logged.</p>
 
@@ -352,7 +404,7 @@ export default function HomePage() {
       {/* ================= REGULATED ENVIRONMENTS ================= */}
       <section className="lp-section lp-reg" id="regulated">
         <div className="lp-wrap">
-          <div className="sec-marker reveal"><span className="idx">03</span> <span className="ln"></span> Built for regulated environments</div>
+          <div className="sec-marker reveal"><span className="idx">04</span> <span className="ln"></span> Built for regulated environments</div>
           <h2 className="sec-title reveal">The part most AI tools skip.</h2>
           <p className="sec-lead reveal">PHI doesn't tolerate "move fast and break things." The architecture is the product: forensic logging, data minimization, and hard tenant boundaries — not features bolted on after a breach.</p>
 
@@ -402,7 +454,7 @@ export default function HomePage() {
       {/* ================= HOW IT WORKS ================= */}
       <section className="lp-section" id="how">
         <div className="lp-wrap">
-          <div className="sec-marker reveal"><span className="idx">04</span> <span className="ln"></span> How it works</div>
+          <div className="sec-marker reveal"><span className="idx">05</span> <span className="ln"></span> How it works</div>
           <h2 className="sec-title reveal">From a client's situation to a recommendation that holds up.</h2>
           <div className="steps reveal">
             <div className="step glass-panel">
@@ -432,7 +484,7 @@ export default function HomePage() {
       {/* ================= DEMO ================= */}
       <section className="lp-section lp-demo" id="demo">
         <div className="lp-wrap">
-          <div className="sec-marker reveal"><span className="idx">05</span> <span className="ln"></span> See it in action</div>
+          <div className="sec-marker reveal"><span className="idx">06</span> <span className="ln"></span> See it in action</div>
           <h2 className="sec-title reveal">Watch a recommendation come together.</h2>
           <p className="sec-lead reveal">A short walkthrough — from a client's intake to a ranked plan, a plain-English benefit answer, and a signed entry in the audit log.</p>
 
