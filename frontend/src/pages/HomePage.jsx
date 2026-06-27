@@ -69,6 +69,49 @@ function IoRows({ rows }) {
   ));
 }
 
+// Vimeo video ID for the product demo (the number in vimeo.com/123456789).
+const VIMEO_ID = '1197158139';
+
+// Click-to-load Vimeo facade: shows a poster + play button and loads NOTHING
+// from Vimeo until a visitor clicks — zero third-party bytes or tracking on
+// page load. dnt=1 asks Vimeo not to track.
+function DemoVideoFrame() {
+  const [playing, setPlaying] = useState(false);
+  return (
+    <figure className="video-frame glass-panel reveal">
+      <div className="vf-chrome">
+        <span className="vf-dot"></span><span className="vf-dot"></span><span className="vf-dot"></span>
+        <span className="vf-url">app.healthflow.work — product demo</span>
+      </div>
+      <div className="vf-stage">
+        {playing ? (
+          <iframe
+            className="vf-video"
+            style={{ border: 0 }}
+            src={`https://player.vimeo.com/video/${VIMEO_ID}?autoplay=1&dnt=1&title=0&byline=0&portrait=0`}
+            title="HealthFlow product demo"
+            allow="autoplay; fullscreen; picture-in-picture"
+            allowFullScreen
+          />
+        ) : (
+          <button
+            className="vf-placeholder"
+            type="button"
+            onClick={() => setPlaying(true)}
+            aria-label="Play demo video"
+          >
+            <span className="vf-play">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+            </span>
+            <span className="vf-ph-title">Watch the product demo</span>
+            <span className="vf-ph-desc">Click to play — streamed from Vimeo, loaded only on demand.</span>
+          </button>
+        )}
+      </div>
+    </figure>
+  );
+}
+
 export default function HomePage() {
   const [active, setActive] = useState('compare');
   const a = AGENTS.find((x) => x.key === active);
@@ -393,21 +436,7 @@ export default function HomePage() {
           <h2 className="sec-title reveal">Watch a recommendation come together.</h2>
           <p className="sec-lead reveal">A short walkthrough — from a client's intake to a ranked plan, a plain-English benefit answer, and a signed entry in the audit log.</p>
 
-          <figure className="video-frame glass-panel reveal">
-            <div className="vf-chrome">
-              <span className="vf-dot"></span><span className="vf-dot"></span><span className="vf-dot"></span>
-              <span className="vf-url">app.healthflow.work — product demo</span>
-            </div>
-            <div className="vf-stage">
-              <div className="vf-placeholder">
-                <span className="vf-play">
-                  <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
-                </span>
-                <span className="vf-ph-title">Guided walkthrough — coming soon</span>
-                <span className="vf-ph-desc">In the meantime, request access to explore the live workspace yourself.</span>
-              </div>
-            </div>
-          </figure>
+          <DemoVideoFrame />
         </div>
       </section>
 
