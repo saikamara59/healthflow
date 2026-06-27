@@ -3,7 +3,7 @@ import { test, expect } from '../fixtures'
 test('broker can log in and reach the dashboard', async ({ page, workerBroker }) => {
   await page.goto('/login')
   await page.getByLabel(/work email/i).fill(workerBroker.email)
-  await page.getByLabel(/password/i).fill(workerBroker.password)
+  await page.locator('#password').fill(workerBroker.password)
   // Scope the click to the form: the v2 glass login also has a "Sign in" tab
   // in the sign in / sign up toggle (rendered outside the form), so a
   // page-level getByRole would match two buttons. /dashboard is the
@@ -16,7 +16,7 @@ test('broker can log in and reach the dashboard', async ({ page, workerBroker })
 test('invalid credentials show an error', async ({ page, workerBroker }) => {
   await page.goto('/login')
   await page.getByLabel(/work email/i).fill(workerBroker.email)
-  await page.getByLabel(/password/i).fill('wrong-password')
+  await page.locator('#password').fill('wrong-password')
   await page.locator('form').getByRole('button', { name: /^sign in$/i }).click()
   // Backend returns "Invalid email or password" for a bad password; the
   // login form surfaces whichever message the api client passes through.
