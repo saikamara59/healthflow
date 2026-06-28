@@ -35,7 +35,7 @@ test: ## Run all backend tests
 	.venv/bin/python -m pytest healthflow/tests/ healthflow/agents/temporal_awareness/tests/ healthflow/forensics/tests/ healthflow/evals/tests/ -v --tb=short
 
 test-quick: ## Run tests without verbose output
-	.venv/bin/python -m pytest healthflow/tests/ healthflow/agents/temporal_awareness/tests/ healthflow/forensics/tests/ -q --tb=short
+	.venv/bin/python -m pytest healthflow/tests/ healthflow/agents/temporal_awareness/tests/ healthflow/forensics/tests/ healthflow/evals/tests/ -q --tb=short
 
 test-cov: ## Run tests with coverage report
 	.venv/bin/pip install coverage -q

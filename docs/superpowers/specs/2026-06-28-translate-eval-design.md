@@ -280,6 +280,37 @@ Benefits documents (CMS / carrier sites), extract the relevant sections to the
 specific carrier/plan is preferred, the user supplies it; otherwise pick a
 well-known public plan.
 
+## Limitations (read before trusting the headline number)
+
+The first live run scored 94.4% pass / 100% faithfulness / 0% hallucination /
+75% abstention on Humana Gold Plus H1036-217. Treat that as a *sample under a
+heuristic*, not a fixed truth:
+
+- **Abstention detection is a substring heuristic and can flap.** The first run
+  reported 25% abstention accuracy — a measurement artifact: the agent abstained
+  correctly on all 4 cases but phrased two as "does not include any information",
+  which the marker set didn't yet recognize. After adding those markers, true
+  abstention behavior showed through. A single unmatched phrasing still flips a
+  case run-to-run. A future version should replace the substring markers with a
+  small LLM abstention check.
+- **The persisted report doesn't capture the agent answer or judge rationale.**
+  `report.json` records pass/fail per case but not *why*, so a failure can't be
+  triaged from the artifact alone (you can't tell a real hallucination from an
+  unmatched abstention phrasing). Adding `answer` + `rationale` to the payload is
+  the highest-value report improvement.
+- **The LLM judge is non-deterministic.** Faithfulness/hallucination rates vary
+  run-to-run; one run is a sample. The judge also penalizes accurate-but-extra
+  context the agent adds beyond the document — arguably correct (the agent is
+  told to answer only the question), but it makes "faithfulness" partly a measure
+  of answer scope, not just correctness.
+- **`JudgeVerdict`/`CaseScore` import `harness`,** which pulls the PHI-crypto
+  chain, so the deterministic scorer/report path needs `PHI_ENCRYPTION_KEY` set
+  to import (tests set a dummy key). Splitting the dataclasses into a
+  dependency-free `types.py` would restore true import-time isolation.
+- **No per-case error isolation in the live run.** A case that errors aborts the
+  whole `make eval` after spending tokens, with no partial report. A per-case
+  try/except recording a failure reason would harden it.
+
 ## Follow-ups (post-v1)
 
 1. Upgrade `TranslationAgent` to emit true citations (which section grounded the
