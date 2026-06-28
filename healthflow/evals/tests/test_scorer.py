@@ -1,3 +1,5 @@
+import pytest
+
 from healthflow.evals.translate.judge import JudgeVerdict
 from healthflow.evals.translate.loader import EvalCase
 from healthflow.evals.translate.runner import AgentRun
@@ -68,3 +70,14 @@ def test_answerable_with_no_expected_amounts_is_vacuously_present():
     s = score(run, verdict)
     assert s.amounts_present is True
     assert s.passed is True
+
+
+def test_detect_abstention_false_on_legitimate_negation():
+    # "does not contain" in a real answer must NOT be read as abstention
+    assert detect_abstention("Your plan does not contain a separate deductible.") is False
+
+
+def test_answerable_without_verdict_raises():
+    run = AgentRun(_case(True, amounts=[120]), "Your ER copay is $120.")
+    with pytest.raises(ValueError, match="requires a judge verdict"):
+        score(run, None)

@@ -11,14 +11,18 @@ from healthflow.evals.translate.runner import AgentRun
 ABSTENTION_MARKERS = (
     "not in the document",
     "not in this document",
-    "doesn't contain",
-    "does not contain",
     "isn't in the document",
     "is not in the document",
-    "unable to determine",
-    "cannot determine",
-    "no information",
-    "not specified",
+    "document doesn't contain",
+    "document does not contain",
+    "not contain that information",
+    "not contain information",
+    "unable to answer",
+    "cannot answer",
+    "can't answer",
+    "not available in the document",
+    "document doesn't address",
+    "document does not address",
 )
 
 
@@ -42,12 +46,14 @@ def detect_abstention(answer: str) -> bool:
 def _amounts_present(answer: str, expected: list[int]) -> bool:
     if not expected:
         return True
-    found = {int(n) for n in re.findall(r"\$?\s*(\d[\d,]*)", answer.replace(",", ""))}
+    found = {int(n) for n in re.findall(r"\$?\s*(\d+)", answer.replace(",", ""))}
     return all(amount in found for amount in expected)
 
 
 def score(run: AgentRun, verdict: JudgeVerdict | None) -> CaseScore:
     case = run.case
+    if case.answerable and verdict is None:
+        raise ValueError(f"answerable case {case.id!r} requires a judge verdict")
     abstained = detect_abstention(run.answer)
 
     if not case.answerable:
