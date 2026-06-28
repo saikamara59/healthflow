@@ -1,3 +1,4 @@
+import time
 import uuid
 
 from fastapi import APIRouter, HTTPException, Path
@@ -5,9 +6,11 @@ from fastapi import APIRouter, HTTPException, Path
 from healthflow.agents.appeal_agent import AppealAgent
 from healthflow.agents.comparison_agent import ComparisonAgent
 from healthflow.agents.cost_calculator_agent import CostCalculatorAgent
-from healthflow.agents.harness import Harness
+from healthflow.agents.harness import CLAUDE_MODEL_HAIKU, Harness
 from healthflow.agents.network_agent import NetworkAgent
 from healthflow.agents.translation_agent import TranslationAgent
+from healthflow.auth.tenant_context import current_broker_id
+from healthflow.decisions.recorder import decision_recorder
 from healthflow.memory.session import InMemoryStore
 from healthflow.models.schemas import (
     AppealRequest,
@@ -122,6 +125,7 @@ def compare_plans(request: CompareRequest):
             })
 
     agent = ComparisonAgent()
+    _t0 = time.monotonic()
     raw_recommendation = agent.recommend(
         plans=ranked_plans,
         age=request.age,
@@ -129,6 +133,7 @@ def compare_plans(request: CompareRequest):
         medications=request.medications or None,
         procedures=request.procedures or None,
     )
+    _elapsed_ms = int((time.monotonic() - _t0) * 1000)
 
     recommendation = harness.filter_output(raw_recommendation)
 
@@ -140,12 +145,34 @@ def compare_plans(request: CompareRequest):
         "plan_ids": [p.plan_id for p in ranked_plans],
     })
 
+    # Capture a durable Decision Record for the broker who made this call.
+    # Anonymous calls (no broker token) return None and get no record.
+    decision_id = decision_recorder.record_compare_decision(
+        broker_id=current_broker_id.get(),
+        client_id=None,
+        inputs={
+            "zip_code": request.zip_code,
+            "age": request.age,
+            "income_level": request.income_level,
+            "medications": request.medications or [],
+            "procedures": request.procedures or [],
+        },
+        recommended_plan=ranked_plans[0].model_dump() if ranked_plans else {},
+        alternatives=[p.model_dump() for p in ranked_plans[1:]],
+        recommendation_text=raw_recommendation,
+        basis=f"Top-ranked of {len(ranked_plans)} plans compared for a "
+              f"{request.income_level}-income profile",
+        model_used=CLAUDE_MODEL_HAIKU,
+        duration_ms=_elapsed_ms,
+    )
+
     return CompareResponse(
         session_id=session_id,
         zip_code=request.zip_code,
         plans=ranked_plans,
         recommendation=recommendation,
         disclaimer=DISCLAIMER,
+        decision_id=str(decision_id) if decision_id else None,
     )
 
 

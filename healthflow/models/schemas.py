@@ -61,6 +61,7 @@ class CompareResponse(BaseModel):
     plans: list[PlanSummary]
     recommendation: str
     disclaimer: str
+    decision_id: str | None = None
 
 
 class CostDetails(BaseModel):
