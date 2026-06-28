@@ -207,7 +207,7 @@ export default function DecisionRecordPanel({ decisionId, open, onClose, recorde
               {/* Reasoning */}
               {record.recommendation_text && (
                 <section className="why-section">
-                  <div className="why-section-head"><span className="eyebrow">Reasoning</span></div>
+                  <div className="why-section-head"><span className="eyebrow">Recommendation</span></div>
                   <AgentMarkdown>{record.recommendation_text}</AgentMarkdown>
                 </section>
               )}
