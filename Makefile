@@ -49,6 +49,9 @@ test-watch: ## Run tests in watch mode (requires pytest-watch)
 smoke-external: ## Run opt-in live smoke tests against RxNav + NPPES (needs internet)
 	LIVE_SMOKE_TESTS=1 .venv/bin/python -m pytest healthflow/tests/integration/ -v
 
+eval: ## Run the translate accuracy benchmark (live; needs ANTHROPIC_API_KEY)
+	LIVE_EVAL=1 .venv/bin/python -m healthflow.evals.translate.run
+
 # ─── Linting ──────────────────────────────────────────────────────────────────
 
 lint: ## Run ruff linter
