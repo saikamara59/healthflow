@@ -23,6 +23,18 @@ ABSTENTION_MARKERS = (
     "not available in the document",
     "document doesn't address",
     "document does not address",
+    # "include" variants — the agent commonly abstains with "does not include
+    # any information"; anchored to "any information" so it won't fire on a
+    # legitimate answer like "your plan does not include a deductible".
+    "does not include any information",
+    "doesn't include any information",
+    "document does not include",
+    "document doesn't include",
+    # explicit "no mention"-style abstentions
+    "not mentioned",
+    "no mention",
+    "does not mention",
+    "doesn't mention",
 )
 
 

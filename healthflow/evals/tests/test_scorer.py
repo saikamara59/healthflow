@@ -77,6 +77,17 @@ def test_detect_abstention_false_on_legitimate_negation():
     assert detect_abstention("Your plan does not contain a separate deductible.") is False
 
 
+def test_detect_abstention_true_on_does_not_include_any_information():
+    # real agent phrasing observed in the live benchmark
+    assert detect_abstention("The document does not include any information about cosmetic surgery.") is True
+    assert detect_abstention("This benefit is not mentioned anywhere in the plan.") is True
+
+
+def test_detect_abstention_false_on_plan_does_not_include_benefit():
+    # "does not include" without "any information" must stay a real answer
+    assert detect_abstention("Your plan does not include a separate Part D deductible.") is False
+
+
 def test_answerable_without_verdict_raises():
     run = AgentRun(_case(True, amounts=[120]), "Your ER copay is $120.")
     with pytest.raises(ValueError, match="requires a judge verdict"):
