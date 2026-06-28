@@ -32,7 +32,7 @@ data-full: ## Download full CMS/FDA data from public APIs
 # ─── Testing ──────────────────────────────────────────────────────────────────
 
 test: ## Run all backend tests
-	.venv/bin/python -m pytest healthflow/tests/ healthflow/agents/temporal_awareness/tests/ healthflow/forensics/tests/ -v --tb=short
+	.venv/bin/python -m pytest healthflow/tests/ healthflow/agents/temporal_awareness/tests/ healthflow/forensics/tests/ healthflow/evals/tests/ -v --tb=short
 
 test-quick: ## Run tests without verbose output
 	.venv/bin/python -m pytest healthflow/tests/ healthflow/agents/temporal_awareness/tests/ healthflow/forensics/tests/ -q --tb=short
