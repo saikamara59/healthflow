@@ -30,3 +30,5 @@ frontend/playwright/.cache/
 .claude/*
 !.claude/skills/
 .playwright-mcp/
+# Generated eval benchmark report
+healthflow/evals/translate/report.json

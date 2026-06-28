@@ -4,14 +4,21 @@ import os
 import sys
 from pathlib import Path
 
-import anthropic
+from dotenv import load_dotenv
 
-from healthflow.agents.translation_agent import TranslationAgent
-from healthflow.evals.translate.judge import judge
-from healthflow.evals.translate.loader import load_cases
-from healthflow.evals.translate.report import aggregate, render_summary, write_report
-from healthflow.evals.translate.runner import run_case
-from healthflow.evals.translate.scorer import score
+# Load .env before the healthflow imports below: importing TranslationAgent
+# pulls in the PHI-crypto chain, which requires PHI_ENCRYPTION_KEY at import
+# time, and the live run needs ANTHROPIC_API_KEY. Mirrors healthflow.main.
+load_dotenv()
+
+import anthropic  # noqa: E402
+
+from healthflow.agents.translation_agent import TranslationAgent  # noqa: E402
+from healthflow.evals.translate.judge import judge  # noqa: E402
+from healthflow.evals.translate.loader import load_cases  # noqa: E402
+from healthflow.evals.translate.report import aggregate, render_summary, write_report  # noqa: E402
+from healthflow.evals.translate.runner import run_case  # noqa: E402
+from healthflow.evals.translate.scorer import score  # noqa: E402
 
 _HERE = Path(__file__).parent
 CASES_PATH = _HERE / "cases.yaml"
