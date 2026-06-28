@@ -616,6 +616,19 @@ class PromptVariantResponse(BaseModel):
     # add a detail endpoint if the UI needs the full text.
 
 
+class DecisionRecordResponse(BaseModel):
+    id: str
+    created_at: str
+    agent_type: str
+    model_used: str | None
+    broker_id: str
+    recommended_plan: dict
+    recommendation_text: str
+    basis: str
+    alternatives: list[dict]
+    inputs: dict
+
+
 class DrugMatchModel(BaseModel):
     rxcui: str = Field(..., description="RxNorm canonical drug identifier")
     name: str = Field(..., description="Human-readable drug name")
