@@ -52,7 +52,7 @@ async def session_with_filter():
 
 def test_registry_lists_phi_tables_only():
     names = {m.__tablename__ for m in TENANT_SCOPED_MODELS}
-    assert names == {"clients", "action_history", "feedback"}
+    assert names == {"clients", "action_history", "feedback", "decision_records"}
 
 
 @pytest.mark.anyio
