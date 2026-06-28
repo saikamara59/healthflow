@@ -159,7 +159,7 @@ def compare_plans(request: CompareRequest):
         },
         recommended_plan=ranked_plans[0].model_dump() if ranked_plans else {},
         alternatives=[p.model_dump() for p in ranked_plans[1:]],
-        recommendation_text=raw_recommendation,
+        recommendation_text=recommendation,
         basis=f"Top-ranked of {len(ranked_plans)} plans compared for a "
               f"{request.income_level}-income profile",
         model_used=CLAUDE_MODEL_HAIKU,
