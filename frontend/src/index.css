@@ -1023,9 +1023,10 @@ html[data-density="compact"] .act-row { padding: 9px 0; }
 /* reasoning */
 /* reasoning prose renders via <AgentMarkdown> (.agent-output) so markdown is
    formatted and matches the comparison page's recommendation styling */
-/* Times New Roman bold (default 700) reads heavy — soften emphasis in the
-   panel to a crisp medium weight in full ink */
-.why-drawer .agent-output strong { font-weight: 600; color: var(--ink); }
+/* bold emphasis in the panel reasoning → brand accent teal, so key facts
+   (plan names, dollar figures) pop; medium weight keeps Times bold from
+   reading heavy */
+.why-drawer .agent-output strong { font-weight: 600; color: var(--accent); }
 
 /* footer attribution */
 .why-foot {
