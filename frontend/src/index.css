@@ -1021,7 +1021,7 @@ html[data-density="compact"] .act-row { padding: 9px 0; }
 .why-rank-more { padding: 10px 14px; font-size: 12px; color: var(--ink-3); background: var(--bg-2); text-align: center; }
 
 /* reasoning */
-.why-reasoning { font-family: 'Times New Roman', Times, serif; font-size: 15px; line-height: 1.6; color: var(--ink-2); margin: 0; }
+.why-reasoning { font-family: var(--sans); font-size: 14px; line-height: 1.62; color: var(--ink-2); margin: 0; }
 
 /* footer attribution */
 .why-foot {
