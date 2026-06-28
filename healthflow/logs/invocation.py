@@ -37,25 +37,9 @@ from healthflow.auth.case_context import case_id as _case_id_var
 from healthflow.auth.tenant_context import current_broker_id, current_endpoint
 from healthflow.database.models import AgentInvocationLog
 from healthflow.logs.audit import AuditLogger
+from healthflow.logs._sync_engine import sync_url as _sync_url
 
 logger = logging.getLogger(__name__)
-
-
-def _sync_url(async_url: str) -> str:
-    """Convert an async SQLAlchemy URL to its sync equivalent.
-
-    Supports the two URL shapes HealthFlow uses:
-      * sqlite+aiosqlite:///healthflow.db → sqlite:///healthflow.db
-      * postgresql+asyncpg://... → postgresql+psycopg://...
-
-    For anything else, returns the URL unchanged and lets SQLAlchemy
-    raise on engine creation (better than a silent surprise).
-    """
-    if async_url.startswith("sqlite+aiosqlite"):
-        return async_url.replace("sqlite+aiosqlite", "sqlite", 1)
-    if async_url.startswith("postgresql+asyncpg"):
-        return async_url.replace("postgresql+asyncpg", "postgresql+psycopg", 1)
-    return async_url
 
 
 @dataclass

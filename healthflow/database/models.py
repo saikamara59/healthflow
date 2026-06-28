@@ -118,6 +118,34 @@ class ActionHistory(Base):
     client: Mapped["Client"] = relationship(back_populates="actions")
 
 
+class DecisionRecord(Base):
+    """Durable, attributable record of one agent recommendation (compare in v1).
+
+    Captured at recommendation time (see healthflow/decisions/recorder.py). The
+    PHI-bearing payload (client inputs + the recommendation) lives in the
+    encrypted `content` blob; metadata columns are plaintext. Tenant-scoped via
+    broker_id (registered in tenant_filter.TENANT_SCOPED_MODELS).
+    """
+    __tablename__ = "decision_records"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), primary_key=True, default=uuid.uuid4
+    )
+    broker_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("brokers.id"), index=True, nullable=False
+    )
+    client_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("clients.id"), index=True, nullable=True
+    )
+    agent_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    model_used: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    content: Mapped[dict] = mapped_column(EncryptedJSON(), default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, nullable=False
+    )
+
+
 class Feedback(Base):
     __tablename__ = "feedback"
 
