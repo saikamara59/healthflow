@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import api from '../api/client';
 import Icon from './ui/Icon';
 import Stars from './ui/Stars';
+import AgentMarkdown from './ui/AgentMarkdown';
 
 // "Why this recommendation" — the audit-grade Decision Record drawer.
 // Reads GET /decisions/{decisionId} (captured at /compare time) and renders it
@@ -207,7 +208,7 @@ export default function DecisionRecordPanel({ decisionId, open, onClose, recorde
               {record.recommendation_text && (
                 <section className="why-section">
                   <div className="why-section-head"><span className="eyebrow">Reasoning</span></div>
-                  <p className="why-reasoning">{record.recommendation_text}</p>
+                  <AgentMarkdown>{record.recommendation_text}</AgentMarkdown>
                 </section>
               )}
             </div>
