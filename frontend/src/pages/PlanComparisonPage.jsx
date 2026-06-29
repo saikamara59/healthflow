@@ -6,6 +6,8 @@ import Icon from '../components/ui/Icon';
 import Stars from '../components/ui/Stars';
 import AgentMarkdown from '../components/ui/AgentMarkdown';
 import useLayout from '../components/ui/useLayout';
+import DecisionRecordPanel from '../components/DecisionRecordPanel';
+import { useAuth } from '../contexts/AuthContext';
 
 function currency(v) {
   if (v == null || Number.isNaN(v)) return '—';
@@ -22,6 +24,7 @@ function annualEstimate(plan) {
 export default function PlanComparisonPage() {
   const location = useLocation();
   const { openMenu, openNotifications } = useLayout();
+  const { user } = useAuth();
 
   const preset = location.state?.client;
   const [step, setStep] = useState('input');
@@ -40,6 +43,7 @@ export default function PlanComparisonPage() {
   const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [expandedPlanId, setExpandedPlanId] = useState(null);
   const [selectToast, setSelectToast] = useState('');
+  const [whyOpen, setWhyOpen] = useState(false);
 
   useEffect(() => {
     api.get('/clients').then((d) => setClientOptions(Array.isArray(d) ? d : [])).catch(() => {});
@@ -92,6 +96,7 @@ export default function PlanComparisonPage() {
       setSelectedPlanId(null);
       setExpandedPlanId(null);
       setSelectToast('');
+      setWhyOpen(false);
       if (clientId) {
         api.post('/history', {
           client_id: clientId,
@@ -278,7 +283,14 @@ export default function PlanComparisonPage() {
               <div className="card compare-rec-card" style={{ marginBottom: 28, overflow: 'hidden' }}>
                 <div className="compare-rec-grid">
                   <div className="compare-rec-main">
-                    <div className="eyebrow" style={{ marginBottom: 14 }}>Recommendation</div>
+                    <div className="between" style={{ marginBottom: 14 }}>
+                      <div className="eyebrow">Recommendation</div>
+                      {result.decision_id && (
+                        <button className="why-trigger" onClick={() => setWhyOpen(true)}>
+                          <Icon name="spark" size={13} /> Why this?
+                        </button>
+                      )}
+                    </div>
                     <AgentMarkdown style={{ maxWidth: 760 }}>
                       {result.recommendation}
                     </AgentMarkdown>
@@ -452,6 +464,13 @@ export default function PlanComparisonPage() {
             )}
 
             {result.disclaimer && <div className="notice" style={{ marginTop: 24 }}>{result.disclaimer}</div>}
+
+            <DecisionRecordPanel
+              decisionId={result.decision_id}
+              open={whyOpen}
+              onClose={() => setWhyOpen(false)}
+              recordedBy={user?.email ? `You · ${user.email}` : 'You'}
+            />
           </>
         )}
       </div>

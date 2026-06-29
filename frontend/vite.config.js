@@ -33,6 +33,7 @@ export default defineConfig({
       '/health': proxyToBackend,
       '/history': proxyToBackend,
       '/feedback': proxyToBackend,
+      '/decisions': proxyToBackend,
       '/temporal': proxyToBackend,
       '/drugs': proxyToBackend,
       '/admin': proxyToBackend,

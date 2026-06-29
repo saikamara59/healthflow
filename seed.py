@@ -13,6 +13,15 @@ import os
 import httpx
 import sys
 
+from dotenv import load_dotenv
+
+# Load .env so DEMO_BROKER_PASSWORD and PHI_ENCRYPTION_KEY/JWT_SECRET are present:
+# the healthflow import chain in _activate_demo_broker requires the PHI key at
+# import time, and the demo password is read just below. Mirrors how the app
+# (healthflow.main) and the eval runner load their config. Must run before the
+# DEMO_BROKER_PASSWORD lookup below.
+load_dotenv()
+
 BASE_URL = "http://localhost:8000"
 
 # Local/dev default; override in any real deploy via the DEMO_BROKER_PASSWORD
