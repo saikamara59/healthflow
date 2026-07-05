@@ -22,7 +22,7 @@ that repo.
 bypassing `AuditLogger` and the `agent_invocation_log` table.
 
 **Rule:** Never call an agent's `_build_prompt` directly with raw arguments.
-Construct the agent's `PromptInput` dataclass (in the package's
+Construct the agent's `PromptInput` model (in the package's
 `healthflow_agents/redaction/prompt_inputs.py`) and pass that. `_build_prompt`
 is type-annotated to accept only the `PromptInput` — there is no path from a
 raw string to a prompt body that skips the redaction boundary. A static `ast`
@@ -37,8 +37,10 @@ the no-BAA threat model, medication/procedure names are de-identified content
 data, not patient PHI.
 
 **Rule:** When adding a new agent, add it in the healthflow-agents repo (with
-a `PromptInput` dataclass in its `redaction/prompt_inputs.py`; free-text
-fields redact in `__post_init__` via the `_redact_field` helper). Emit the
+a frozen `PromptInput` Pydantic model in its `redaction/prompt_inputs.py`;
+free-text fields redact in a `mode="before"` model validator via the
+`_redact_field` helper, and raw-input field names must never persist as
+stored fields). Emit the
 `phi_redacted` audit event with `prompt_input.redaction_summary`. Then add a
 `build_<agent>()` factory in `healthflow/agents/wiring.py` here.
 
