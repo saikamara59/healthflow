@@ -31,7 +31,7 @@ MOCK_ARGUMENT = CoverageArgument(
 )
 
 
-@patch("healthflow.api.routes.AppealAgent")
+@patch("healthflow.api.routes.build_appeal_agent")
 def test_appeal_valid_request(mock_agent_cls):
     mock_agent = MagicMock()
     mock_agent.process_appeal.return_value = (
@@ -71,7 +71,7 @@ def test_appeal_whitespace_denial_text():
     assert response.status_code == 422
 
 
-@patch("healthflow.api.routes.AppealAgent")
+@patch("healthflow.api.routes.build_appeal_agent")
 def test_appeal_response_has_disclaimer(mock_agent_cls):
     mock_agent = MagicMock()
     mock_agent.process_appeal.return_value = (
@@ -91,7 +91,7 @@ def test_appeal_response_has_disclaimer(mock_agent_cls):
     assert "not" in data["disclaimer"].lower() and "legal" in data["disclaimer"].lower()
 
 
-@patch("healthflow.api.routes.AppealAgent")
+@patch("healthflow.api.routes.build_appeal_agent")
 def test_appeal_response_has_appeal_letter(mock_agent_cls):
     mock_agent = MagicMock()
     mock_agent.process_appeal.return_value = (
@@ -111,7 +111,7 @@ def test_appeal_response_has_appeal_letter(mock_agent_cls):
     assert "appeal" in data["appeal_letter"].lower()
 
 
-@patch("healthflow.api.routes.AppealAgent")
+@patch("healthflow.api.routes.build_appeal_agent")
 def test_appeal_medical_advice_filtered(mock_agent_cls):
     mock_agent = MagicMock()
     mock_agent.process_appeal.return_value = (

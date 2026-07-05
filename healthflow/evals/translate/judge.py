@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-from healthflow.agents.harness import CLAUDE_MODEL_SONNET, extract_text, strip_code_fence
+from healthflow_agents.core.client import extract_text, strip_code_fence
+from healthflow_agents.core.models import CLAUDE_MODEL_SONNET
 from healthflow.models.schemas import DocumentSection
 
 SYSTEM_PROMPT = (

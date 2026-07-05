@@ -20,7 +20,7 @@ Tier 2 (Preferred Brand): $45 copay
 """
 
 
-@patch("healthflow.api.routes.TranslationAgent")
+@patch("healthflow.api.routes.build_translation_agent")
 def test_translate_valid_request(mock_agent_cls):
     mock_agent = MagicMock()
     mock_agent.translate.return_value = (
@@ -45,7 +45,7 @@ def test_translate_valid_request(mock_agent_cls):
     assert data["question"] == "What is the ER copay?"
 
 
-@patch("healthflow.api.routes.TranslationAgent")
+@patch("healthflow.api.routes.build_translation_agent")
 def test_translate_filters_medical_advice(mock_agent_cls):
     mock_agent = MagicMock()
     mock_agent.translate.return_value = (
@@ -90,7 +90,7 @@ def test_translate_document_too_long():
     assert response.status_code == 422
 
 
-@patch("healthflow.api.routes.TranslationAgent")
+@patch("healthflow.api.routes.build_translation_agent")
 def test_translate_response_has_disclaimer(mock_agent_cls):
     mock_agent = MagicMock()
     mock_agent.translate.return_value = ("Answer text.", ["EMERGENCY CARE"])

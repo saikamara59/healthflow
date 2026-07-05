@@ -6,7 +6,7 @@ forensics is a high-trust read surface, so we run every string-valued
 output field through PHIRedactor before returning.
 """
 from healthflow.forensics.schemas import AgentInvocation, CaseTimeline
-from healthflow.tools.phi_redactor import PHIRedactor
+from healthflow_agents.redaction.phi_redactor import PHIRedactor
 
 _DETAILS_SUMMARY_MAX = 200
 _redactor = PHIRedactor()

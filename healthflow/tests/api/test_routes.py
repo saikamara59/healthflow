@@ -24,7 +24,7 @@ def test_get_plans_invalid_zip():
     assert response.status_code == 422
 
 
-@patch("healthflow.api.routes.ComparisonAgent")
+@patch("healthflow.api.routes.build_comparison_agent")
 def test_compare_valid_request(mock_agent_cls):
     mock_agent = MagicMock()
     mock_agent.recommend.return_value = "Plan A is the best value."
@@ -49,7 +49,7 @@ def test_compare_valid_request(mock_agent_cls):
     assert len(data["plans"]) <= 5
 
 
-@patch("healthflow.api.routes.ComparisonAgent")
+@patch("healthflow.api.routes.build_comparison_agent")
 def test_compare_invalid_zip(mock_agent_cls):
     response = client.post(
         "/compare",
@@ -58,7 +58,7 @@ def test_compare_invalid_zip(mock_agent_cls):
     assert response.status_code == 422
 
 
-@patch("healthflow.api.routes.ComparisonAgent")
+@patch("healthflow.api.routes.build_comparison_agent")
 def test_compare_invalid_age(mock_agent_cls):
     response = client.post(
         "/compare",

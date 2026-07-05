@@ -47,13 +47,13 @@ Claims Department
 """
 
 
-@patch("healthflow.api.routes.AppealAgent")
+@patch("healthflow.api.routes.build_appeal_agent")
 def test_end_to_end_realistic_denial(mock_agent_cls):
     """End-to-end test with a realistic denial letter."""
-    from healthflow.tools.denial_codes import DenialCodeDB
-    from healthflow.tools.denial_parser import DenialParser
-    from healthflow.tools.phi_redactor import PHIRedactor
-    from healthflow.tools.appeal_writer import AppealWriter
+    from healthflow_agents.tools.denial_codes import DenialCodeDB
+    from healthflow_agents.tools.denial_parser import DenialParser
+    from healthflow_agents.redaction.phi_redactor import PHIRedactor
+    from healthflow_agents.tools.appeal_writer import AppealWriter
     from healthflow.models.schemas import CoverageArgument
 
     # Run the real pipeline (except Claude)
@@ -106,11 +106,11 @@ def test_end_to_end_realistic_denial(mock_agent_cls):
     assert len(data["appeal_letter"]) > 100
 
 
-@patch("healthflow.api.routes.AppealAgent")
+@patch("healthflow.api.routes.build_appeal_agent")
 def test_phi_not_in_response(mock_agent_cls):
     """Verify PHI from the denial letter does not appear in the response."""
-    from healthflow.tools.phi_redactor import PHIRedactor
-    from healthflow.tools.denial_parser import DenialParser
+    from healthflow_agents.redaction.phi_redactor import PHIRedactor
+    from healthflow_agents.tools.denial_parser import DenialParser
     from healthflow.models.schemas import CoverageArgument
 
     redactor = PHIRedactor()
@@ -146,11 +146,11 @@ def test_phi_not_in_response(mock_agent_cls):
     assert "(555) 867-5309" not in response_text
 
 
-@patch("healthflow.api.routes.AppealAgent")
+@patch("healthflow.api.routes.build_appeal_agent")
 def test_medical_advice_filtered(mock_agent_cls):
     """Verify medical advice from Claude is filtered out."""
-    from healthflow.tools.denial_parser import DenialParser
-    from healthflow.tools.phi_redactor import PHIRedactor
+    from healthflow_agents.tools.denial_parser import DenialParser
+    from healthflow_agents.redaction.phi_redactor import PHIRedactor
     from healthflow.models.schemas import CoverageArgument
 
     redactor = PHIRedactor()

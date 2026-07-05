@@ -1,5 +1,27 @@
 from pydantic import BaseModel, Field, field_validator
 
+# The models the agents consume moved to the healthflow-agents package
+# (healthflow_agents.contracts). They are re-exported here so the
+# request/response wrappers below and every existing
+# `from healthflow.models.schemas import ...` keep referencing a single class.
+from healthflow_agents.contracts import (  # noqa: F401
+    CostBreakdown,
+    CoverageArgument,
+    DenialAnalysis,
+    DocumentSection,
+    FormularyResult,
+    PlanCostResult,
+    PlanNetworkResult,
+    PlanSummary,
+    PrescriptionDetail,
+    PrescriptionInput,
+    ProcedureDetail,
+    ProcedureInput,
+    ProviderInput,
+    ProviderResult,
+    UsageInput,
+)
+
 
 class CompareRequest(BaseModel):
     zip_code: str = Field(..., description="5-digit US zip code")
@@ -42,19 +64,6 @@ class EstimateRequest(BaseModel):
         return v
 
 
-class PlanSummary(BaseModel):
-    plan_name: str
-    plan_id: str
-    monthly_premium: float
-    annual_deductible: float
-    out_of_pocket_max: float
-    star_rating: float = Field(..., ge=1.0, le=5.0)
-    plan_type: str
-    drug_coverage: bool
-    estimated_medication_costs: dict[str, float] | None = None
-    estimated_procedure_costs: dict[str, float] | None = None
-
-
 class CompareResponse(BaseModel):
     session_id: str
     zip_code: str
@@ -79,11 +88,6 @@ class EstimateResponse(BaseModel):
     estimated_cost: float
     cost_details: CostDetails
     disclaimer: str
-
-
-class DocumentSection(BaseModel):
-    title: str
-    content: str
 
 
 class TranslateRequest(BaseModel):
@@ -117,26 +121,6 @@ class TranslateResponse(BaseModel):
     disclaimer: str
 
 
-class PrescriptionInput(BaseModel):
-    name: str
-    fills_per_year: int = Field(..., ge=1, le=365)
-
-
-class ProcedureInput(BaseModel):
-    name: str
-    count: int = Field(..., ge=1, le=365)
-
-
-class UsageInput(BaseModel):
-    doctor_visits_per_year: int = Field(..., ge=0, le=365)
-    prescriptions: list[PrescriptionInput] = Field(
-        default_factory=list, max_length=20
-    )
-    procedures: list[ProcedureInput] = Field(
-        default_factory=list, max_length=20
-    )
-
-
 class CalculateRequest(BaseModel):
     session_id: str | None = None
     zip_code: str | None = None
@@ -166,40 +150,6 @@ class CalculateRequest(BaseModel):
             raise ValueError(
                 "income_level is required when using zip_code instead of session_id"
             )
-
-
-class PrescriptionDetail(BaseModel):
-    name: str
-    cost_per_fill: float
-    annual_cost: float
-
-
-class ProcedureDetail(BaseModel):
-    name: str
-    cost_per_visit: float
-    annual_cost: float
-
-
-class CostBreakdown(BaseModel):
-    premium_total: float
-    deductible_spent: float
-    doctor_visit_costs: float
-    prescription_costs: float
-    procedure_costs: float
-    total_before_oop_cap: float
-    oop_cap_applied: bool
-    final_care_cost: float
-
-
-class PlanCostResult(BaseModel):
-    plan_name: str
-    plan_id: str
-    annual_premium: float
-    annual_care_cost: float
-    total_annual_cost: float
-    breakdown: CostBreakdown
-    prescription_details: list[PrescriptionDetail]
-    procedure_details: list[ProcedureDetail]
 
 
 class CalculateResponse(BaseModel):
@@ -232,21 +182,6 @@ class AppealRequest(BaseModel):
         return v
 
 
-class DenialAnalysis(BaseModel):
-    denial_reason_code: str | None
-    denial_reason: str
-    treatment_denied: str
-    policy_section_cited: str | None
-    appeal_deadline: str | None
-    denial_date: str | None
-
-
-class CoverageArgument(BaseModel):
-    cms_rule: str
-    common_appeal_grounds: list[str]
-    success_precedents: list[str]
-
-
 class AppealResponse(BaseModel):
     session_id: str
     denial_analysis: DenialAnalysis
@@ -254,11 +189,6 @@ class AppealResponse(BaseModel):
     appeal_letter: str
     refined_recommendation: str
     disclaimer: str
-
-
-class ProviderInput(BaseModel):
-    name: str
-    npi: str | None = None
 
 
 class VerifyRequest(BaseModel):
@@ -291,31 +221,6 @@ class VerifyRequest(BaseModel):
             raise ValueError(
                 "income_level is required when using zip_code instead of session_id"
             )
-
-
-class ProviderResult(BaseModel):
-    name: str
-    npi: str | None
-    npi_verified: bool
-    specialty: str | None
-    in_network: bool
-    warning: str | None
-
-
-class FormularyResult(BaseModel):
-    drug_name: str
-    on_formulary: bool
-    tier: str | None
-    copay: float | None
-    prior_auth_required: bool
-    warning: str | None
-
-
-class PlanNetworkResult(BaseModel):
-    plan_name: str
-    plan_id: str
-    provider_results: list[ProviderResult]
-    formulary_results: list[FormularyResult]
 
 
 class VerifyResponse(BaseModel):

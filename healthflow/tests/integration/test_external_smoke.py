@@ -51,7 +51,7 @@ async def test_rxnav_search_returns_metformin(tmp_path):
 def test_nppes_lookup_by_npi_returns_doctor():
     """NPPES: looking up a known seeded NPI returns a result with the expected
     fields populated. Would have caught the missing-version=2.1-param bug."""
-    from healthflow.tools.npi_client import NPIClient
+    from healthflow_agents.tools.npi_client import NPIClient
 
     # NPI 1982833471 is in scripts/real_doctors.json (Dr. Nivedita Aanur).
     # If NPPES retires or reissues this NPI, swap for any other NPI from
@@ -69,7 +69,7 @@ def test_nppes_lookup_by_npi_returns_doctor():
 def test_nppes_search_by_name_returns_matches():
     """NPPES: searching by 'Aanur' returns at least one match. Exercises the
     search_by_name code path used when a provider has no NPI."""
-    from healthflow.tools.npi_client import NPIClient
+    from healthflow_agents.tools.npi_client import NPIClient
 
     client = NPIClient()
     results = client.search_by_name(first_name="Nivedita", last_name="Aanur")

@@ -5,8 +5,8 @@ from healthflow.main import app
 client = TestClient(app)
 
 
-@patch("healthflow.api.routes.CostCalculatorAgent")
-@patch("healthflow.api.routes.ComparisonAgent")
+@patch("healthflow.api.routes.build_cost_calculator_agent")
+@patch("healthflow.api.routes.build_comparison_agent")
 def test_compare_then_calculate_flow(mock_compare_cls, mock_calc_cls):
     """End-to-end: /compare → get session_id → /calculate with session_id"""
     mock_compare = MagicMock()
@@ -41,7 +41,7 @@ def test_compare_then_calculate_flow(mock_compare_cls, mock_calc_cls):
     assert "recommendation" in data
 
 
-@patch("healthflow.api.routes.CostCalculatorAgent")
+@patch("healthflow.api.routes.build_cost_calculator_agent")
 def test_calculate_standalone_with_full_usage(mock_agent_cls):
     """Standalone /calculate with prescriptions and procedures."""
     mock_agent = MagicMock()
@@ -72,7 +72,7 @@ def test_calculate_standalone_with_full_usage(mock_agent_cls):
     assert "disclaimer" in data
 
 
-@patch("healthflow.api.routes.CostCalculatorAgent")
+@patch("healthflow.api.routes.build_cost_calculator_agent")
 def test_calculate_output_filtered(mock_agent_cls):
     """Verify medical advice is filtered from calculator output."""
     mock_agent = MagicMock()

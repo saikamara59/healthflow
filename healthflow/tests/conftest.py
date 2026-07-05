@@ -30,6 +30,15 @@ os.environ.setdefault("FRONTEND_BASE_URL", "https://test.example.com")
 # tests that mock Anthropic and assert on the mocked response.
 os.environ.setdefault("HEALTHFLOW_ENABLE_TEST_ROUTES", "1")
 
+# Point the healthflow-agents package at this repo's public drug reference DB
+# (the package's CostEstimator resolves it via env var, not repo-relative path).
+from pathlib import Path as _Path
+
+os.environ.setdefault(
+    "HEALTHFLOW_DATA_DB",
+    str(_Path(__file__).resolve().parent.parent.parent / "healthflow_data.db"),
+)
+
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport

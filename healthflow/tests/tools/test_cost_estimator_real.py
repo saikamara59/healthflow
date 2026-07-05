@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from healthflow.tools.cost_estimator import CostEstimator
+from healthflow_agents.tools.cost_estimator import CostEstimator
 
 
 @pytest.fixture

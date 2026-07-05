@@ -11,7 +11,7 @@ _BODY = {"zip_code": "10001", "age": 65, "income_level": "low",
 
 
 @patch("healthflow.api.routes.decision_recorder")
-@patch("healthflow.api.routes.ComparisonAgent")
+@patch("healthflow.api.routes.build_comparison_agent")
 def test_compare_threads_decision_id_from_recorder(mock_agent_cls, mock_recorder):
     mock_agent = MagicMock()
     mock_agent.recommend.return_value = "Plan A is the best value."
@@ -32,7 +32,7 @@ def test_compare_threads_decision_id_from_recorder(mock_agent_cls, mock_recorder
 
 
 @patch("healthflow.api.routes.decision_recorder")
-@patch("healthflow.api.routes.ComparisonAgent")
+@patch("healthflow.api.routes.build_comparison_agent")
 def test_compare_decision_id_null_when_recorder_returns_none(mock_agent_cls, mock_recorder):
     mock_agent = MagicMock()
     mock_agent.recommend.return_value = "Plan A is the best value."
