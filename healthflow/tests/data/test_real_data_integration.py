@@ -112,7 +112,7 @@ def test_real_cms_fetcher_returns_plans_for_zip_10001():
 
 def test_cost_estimator_metformin_returns_result():
     """CostEstimator.estimate for 'Metformin' must return a non-None result."""
-    from healthflow.tools.cost_estimator import CostEstimator
+    from healthflow_agents.tools.cost_estimator import CostEstimator
 
     estimator = CostEstimator(db_path=str(DB_PATH))
     result = estimator.estimate("Metformin", "medication", "HMO")

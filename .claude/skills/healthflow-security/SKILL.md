@@ -1,6 +1,6 @@
 ---
 name: healthflow-security
-description: Use when touching healthflow/auth/, healthflow/agents/ (LLM calls), client/PHI fields in healthflow/database/models.py, env/config, the seed script, or anything that logs request bodies. Project-specific PHI and secret-handling rules for HealthFlow.
+description: Use when touching healthflow/auth/, healthflow/agents/ (agent wiring, temporal awareness), the healthflow-agents package (LLM calls), client/PHI fields in healthflow/database/models.py, env/config, the seed script, or anything that logs request bodies. Project-specific PHI and secret-handling rules for HealthFlow.
 ---
 
 # HealthFlow Security Notes
@@ -9,27 +9,38 @@ Project-specific traps. Generic OWASP advice (parameterize SQL, sanitize HTML, e
 
 ## PHI on the wire to Anthropic
 
-Five agents in `healthflow/agents/` send data to Claude: `comparison_agent`, `cost_calculator_agent`, `network_agent`, `translation_agent`, `appeal_agent`. Client records contain medications, conditions, doctors, NPIs — all PHI. The convention is now enforced by the type system and AST tests.
+The five agents that send data to Claude (`comparison`, `cost_calculator`,
+`network`, `translation`, `appeal`) live in the **healthflow-agents package**
+(pip-installed from github.com/saikamara59/healthflow-agents; import path
+`healthflow_agents`). Client records contain medications, conditions, doctors,
+NPIs — all PHI. The convention is enforced by the type system and AST tests in
+that repo.
+
+**Rule:** Construct agents ONLY through the factories in
+`healthflow/agents/wiring.py` (`build_comparison_agent()` etc.). A bare
+`ComparisonAgent()` silently falls back to the package's stdout logging,
+bypassing `AuditLogger` and the `agent_invocation_log` table.
 
 **Rule:** Never call an agent's `_build_prompt` directly with raw arguments.
-Construct the agent's `PromptInput` dataclass (in `healthflow/agents/prompt_inputs.py`)
-and pass that. `_build_prompt` is type-annotated to accept only the
-`PromptInput` — there is no path from a raw string to a prompt body that
-skips the redaction boundary. A static `ast` test
-(`tests/agents/test_no_raw_prompt_path.py`) enforces this.
+Construct the agent's `PromptInput` dataclass (in the package's
+`healthflow_agents/redaction/prompt_inputs.py`) and pass that. `_build_prompt`
+is type-annotated to accept only the `PromptInput` — there is no path from a
+raw string to a prompt body that skips the redaction boundary. A static `ast`
+test (`tests/test_no_raw_prompt_path.py` in the package repo) enforces this.
 
 **Rule:** Free-text fields on a `PromptInput` (denial text, document content,
-questions) are redacted by the dataclass constructor via `PHIRedactor`.
-Structured fields — medication names, procedure names, doctor names + NPIs —
-pass through by design. Under the no-BAA threat model, medication/procedure
-names are de-identified content (not among HIPAA's 18 identifiers) and doctor
-NPIs are public NPPES registry data, not patient PHI.
+questions) are redacted by the dataclass constructor via `PHIRedactor`
+(`healthflow_agents.redaction.phi_redactor`). Structured fields — medication
+names, procedure names, doctor names + NPIs — pass through by design. Under
+the no-BAA threat model, medication/procedure names are de-identified content
+(not among HIPAA's 18 identifiers) and doctor NPIs are public NPPES registry
+data, not patient PHI.
 
-**Rule:** When adding a new agent, add a `PromptInput` dataclass for it in
-`prompt_inputs.py`. If it has free-text fields, redact them in `__post_init__`
-using the `_redact_field` helper (frozen dataclass — reassigning a field needs
-`object.__setattr__`; appending to `_redaction_log` does not). Emit the
-`phi_redacted` audit event with `prompt_input.redaction_summary`.
+**Rule:** When adding a new agent, add it in the healthflow-agents repo (with
+a `PromptInput` dataclass in its `redaction/prompt_inputs.py`; free-text
+fields redact in `__post_init__` via the `_redact_field` helper). Emit the
+`phi_redacted` audit event with `prompt_input.redaction_summary`. Then add a
+`build_<agent>()` factory in `healthflow/agents/wiring.py` here.
 
 **Rule:** Don't log raw prompt payloads. The `phi_redacted` audit event logs
 only counts and placeholder types (`prompt_input.redaction_summary`), never

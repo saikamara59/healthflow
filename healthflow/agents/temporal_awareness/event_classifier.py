@@ -10,9 +10,11 @@ from datetime import date
 
 import anthropic
 
-from healthflow.agents.harness import CLAUDE_CLASSIFIER_MODEL, extract_text, strip_code_fence
+from healthflow_agents.core.client import extract_text, strip_code_fence
+from healthflow_agents.core.models import CLAUDE_CLASSIFIER_MODEL
+from healthflow_agents.redaction.phi_redactor import PHIRedactor
+
 from healthflow.agents.temporal_awareness.schemas import ClassifiedEvent, EventType
-from healthflow.tools.phi_redactor import PHIRedactor
 
 
 _SYSTEM_PROMPT = (

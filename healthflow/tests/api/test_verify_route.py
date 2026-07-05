@@ -39,7 +39,7 @@ def _make_plan_network_result(plan_name: str, plan_id: str) -> PlanNetworkResult
     )
 
 
-@patch("healthflow.api.routes.NetworkAgent")
+@patch("healthflow.api.routes.build_network_agent")
 def test_verify_with_zip_code(mock_agent_cls):
     mock_agent = MagicMock()
     mock_results = [_make_plan_network_result("Test Plan", "H3312-034")]
@@ -65,10 +65,10 @@ def test_verify_with_zip_code(mock_agent_cls):
     assert data["plans"][0]["plan_name"] == "Test Plan"
 
 
-@patch("healthflow.api.routes.NetworkAgent")
+@patch("healthflow.api.routes.build_network_agent")
 def test_verify_with_session_id(mock_agent_cls):
     # First create a session via /compare
-    with patch("healthflow.api.routes.ComparisonAgent") as mock_compare_cls:
+    with patch("healthflow.api.routes.build_comparison_agent") as mock_compare_cls:
         mock_compare = MagicMock()
         mock_compare.recommend.return_value = "Plan A is best."
         mock_compare_cls.return_value = mock_compare
@@ -108,7 +108,7 @@ def test_verify_missing_both_session_and_zip():
     assert response.status_code == 422
 
 
-@patch("healthflow.api.routes.NetworkAgent")
+@patch("healthflow.api.routes.build_network_agent")
 def test_verify_response_has_disclaimer(mock_agent_cls):
     mock_agent = MagicMock()
     mock_agent.verify.return_value = ([], "No results.")
@@ -128,7 +128,7 @@ def test_verify_response_has_disclaimer(mock_agent_cls):
     assert "not medical advice" in data["disclaimer"].lower()
 
 
-@patch("healthflow.api.routes.NetworkAgent")
+@patch("healthflow.api.routes.build_network_agent")
 def test_verify_response_has_provider_and_formulary_results(mock_agent_cls):
     mock_agent = MagicMock()
     mock_results = [_make_plan_network_result("Test Plan", "H3312-034")]
@@ -153,7 +153,7 @@ def test_verify_response_has_provider_and_formulary_results(mock_agent_cls):
     assert plan["formulary_results"][0]["on_formulary"] is True
 
 
-@patch("healthflow.api.routes.NetworkAgent")
+@patch("healthflow.api.routes.build_network_agent")
 def test_verify_invalid_session_id(mock_agent_cls):
     response = client.post(
         "/verify",

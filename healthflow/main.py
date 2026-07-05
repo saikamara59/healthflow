@@ -1,12 +1,21 @@
 import logging
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from dotenv import load_dotenv
 
 # Load .env before any module reads os.getenv (e.g., DATABASE_URL, ANTHROPIC_API_KEY).
 # Existing process env wins — useful in docker/CI where vars are passed explicitly.
 load_dotenv(override=False)
+
+# The healthflow-agents package resolves the public drug reference DB via this
+# env var (its CostEstimator can't path-resolve relative to this repo the way
+# the old in-tree healthflow.data.drug_database did).
+os.environ.setdefault(
+    "HEALTHFLOW_DATA_DB",
+    str(Path(__file__).resolve().parent.parent / "healthflow_data.db"),
+)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

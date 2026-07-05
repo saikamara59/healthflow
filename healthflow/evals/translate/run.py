@@ -13,7 +13,7 @@ load_dotenv()
 
 import anthropic  # noqa: E402
 
-from healthflow.agents.translation_agent import TranslationAgent  # noqa: E402
+from healthflow.agents.wiring import build_translation_agent  # noqa: E402
 from healthflow.evals.translate.judge import judge  # noqa: E402
 from healthflow.evals.translate.loader import load_cases  # noqa: E402
 from healthflow.evals.translate.report import aggregate, render_summary, write_report  # noqa: E402
@@ -35,7 +35,7 @@ def main() -> int:
         return 2
 
     cases = load_cases(CASES_PATH)
-    agent = TranslationAgent()
+    agent = build_translation_agent()
     client = anthropic.Anthropic()
 
     scores = []

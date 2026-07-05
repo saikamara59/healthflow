@@ -5,7 +5,7 @@ from healthflow.main import app
 client = TestClient(app)
 
 
-@patch("healthflow.api.routes.CostCalculatorAgent")
+@patch("healthflow.api.routes.build_cost_calculator_agent")
 def test_calculate_with_zip_code(mock_agent_cls):
     mock_agent = MagicMock()
     mock_results = [MagicMock()]
@@ -72,9 +72,9 @@ def test_calculate_zip_without_income():
     assert response.status_code == 422
 
 
-@patch("healthflow.api.routes.CostCalculatorAgent")
+@patch("healthflow.api.routes.build_cost_calculator_agent")
 def test_calculate_with_session_id(mock_agent_cls):
-    with patch("healthflow.api.routes.ComparisonAgent") as mock_compare_cls:
+    with patch("healthflow.api.routes.build_comparison_agent") as mock_compare_cls:
         mock_compare = MagicMock()
         mock_compare.recommend.return_value = "Plan A is best."
         mock_compare_cls.return_value = mock_compare
@@ -99,7 +99,7 @@ def test_calculate_with_session_id(mock_agent_cls):
     assert response.status_code == 200
 
 
-@patch("healthflow.api.routes.CostCalculatorAgent")
+@patch("healthflow.api.routes.build_cost_calculator_agent")
 def test_calculate_invalid_session_id(mock_agent_cls):
     response = client.post(
         "/calculate",
@@ -111,7 +111,7 @@ def test_calculate_invalid_session_id(mock_agent_cls):
     assert response.status_code == 404
 
 
-@patch("healthflow.api.routes.CostCalculatorAgent")
+@patch("healthflow.api.routes.build_cost_calculator_agent")
 def test_calculate_response_has_disclaimer(mock_agent_cls):
     mock_agent = MagicMock()
     mock_agent.calculate.return_value = ([], "Recommendation.")

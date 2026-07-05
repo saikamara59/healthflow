@@ -18,7 +18,8 @@ from datetime import date
 
 import anthropic
 
-from healthflow.agents.harness import CLAUDE_MODEL, extract_text, strip_code_fence
+from healthflow_agents.core.client import extract_text, strip_code_fence
+from healthflow_agents.core.models import CLAUDE_MODEL
 from healthflow.logs.invocation import invocation
 from healthflow.agents.temporal_awareness.deadline_engine import (
     DeadlineInfo,

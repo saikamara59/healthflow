@@ -7,7 +7,7 @@ from healthflow.main import app
 client = TestClient(app)
 
 
-@patch("healthflow.api.routes.NetworkAgent")
+@patch("healthflow.api.routes.build_network_agent")
 def test_end_to_end_with_mocked_nppes(mock_agent_cls):
     """End-to-end test: verify endpoint with mocked NPPES API and NetworkAgent."""
     from healthflow.models.schemas import (
@@ -84,7 +84,7 @@ def test_end_to_end_with_mocked_nppes(mock_agent_cls):
     assert "Lisinopril" in drug_names
 
 
-@patch("healthflow.api.routes.NetworkAgent")
+@patch("healthflow.api.routes.build_network_agent")
 def test_cache_prevents_duplicate_api_calls(mock_agent_cls):
     """Verify that the cache prevents redundant NPI API calls."""
     from healthflow.models.schemas import PlanNetworkResult, ProviderResult
@@ -138,7 +138,7 @@ def test_cache_prevents_duplicate_api_calls(mock_agent_cls):
     assert mock_agent_cls.call_count == 1
 
 
-@patch("healthflow.api.routes.NetworkAgent")
+@patch("healthflow.api.routes.build_network_agent")
 def test_medical_advice_filtered_from_output(mock_agent_cls):
     """Verify that medical advice is filtered by the harness."""
     from healthflow.models.schemas import PlanNetworkResult, ProviderResult

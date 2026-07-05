@@ -44,7 +44,7 @@ Comprehensive dental (fillings, extractions): 50% coinsurance
 """
 
 
-@patch("healthflow.api.routes.TranslationAgent")
+@patch("healthflow.api.routes.build_translation_agent")
 def test_full_translate_pipeline(mock_agent_cls):
     """End-to-end: document parsing → section matching → agent → output filter → response"""
     mock_agent = MagicMock()
@@ -79,7 +79,7 @@ def test_full_translate_pipeline(mock_agent_cls):
     assert "EMERGENCY CARE" in section_titles
 
 
-@patch("healthflow.api.routes.TranslationAgent")
+@patch("healthflow.api.routes.build_translation_agent")
 def test_translate_drug_question(mock_agent_cls):
     mock_agent = MagicMock()
     mock_agent.translate.return_value = (
@@ -103,7 +103,7 @@ def test_translate_drug_question(mock_agent_cls):
     assert "PRESCRIPTION DRUG COVERAGE" in section_titles
 
 
-@patch("healthflow.api.routes.TranslationAgent")
+@patch("healthflow.api.routes.build_translation_agent")
 def test_translate_mental_health_question(mock_agent_cls):
     mock_agent = MagicMock()
     mock_agent.translate.return_value = (
@@ -127,7 +127,7 @@ def test_translate_mental_health_question(mock_agent_cls):
     assert "MENTAL HEALTH SERVICES" in section_titles
 
 
-@patch("healthflow.api.routes.TranslationAgent")
+@patch("healthflow.api.routes.build_translation_agent")
 def test_translate_output_filtered(mock_agent_cls):
     mock_agent = MagicMock()
     mock_agent.translate.return_value = (

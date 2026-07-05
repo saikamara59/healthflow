@@ -5,7 +5,7 @@ from healthflow.main import app
 client = TestClient(app)
 
 
-@patch("healthflow.api.routes.ComparisonAgent")
+@patch("healthflow.api.routes.build_comparison_agent")
 def test_full_compare_pipeline(mock_agent_cls):
     """End-to-end test: request → validation → fetch → parse → estimate → agent → response"""
     mock_agent = MagicMock()
@@ -48,7 +48,7 @@ def test_full_compare_pipeline(mock_agent_cls):
     assert "not medical advice" in data["disclaimer"].lower()
 
 
-@patch("healthflow.api.routes.ComparisonAgent")
+@patch("healthflow.api.routes.build_comparison_agent")
 def test_compare_filters_medical_advice(mock_agent_cls):
     """Verify the harness filters medical advice from Claude's response."""
     mock_agent = MagicMock()
@@ -67,7 +67,7 @@ def test_compare_filters_medical_advice(mock_agent_cls):
     assert "you should take" not in data["recommendation"].lower()
 
 
-@patch("healthflow.api.routes.ComparisonAgent")
+@patch("healthflow.api.routes.build_comparison_agent")
 def test_compare_no_meds_or_procs(mock_agent_cls):
     """Verify compare works without medications or procedures."""
     mock_agent = MagicMock()

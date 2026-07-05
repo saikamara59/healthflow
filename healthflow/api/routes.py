@@ -3,12 +3,17 @@ import uuid
 
 from fastapi import APIRouter, HTTPException, Path
 
-from healthflow.agents.appeal_agent import AppealAgent
-from healthflow.agents.comparison_agent import ComparisonAgent
-from healthflow.agents.cost_calculator_agent import CostCalculatorAgent
-from healthflow.agents.harness import CLAUDE_MODEL_HAIKU, Harness
-from healthflow.agents.network_agent import NetworkAgent
-from healthflow.agents.translation_agent import TranslationAgent
+from healthflow_agents.core.models import CLAUDE_MODEL_HAIKU
+from healthflow_agents.tools.cost_estimator import CostEstimator
+
+from healthflow.agents.wiring import (
+    build_appeal_agent,
+    build_comparison_agent,
+    build_cost_calculator_agent,
+    build_harness,
+    build_network_agent,
+    build_translation_agent,
+)
 from healthflow.auth.tenant_context import current_broker_id
 from healthflow.decisions.recorder import decision_recorder
 from healthflow.memory.session import InMemoryStore
@@ -29,7 +34,6 @@ from healthflow.models.schemas import (
     VerifyResponse,
 )
 from healthflow.tools.cms_fetcher import RealCMSFetcher
-from healthflow.tools.cost_estimator import CostEstimator
 from healthflow.tools.document_parser import DocumentParser
 from healthflow.tools.plan_parser import PlanParser
 
@@ -38,7 +42,7 @@ router = APIRouter()
 fetcher = RealCMSFetcher()
 parser = PlanParser()
 estimator = CostEstimator()
-harness = Harness()
+harness = build_harness()
 session_store = InMemoryStore()
 document_parser = DocumentParser()
 
@@ -124,7 +128,7 @@ def compare_plans(request: CompareRequest):
                 "procedures": len(request.procedures),
             })
 
-    agent = ComparisonAgent()
+    agent = build_comparison_agent()
     _t0 = time.monotonic()
     raw_recommendation = agent.recommend(
         plans=ranked_plans,
@@ -209,7 +213,7 @@ def translate_coverage(request: TranslateRequest):
     sections = document_parser.parse(request.document_text)
     relevant = document_parser.find_relevant_sections(sections, request.question)
 
-    agent = TranslationAgent()
+    agent = build_translation_agent()
     raw_answer, section_titles = agent.translate(
         sections=relevant,
         question=request.question,
@@ -251,7 +255,7 @@ def calculate_costs(request: CalculateRequest):
 
     harness.audit.log("tool_called", {"tool": "cost_calculator", "plans": len(ranked_plans)})
 
-    agent = CostCalculatorAgent()
+    agent = build_cost_calculator_agent()
     results, raw_recommendation = agent.calculate(ranked_plans, request.usage)
 
     recommendation = harness.filter_output(raw_recommendation)
@@ -279,7 +283,7 @@ def generate_appeal(request: AppealRequest):
         "denial_length": len(request.denial_text),
     })
 
-    agent = AppealAgent()
+    agent = build_appeal_agent()
     analysis, argument, appeal_letter, raw_recommendation = agent.process_appeal(
         request.denial_text,
         request.additional_context,
@@ -327,7 +331,7 @@ def verify_network(request: VerifyRequest):
         "prescriptions": len(request.prescriptions),
     })
 
-    agent = NetworkAgent()
+    agent = build_network_agent()
     results, raw_recommendation = agent.verify(
         ranked_plans, request.providers, request.prescriptions
     )
