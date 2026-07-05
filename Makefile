@@ -32,10 +32,10 @@ data-full: ## Download full CMS/FDA data from public APIs
 # ─── Testing ──────────────────────────────────────────────────────────────────
 
 test: ## Run all backend tests
-	.venv/bin/python -m pytest healthflow/tests/ healthflow/agents/temporal_awareness/tests/ healthflow/forensics/tests/ healthflow/evals/tests/ -v --tb=short
+	.venv/bin/python -m pytest healthflow/tests/ healthflow/agents/temporal_awareness/tests/ healthflow/forensics/tests/ -v --tb=short
 
 test-quick: ## Run tests without verbose output
-	.venv/bin/python -m pytest healthflow/tests/ healthflow/agents/temporal_awareness/tests/ healthflow/forensics/tests/ healthflow/evals/tests/ -q --tb=short
+	.venv/bin/python -m pytest healthflow/tests/ healthflow/agents/temporal_awareness/tests/ healthflow/forensics/tests/ -q --tb=short
 
 test-cov: ## Run tests with coverage report
 	.venv/bin/pip install coverage -q
@@ -49,8 +49,8 @@ test-watch: ## Run tests in watch mode (requires pytest-watch)
 smoke-external: ## Run opt-in live smoke tests against RxNav + NPPES (needs internet)
 	LIVE_SMOKE_TESTS=1 .venv/bin/python -m pytest healthflow/tests/integration/ -v
 
-eval: ## Run the translate accuracy benchmark (live; needs ANTHROPIC_API_KEY)
-	LIVE_EVAL=1 .venv/bin/python -m healthflow.evals.translate.run
+# The translate accuracy benchmark moved to the healthflow-agents repo:
+#   cd ../healthflow-agents && LIVE_EVAL=1 python -m evals.translate.run
 
 # ─── Linting ──────────────────────────────────────────────────────────────────
 
