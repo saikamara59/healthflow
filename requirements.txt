@@ -19,4 +19,4 @@ boto3>=1.34
 pyyaml>=6.0
 
 # The five insurance-navigation agents, tools, and PHI redaction layer
-healthflow-agents @ git+https://github.com/saikamara59/healthflow-agents.git@v0.2.0
+healthflow-agents @ git+https://github.com/saikamara59/healthflow-agents.git@v0.4.0
