@@ -59,6 +59,39 @@ class HealthflowAgentsDependencyTests(unittest.TestCase):
             deploy_workflow,
         )
 
+    def test_e2e_compose_builds_receive_private_dependency_secret(self):
+        import yaml
+
+        compose = yaml.safe_load((REPO_ROOT / "docker-compose.yml").read_text())
+        test_compose = yaml.safe_load(
+            (REPO_ROOT / "docker-compose.test.yml").read_text()
+        )
+        e2e_workflow = yaml.safe_load(
+            (REPO_ROOT / ".github" / "workflows" / "e2e.yml").read_text()
+        )
+
+        self.assertEqual(
+            compose["secrets"]["HEALTHFLOW_AGENTS_TOKEN"],
+            {"environment": "HEALTHFLOW_AGENTS_TOKEN"},
+        )
+        self.assertIn(
+            "HEALTHFLOW_AGENTS_TOKEN",
+            compose["services"]["backend"]["build"]["secrets"],
+        )
+        self.assertIn(
+            "HEALTHFLOW_AGENTS_TOKEN",
+            test_compose["services"]["seed"]["build"]["secrets"],
+        )
+        playwright_step = next(
+            step
+            for step in e2e_workflow["jobs"]["e2e"]["steps"]
+            if step.get("name") == "Run Playwright"
+        )
+        self.assertEqual(
+            playwright_step["env"]["HEALTHFLOW_AGENTS_TOKEN"],
+            "${{ secrets.HEALTHFLOW_AGENTS_TOKEN }}",
+        )
+
 
 class HealthflowAgentsFactoryTests(unittest.TestCase):
     def test_factories_select_successor_ports_and_retain_original_appeal_agent(self):

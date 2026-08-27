@@ -16,6 +16,8 @@ services:
     build:
       context: .
       target: backend
+      secrets:
+        - HEALTHFLOW_AGENTS_TOKEN
     environment:
       - ANTHROPIC_API_KEY=test-key-not-used
       - JWT_SECRET=test-secret
