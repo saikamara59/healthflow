@@ -35,6 +35,7 @@ jobs:
           PHI_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
           EMAIL_PROVIDER: console
           FRONTEND_BASE_URL: https://test.example.com
+          HEALTHFLOW_AGENTS_TOKEN: ${{ secrets.HEALTHFLOW_AGENTS_TOKEN }}
         run: npm run test:e2e
 
       - name: Upload Playwright report on failure

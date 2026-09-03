@@ -18,5 +18,6 @@ python-dotenv>=1.0
 boto3>=1.34
 pyyaml>=6.0
 
-# The five insurance-navigation agents, tools, and PHI redaction layer
-healthflow-agents @ git+https://github.com/saikamara59/healthflow-agents.git@v0.4.0
+# The four PydanticAI successor Ports plus the original AppealAgent, shared
+# contracts/tools, and PHI redaction layer. Logfire remains opt-in at runtime.
+healthflow-agents[pydantic-ai] @ git+https://github.com/saikamara59/healthflow-agents.git@v0.5.0

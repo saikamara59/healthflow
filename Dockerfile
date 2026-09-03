@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 # ── Backend ──────────────────────────────────────────────────────────────────
 FROM python:3.12-slim AS backend
 
@@ -10,9 +12,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python deps
+# Install Python deps. The private GitHub credential is a BuildKit secret: Git
+# reads it through an ephemeral helper and neither the token nor helper config
+# is persisted in the image layer.
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=secret,id=HEALTHFLOW_AGENTS_TOKEN,required=true \
+    GIT_CONFIG_COUNT=1 \
+    GIT_CONFIG_KEY_0=credential.helper \
+    GIT_CONFIG_VALUE_0='!f() { echo "username=x-access-token"; echo "password=$(cat /run/secrets/HEALTHFLOW_AGENTS_TOKEN)"; }; f' \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy app code
 COPY healthflow/ healthflow/

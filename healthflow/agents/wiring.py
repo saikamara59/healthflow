@@ -1,12 +1,14 @@
-"""Constructs healthflow-agents package agents with HealthFlow's real audit
-and invocation-tracking implementations injected.
+"""Construct healthflow-agents implementations with HealthFlow's real audit
+and invocation-tracking infrastructure injected.
 
-Always build agents through these factories — a bare `ComparisonAgent()`
-silently falls back to the package's stdout logging, bypassing the audit
-trail and the agent_invocation_log table.
+The four available PydanticAI successor Ports are selected here. AppealAgent
+remains on the original implementation because v0.5.0 does not ship an appeal
+Port. Always build agents through these factories: bare construction silently
+falls back to package stdout logging and bypasses HealthFlow's audit trail and
+agent_invocation_log table.
 """
-from healthflow_agents import (
-    AppealAgent,
+from healthflow_agents import AppealAgent
+from healthflow_agents.pydantic_agents import (
     ComparisonAgent,
     CostCalculatorAgent,
     NetworkAgent,

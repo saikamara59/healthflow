@@ -3,6 +3,8 @@ services:
     build:
       context: .
       target: backend
+      secrets:
+        - HEALTHFLOW_AGENTS_TOKEN
     ports:
       - "8000:8000"
     environment:
@@ -38,3 +40,7 @@ services:
 
 volumes:
   redis-data:
+
+secrets:
+  HEALTHFLOW_AGENTS_TOKEN:
+    environment: HEALTHFLOW_AGENTS_TOKEN
