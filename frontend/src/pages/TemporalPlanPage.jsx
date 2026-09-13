@@ -64,6 +64,7 @@ const daysBetween = (a, b) => {
 
 // ── Input card ──────────────────────────────────────────────────────────────
 
+/** Collects the event details needed to generate a deadline plan. */
 function InputCard({ onSubmit, loading }) {
   const [mode, setMode] = useState('structured');
   const [eventType, setEventType] = useState('sep_job_loss');
@@ -237,6 +238,7 @@ function TimelineMarker({ pct, label, date, align, tone }) {
   );
 }
 
+/** Plots a deadline and its recommended actions on a proportional timeline. */
 function Timeline({ triggerDate, deadline, actions, today }) {
   const total = Math.max(1, daysBetween(triggerDate, deadline));
   const todayPct = Math.max(0, Math.min(100, (daysBetween(triggerDate, today) / total) * 100));
@@ -499,6 +501,7 @@ const DEMO_PAYLOADS = {
   },
 };
 
+/** Generates and displays an ordered action plan for a time-sensitive event. */
 export default function TemporalPlanPage() {
   const { openMenu, openNotifications } = useLayout();
   const [state, setState] = useState({ status: 'idle', plan: null, error: null, lastPayload: null });

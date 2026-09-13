@@ -7,6 +7,7 @@ import AgentMarkdown from '../components/ui/AgentMarkdown';
 import useLayout from '../components/ui/useLayout';
 import DrugAutocomplete from '../components/ui/DrugAutocomplete';
 
+/** Checks provider-network and formulary data for a client's selected plans. */
 export default function NetworkVerificationPage() {
   const { openMenu, openNotifications } = useLayout();
   const [clients, setClients] = useState([]);

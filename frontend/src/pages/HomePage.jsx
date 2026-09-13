@@ -75,6 +75,7 @@ const VIMEO_ID = '1197158139';
 // Click-to-load Vimeo facade: shows a poster + play button and loads NOTHING
 // from Vimeo until a visitor clicks — zero third-party bytes or tracking on
 // page load. dnt=1 asks Vimeo not to track.
+/** Defers loading the product-demo player until a visitor chooses to watch it. */
 function DemoVideoFrame() {
   const [playing, setPlaying] = useState(false);
   return (
@@ -111,6 +112,7 @@ function DemoVideoFrame() {
   );
 }
 
+/** Renders the public HealthFlow product overview and primary calls to action. */
 export default function HomePage() {
   const [active, setActive] = useState('compare');
   const a = AGENTS.find((x) => x.key === active);

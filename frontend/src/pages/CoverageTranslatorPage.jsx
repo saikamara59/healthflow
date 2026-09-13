@@ -31,6 +31,7 @@ const SUGGESTED = [
   'How are Tier 5 specialty drugs covered?',
 ];
 
+/** Converts plan-document content into plain-language coverage explanations. */
 export default function CoverageTranslatorPage() {
   const { openMenu, openNotifications } = useLayout();
   const [doc, setDoc] = useState(SAMPLE_DOC);

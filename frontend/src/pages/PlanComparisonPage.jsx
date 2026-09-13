@@ -21,6 +21,7 @@ function annualEstimate(plan) {
   return premium + rxTotal + procTotal + (plan.annual_deductible || 0) * 0.3;
 }
 
+/** Compares Medicare Advantage plans for a ZIP code and optional client profile. */
 export default function PlanComparisonPage() {
   const location = useLocation();
   const { openMenu, openNotifications } = useLayout();

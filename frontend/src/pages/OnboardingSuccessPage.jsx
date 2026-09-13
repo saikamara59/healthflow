@@ -7,6 +7,7 @@ import Avatar from '../components/ui/Avatar';
 import Chip from '../components/ui/Chip';
 import useLayout from '../components/ui/useLayout';
 
+/** Confirms workspace setup and directs the broker to their first client task. */
 export default function OnboardingSuccessPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();

@@ -24,6 +24,7 @@ function sinceLabel(iso) {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
+/** Presents the broker's workspace overview, active clients, and recent work. */
 export default function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();

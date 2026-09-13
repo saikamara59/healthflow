@@ -23,6 +23,7 @@ function iconForAction(type) {
   return 'history';
 }
 
+/** Displays recent workspace activity in a dismissible notification drawer. */
 export default function NotificationPanel({ open, onClose }) {
   const navigate = useNavigate();
   const [history, setHistory] = useState([]);

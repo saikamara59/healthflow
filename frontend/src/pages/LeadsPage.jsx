@@ -17,6 +17,7 @@ function sinceLabel(iso) {
   return `${Math.floor(days / 7)}w ago`;
 }
 
+/** Lists prospective clients who have not yet recorded workspace activity. */
 export default function LeadsPage() {
   const navigate = useNavigate();
   const { openMenu, openNotifications } = useLayout();

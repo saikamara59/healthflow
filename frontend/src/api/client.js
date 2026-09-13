@@ -42,6 +42,7 @@ async function refreshAccessToken() {
   }
 }
 
+/** Sends an authenticated API request and retries once after refreshing an expired session. */
 async function request(method, path, body = null) {
   const headers = { 'Content-Type': 'application/json' }
   const token = getToken()

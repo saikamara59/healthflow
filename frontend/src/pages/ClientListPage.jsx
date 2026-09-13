@@ -114,6 +114,7 @@ function downloadCsv(filename, csv) {
   URL.revokeObjectURL(url);
 }
 
+/** Displays searchable client records and the actions available for each client. */
 export default function ClientListPage() {
   const navigate = useNavigate();
   const { openMenu, openNotifications } = useLayout();

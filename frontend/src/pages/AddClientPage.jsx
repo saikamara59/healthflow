@@ -6,6 +6,7 @@ import Icon from '../components/ui/Icon';
 import useLayout from '../components/ui/useLayout';
 import DrugAutocomplete from '../components/ui/DrugAutocomplete';
 
+/** Collects and submits the details needed to create a client profile. */
 export default function AddClientPage() {
   const navigate = useNavigate();
   const { openMenu, openNotifications } = useLayout();

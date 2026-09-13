@@ -22,6 +22,7 @@ function annualEstimate(plan) {
   return premium + rxTotal + procTotal + (plan.annual_deductible || 0) * 0.3;
 }
 
+/** Formats a decision-record timestamp for display in the broker's locale. */
 function formatRecordedAt(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -46,6 +47,7 @@ function KV({ k, v }) {
 
 const RANKED_LIMIT = 5;
 
+/** Displays the supporting inputs, sources, and activity for a recorded decision. */
 export default function DecisionRecordPanel({ decisionId, open, onClose, recordedBy }) {
   const [record, setRecord] = useState(null);
   const [loading, setLoading] = useState(false);

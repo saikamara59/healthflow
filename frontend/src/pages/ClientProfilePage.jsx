@@ -20,6 +20,7 @@ function sinceLabel(iso) {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
+/** Shows a client's profile, coverage details, and recorded activity. */
 export default function ClientProfilePage() {
   const { id } = useParams();
   const navigate = useNavigate();

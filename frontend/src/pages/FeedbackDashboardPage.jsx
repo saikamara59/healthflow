@@ -11,6 +11,7 @@ function toneFor(score) {
   return 'neg';
 }
 
+/** Summarizes broker feedback and highlights responses that need review. */
 export default function FeedbackDashboardPage() {
   const { openMenu, openNotifications } = useLayout();
   const [analytics, setAnalytics] = useState(null);

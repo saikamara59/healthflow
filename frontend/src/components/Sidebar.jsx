@@ -47,6 +47,7 @@ const NAV = [
   },
 ];
 
+/** Renders the primary workspace navigation and its responsive drawer state. */
 export default function Sidebar({ open, onClose }) {
   const { user, logout } = useAuth();
   const brokerName = user?.email?.split('@')[0] || 'Broker';

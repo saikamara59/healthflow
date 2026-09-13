@@ -27,6 +27,7 @@ function groupByDay(items) {
   return groups;
 }
 
+/** Lists completed workspace activity grouped by the day it was recorded. */
 export default function ActivityPage() {
   const navigate = useNavigate();
   const { openMenu, openNotifications } = useLayout();

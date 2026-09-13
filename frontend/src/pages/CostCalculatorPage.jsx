@@ -9,6 +9,7 @@ function currency(v) {
   return `$${Math.round(v).toLocaleString()}`;
 }
 
+/** Estimates a client's annual healthcare costs from plan and usage inputs. */
 export default function CostCalculatorPage() {
   const { openMenu, openNotifications } = useLayout();
   const [clients, setClients] = useState([]);

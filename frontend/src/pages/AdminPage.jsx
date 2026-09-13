@@ -27,6 +27,7 @@ function isLocked(broker) {
   return new Date(broker.locked_until).getTime() > Date.now();
 }
 
+/** Provides administrators with broker access controls and recent activity records. */
 export default function AdminPage() {
   const { user } = useAuth();
   const { openMenu, openNotifications } = useLayout();

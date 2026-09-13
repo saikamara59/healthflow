@@ -14,6 +14,7 @@ Policy section: Section 4.2(b), Diagnostic Imaging.
 Denial date: 03/28/2026.
 You have 60 days to appeal this decision.`;
 
+/** Analyzes a denial notice and prepares supporting material for an appeal. */
 export default function ClaimsAppealPage() {
   const { openMenu, openNotifications } = useLayout();
   const [denialText, setDenialText] = useState('');

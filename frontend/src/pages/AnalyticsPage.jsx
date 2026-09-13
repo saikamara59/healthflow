@@ -4,6 +4,7 @@ import TopBar from '../components/TopBar';
 import Sparkline from '../components/ui/Sparkline';
 import useLayout from '../components/ui/useLayout';
 
+/** Summarizes client demographics and tool use across the workspace. */
 export default function AnalyticsPage() {
   const { openMenu, openNotifications } = useLayout();
   const [clients, setClients] = useState([]);

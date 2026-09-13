@@ -25,6 +25,7 @@ function actionTone(t) {
   return '';
 }
 
+/** Presents the broker's completed tool runs in reverse chronological order. */
 export default function ComparisonHistoryPage() {
   const navigate = useNavigate();
   const { openMenu, openNotifications } = useLayout();

@@ -40,6 +40,7 @@ const RESOURCES = [
   },
 ];
 
+/** Provides task-specific help resources and a direct support contact. */
 export default function SupportPage() {
   const { openMenu, openNotifications } = useLayout();
   return (

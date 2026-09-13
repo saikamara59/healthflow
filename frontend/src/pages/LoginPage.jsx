@@ -6,6 +6,7 @@ import BrandWordmark from '../components/ui/BrandWordmark'
 import '../home-v2.css'
 import '../login-v2.css'
 
+/** Authenticates a broker and routes successful sign-ins to the workspace. */
 export default function LoginPage() {
   const navigate = useNavigate()
   const { login, register } = useAuth()
