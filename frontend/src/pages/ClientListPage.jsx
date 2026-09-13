@@ -114,6 +114,7 @@ function downloadCsv(filename, csv) {
   URL.revokeObjectURL(url);
 }
 
+/** Displays searchable client records and the actions available for each client. */
 export default function ClientListPage() {
   const navigate = useNavigate();
   const { openMenu, openNotifications } = useLayout();
@@ -210,7 +211,7 @@ export default function ClientListPage() {
       <div className="page wide">
         <div className="page-head">
           <div>
-            <div className="eyebrow" style={{ marginBottom: 14 }}>Book · {clients.length} active</div>
+            <div className="eyebrow" style={{ marginBottom: 14 }}>{clients.length} active clients</div>
             <h1 className="page-title"><em>Clients</em></h1>
             <p className="page-sub">
               Sorted by most-recent touch. Click a row to open the profile, or select rows to act in bulk.
@@ -284,7 +285,7 @@ export default function ClientListPage() {
                   />
                 </th>
                 <Th k="name" sort={sort} setSort={setSort} style={{ width: '24%' }}>Client</Th>
-                <Th k="age" sort={sort} setSort={setSort}>ZIP · Age</Th>
+                <Th k="age" sort={sort} setSort={setSort}>ZIP and age</Th>
                 <th>Income</th>
                 <Th k="risk" sort={sort} setSort={setSort}>Risk</Th>
                 <th>Rx / Providers</th>
@@ -345,7 +346,7 @@ export default function ClientListPage() {
                     </td>
                     <td className="num">
                       <span>{c.prescriptions?.length || 0} Rx</span>
-                      <span className="muted"> · {c.doctors?.length || 0} dr</span>
+                      <span className="muted">, {c.doctors?.length || 0} doctors</span>
                     </td>
                     <td>
                       {na.tone === 'ghost' ? (

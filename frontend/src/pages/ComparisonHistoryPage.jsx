@@ -25,6 +25,7 @@ function actionTone(t) {
   return '';
 }
 
+/** Presents the broker's completed tool runs in reverse chronological order. */
 export default function ComparisonHistoryPage() {
   const navigate = useNavigate();
   const { openMenu, openNotifications } = useLayout();
@@ -63,10 +64,10 @@ export default function ComparisonHistoryPage() {
       <div className="page wide">
         <div className="page-head">
           <div>
-            <div className="eyebrow" style={{ marginBottom: 14 }}>{history.length} actions logged</div>
+            <div className="eyebrow" style={{ marginBottom: 14 }}>{history.length} recorded activities</div>
             <h1 className="page-title"><em>History</em></h1>
             <p className="page-sub">
-              Every comparison, verification, cost calculation, and appeal you've run — most recent first.
+              Completed comparisons, checks, cost calculations, and appeals, with the most recent first.
             </p>
           </div>
         </div>
@@ -118,7 +119,7 @@ export default function ComparisonHistoryPage() {
                     <td><Chip tone={actionTone(h.action_type)}>{h.action_type}</Chip></td>
                     <td>{h.client_name || <span className="muted">—</span>}</td>
                     <td className="muted" style={{ fontSize: 12.5 }}>
-                      {Object.entries(h.response_summary || {}).slice(0, 3).map(([k, v]) => `${k}: ${v}`).join(' · ') || '—'}
+                      {Object.entries(h.response_summary || {}).slice(0, 3).map(([k, v]) => `${k}: ${v}`).join(', ') || 'None'}
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <Icon name="chev_r" size={14} className="ink-4" />

@@ -6,23 +6,23 @@ import Chip from '../components/ui/Chip';
 import AgentMarkdown from '../components/ui/AgentMarkdown';
 import useLayout from '../components/ui/useLayout';
 
-const SAMPLE_DOC = `SUMMARY OF BENEFITS — PRIME HMO
+const SAMPLE_DOC = `SUMMARY OF BENEFITS: PRIME HMO
 Member Responsibility:
   $0 Individual Deductible (In-Network)
   $5,900 Annual Out-of-Pocket Maximum
 
 Professional Services:
-  Primary Care Visit — $0 copay
-  Specialist Visit — $35 copay (referral required)
-  Urgent Care — $45 copay
-  Emergency Room — $120 (waived if admitted)
+  Primary Care Visit: $0 copay
+  Specialist Visit: $35 copay (referral required)
+  Urgent Care: $45 copay
+  Emergency Room: $120 (waived if admitted)
 
 Prescription Drugs:
-  Tier 1 Preferred Generic — $0
-  Tier 2 Generic — $8
-  Tier 3 Preferred Brand — $40
-  Tier 4 Non-Preferred Brand — $95
-  Tier 5 Specialty — 33% coinsurance`;
+  Tier 1 Preferred Generic: $0
+  Tier 2 Generic: $8
+  Tier 3 Preferred Brand: $40
+  Tier 4 Non-Preferred Brand: $95
+  Tier 5 Specialty: 33% coinsurance`;
 
 const SUGGESTED = [
   'What is the ER copay if admitted?',
@@ -31,6 +31,7 @@ const SUGGESTED = [
   'How are Tier 5 specialty drugs covered?',
 ];
 
+/** Converts plan-document content into plain-language coverage explanations. */
 export default function CoverageTranslatorPage() {
   const { openMenu, openNotifications } = useLayout();
   const [doc, setDoc] = useState(SAMPLE_DOC);
@@ -74,7 +75,7 @@ export default function CoverageTranslatorPage() {
       <div className="page">
         <div className="page-head">
           <div>
-            <div className="eyebrow" style={{ marginBottom: 14 }}>AI-assisted · citations included</div>
+            <div className="eyebrow" style={{ marginBottom: 14 }}>Answers with source citations</div>
             <h1 className="page-title">Make benefit<br />language <em>plain.</em></h1>
             <p className="page-sub">
               Paste any Summary of Benefits and ask questions in plain English. Every answer links back to the exact
@@ -158,7 +159,7 @@ export default function CoverageTranslatorPage() {
                     <div>
                       <div className="bub-label">Translator</div>
                       <div className="bubble agent-output">
-                        <span className="loader" /> thinking…
+                        <span className="loader" /> Checking the document…
                       </div>
                     </div>
                   </div>

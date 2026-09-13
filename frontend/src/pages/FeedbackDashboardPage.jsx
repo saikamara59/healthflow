@@ -11,6 +11,7 @@ function toneFor(score) {
   return 'neg';
 }
 
+/** Summarizes broker feedback and highlights responses that need review. */
 export default function FeedbackDashboardPage() {
   const { openMenu, openNotifications } = useLayout();
   const [analytics, setAnalytics] = useState(null);
@@ -44,8 +45,8 @@ export default function FeedbackDashboardPage() {
             <div className="eyebrow" style={{ marginBottom: 14 }}>Last {analytics?.period_days || 30} days</div>
             <h1 className="page-title"><em>Feedback</em></h1>
             <p className="page-sub">
-              How the agents are performing — accuracy, clarity, and helpfulness scored by brokers after each
-              output. Drives the weekly RLHF reward loop.
+              Broker ratings for accuracy, clarity, and helpfulness after each result. Use this view to identify
+              strong results and responses that need review.
             </p>
           </div>
         </div>
@@ -73,7 +74,7 @@ export default function FeedbackDashboardPage() {
 
               <div style={{ gridColumn: 'span 8' }}>
                 <div className="card card-pad">
-                  <div className="eyebrow" style={{ marginBottom: 14 }}>By agent</div>
+                  <div className="eyebrow" style={{ marginBottom: 14 }}>By tool</div>
                   {agents.length === 0 ? (
                     <div className="muted" style={{ fontSize: 13 }}>No feedback collected yet.</div>
                   ) : (
@@ -104,11 +105,11 @@ export default function FeedbackDashboardPage() {
                 <div className="card card-pad">
                   <div className="grid-3">
                     <div>
-                      <div className="eyebrow">Best agent</div>
+                      <div className="eyebrow">Highest-rated tool</div>
                       <div style={{ fontFamily: 'var(--serif)', fontSize: 22, marginTop: 6 }}>{weekly.best_agent || '—'}</div>
                     </div>
                     <div>
-                      <div className="eyebrow">Worst agent</div>
+                      <div className="eyebrow">Needs review</div>
                       <div style={{ fontFamily: 'var(--serif)', fontSize: 22, marginTop: 6 }}>{weekly.worst_agent || '—'}</div>
                     </div>
                     <div>
@@ -125,13 +126,13 @@ export default function FeedbackDashboardPage() {
               {recent.length === 0 ? (
                 <div className="empty">
                   <div className="empty-title">No feedback yet</div>
-                  <div>Submit feedback on an agent output to populate this view.</div>
+                  <div>Submit feedback on a result to populate this view.</div>
                 </div>
               ) : (
                 <table className="tbl">
                   <thead>
                     <tr>
-                      <th>Agent</th>
+                      <th>Tool</th>
                       <th>Accuracy</th>
                       <th>Clarity</th>
                       <th>Helpfulness</th>

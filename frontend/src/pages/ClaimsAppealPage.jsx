@@ -10,10 +10,11 @@ const SAMPLE = `This letter is to inform you that your claim for MRI of the righ
 performed on 03/14/2026 has been denied.
 
 Reason for denial: Services not medically necessary.
-Policy section: Section 4.2(b) — Diagnostic Imaging.
+Policy section: Section 4.2(b), Diagnostic Imaging.
 Denial date: 03/28/2026.
 You have 60 days to appeal this decision.`;
 
+/** Analyzes a denial notice and prepares supporting material for an appeal. */
 export default function ClaimsAppealPage() {
   const { openMenu, openNotifications } = useLayout();
   const [denialText, setDenialText] = useState('');
@@ -50,7 +51,7 @@ export default function ClaimsAppealPage() {
       <div className="page wide">
         <div className="page-head">
           <div>
-            <div className="eyebrow" style={{ marginBottom: 14 }}>Denial analysis · letter drafting</div>
+            <div className="eyebrow" style={{ marginBottom: 14 }}>Denial analysis and letter drafting</div>
             <h1 className="page-title">Turn a denial into<br /><em>an appeal.</em></h1>
             <p className="page-sub">
               Paste the denial letter. HealthFlow extracts the reason code, policy citation, and deadline, surfaces
@@ -82,7 +83,7 @@ export default function ClaimsAppealPage() {
                 style={{ height: 140, border: 0, background: 'transparent', fontSize: 13 }}
                 value={context}
                 onChange={(e) => setContext(e.target.value)}
-                placeholder="Anything the reviewer should know — e.g. referring physician's notes, symptom history, prior failed treatments."
+                placeholder="Add referring physician notes, symptom history, or prior failed treatments."
               />
             </div>
 

@@ -27,6 +27,7 @@ function groupByDay(items) {
   return groups;
 }
 
+/** Lists completed workspace activity grouped by the day it was recorded. */
 export default function ActivityPage() {
   const navigate = useNavigate();
   const { openMenu, openNotifications } = useLayout();
@@ -49,10 +50,10 @@ export default function ActivityPage() {
       <div className="page">
         <div className="page-head">
           <div>
-            <div className="eyebrow" style={{ marginBottom: 14 }}>{history.length} actions logged</div>
+            <div className="eyebrow" style={{ marginBottom: 14 }}>{history.length} recorded activities</div>
             <h1 className="page-title"><em>Activity</em></h1>
             <p className="page-sub">
-              A real-time log of every comparison, verification, calculation, and appeal you've run — grouped by day.
+              A record of completed comparisons, checks, calculations, and appeals, grouped by day.
             </p>
           </div>
         </div>
@@ -85,7 +86,7 @@ export default function ActivityPage() {
                     </Chip>
                     <div className="act-body">
                       <span className="who">{a.client_name || 'Session'}</span>
-                      <span className="muted"> · {a.action_type.replace(/_/g, ' ')} session run</span>
+                      <span className="muted">. {a.action_type.replace(/_/g, ' ')} completed</span>
                     </div>
                     {a.client_id && <Icon name="chev_r" size={14} className="ink-4" />}
                   </div>

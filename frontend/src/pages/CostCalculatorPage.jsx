@@ -9,6 +9,7 @@ function currency(v) {
   return `$${Math.round(v).toLocaleString()}`;
 }
 
+/** Estimates a client's annual healthcare costs from plan and usage inputs. */
 export default function CostCalculatorPage() {
   const { openMenu, openNotifications } = useLayout();
   const [clients, setClients] = useState([]);
@@ -81,7 +82,7 @@ export default function CostCalculatorPage() {
             <h1 className="page-title"><em>Calculate</em> full-year cost.</h1>
             <p className="page-sub">
               Project a client's total out-of-pocket spend across premiums, deductibles, prescription tiers, and
-              expected procedures — for every plan in their ZIP.
+              expected procedures for plans in their ZIP.
             </p>
           </div>
         </div>
@@ -91,9 +92,9 @@ export default function CostCalculatorPage() {
             <div className="field" style={{ marginBottom: 20 }}>
               <label className="field-label">Prefill from client</label>
               <select className="select" value={clientId} onChange={(e) => applyClient(clients.find((x) => x.id === e.target.value))}>
-                <option value="">— none —</option>
+                <option value="">None</option>
                 {clients.map((c) => (
-                  <option key={c.id} value={c.id}>{c.full_name} · ZIP {c.zip_code}</option>
+                  <option key={c.id} value={c.id}>{c.full_name}, ZIP {c.zip_code}</option>
                 ))}
               </select>
             </div>
@@ -122,7 +123,7 @@ export default function CostCalculatorPage() {
 
           <div className="grid-2">
             <div>
-              <div className="eyebrow" style={{ marginBottom: 12 }}>Prescriptions · annual fills</div>
+              <div className="eyebrow" style={{ marginBottom: 12 }}>Annual prescription fills</div>
               <div className="input-group">
                 <input className="input" placeholder="Medication" value={rxName} onChange={(e) => setRxName(e.target.value)} />
                 <input
@@ -154,7 +155,7 @@ export default function CostCalculatorPage() {
             </div>
 
             <div>
-              <div className="eyebrow" style={{ marginBottom: 12 }}>Procedures · annual count</div>
+              <div className="eyebrow" style={{ marginBottom: 12 }}>Annual procedure count</div>
               <div className="input-group">
                 <input className="input" placeholder="Procedure" value={procName} onChange={(e) => setProcName(e.target.value)} />
                 <input
@@ -201,9 +202,9 @@ export default function CostCalculatorPage() {
               <div className="card" style={{ marginBottom: 28, overflow: 'hidden' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px' }}>
                   <div style={{ padding: 28 }}>
-                    <div className="eyebrow" style={{ marginBottom: 10 }}>Best value</div>
+                    <div className="eyebrow" style={{ marginBottom: 10 }}>Lowest estimated annual cost</div>
                     <h2 style={{ fontFamily: 'var(--serif)', fontSize: 26, letterSpacing: '-0.01em', lineHeight: 1.25 }}>
-                      <em style={{ color: 'var(--accent)' }}>{cheapest.plan_name}</em> — {currency(cheapest.total_annual_cost)} projected for the year.
+                      {cheapest.plan_name}: {currency(cheapest.total_annual_cost)} estimated for the year.
                     </h2>
                   </div>
                   <div style={{ background: 'var(--bg-2)', borderLeft: '1px solid var(--line)', padding: 28 }}>
@@ -212,7 +213,7 @@ export default function CostCalculatorPage() {
                       {currency(cheapest.total_annual_cost)}
                     </div>
                     <div className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>
-                      {currency(cheapest.annual_premium)} premium · {currency(cheapest.annual_care_cost)} care
+                      {currency(cheapest.annual_premium)} premium, {currency(cheapest.annual_care_cost)} care
                     </div>
                   </div>
                 </div>

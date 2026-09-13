@@ -20,6 +20,7 @@ function sinceLabel(iso) {
   return `${Math.floor(days / 30)}mo ago`;
 }
 
+/** Shows a client's profile, coverage details, and recorded activity. */
 export default function ClientProfilePage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -137,7 +138,7 @@ export default function ClientProfilePage() {
       <div className="page">
         <div style={{ marginBottom: 20 }}>
           <a onClick={() => navigate('/clients')} className="muted" style={{ fontSize: 13, cursor: 'pointer' }}>
-            ← All clients
+            Back to clients
           </a>
         </div>
 
@@ -162,7 +163,7 @@ export default function ClientProfilePage() {
               {new Date(client.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
             </div>
             <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-              Updated · {sinceLabel(client.updated_at)}
+              Updated {sinceLabel(client.updated_at)}
             </div>
           </div>
         </div>
@@ -296,7 +297,7 @@ export default function ClientProfilePage() {
               <div className="card card-pad">
                 {[
                   { icon: 'compare', label: 'Compare plans', path: '/compare' },
-                  { icon: 'history', label: 'Temporal plan', path: '/plan' },
+                  { icon: 'history', label: 'Deadline planner', path: '/plan' },
                   { icon: 'translate', label: 'Translate coverage', path: '/translator' },
                   { icon: 'network', label: 'Verify network', path: '/network' },
                   { icon: 'calculator', label: 'Estimate costs', path: '/calculator' },
@@ -326,7 +327,7 @@ export default function ClientProfilePage() {
 
         {tab === 'coverage' && (
           <div className="card card-pad" style={{ marginTop: 28, padding: 60, textAlign: 'center' }}>
-            <div className="placeholder-img" style={{ height: 240, marginBottom: 20 }}>coverage · pending</div>
+            <div className="placeholder-img" style={{ height: 240, marginBottom: 20 }}>Coverage pending</div>
             <div className="muted" style={{ maxWidth: 480, margin: '0 auto' }}>
               Once you run a plan comparison for {client.full_name}, enrolled plan details and formulary coverage will appear here.
             </div>

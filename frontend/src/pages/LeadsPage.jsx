@@ -17,6 +17,7 @@ function sinceLabel(iso) {
   return `${Math.floor(days / 7)}w ago`;
 }
 
+/** Lists prospective clients who have not yet recorded workspace activity. */
 export default function LeadsPage() {
   const navigate = useNavigate();
   const { openMenu, openNotifications } = useLayout();
@@ -55,7 +56,7 @@ export default function LeadsPage() {
             <h1 className="page-title"><em>Leads</em></h1>
             <p className="page-sub">
               Prospects added in the last 14 days, plus any clients who've gone quiet for a month or more. Convert a
-              lead by running a comparison — it marks activity on the account.
+              lead by running a comparison. That activity is recorded on the account.
             </p>
           </div>
         </div>
@@ -79,7 +80,7 @@ export default function LeadsPage() {
                   <thead>
                     <tr>
                       <th>Name</th>
-                      <th>ZIP · Age</th>
+                      <th>ZIP and age</th>
                       <th>Income</th>
                       <th>Added</th>
                       <th></th>
@@ -96,7 +97,7 @@ export default function LeadsPage() {
                               <div style={{ fontWeight: 500 }}>{c.full_name}</div>
                             </div>
                           </td>
-                          <td>{c.zip_code} · {c.age}</td>
+                          <td>{c.zip_code}, age {c.age}</td>
                           <td><Chip tone={tone} dot>{c.income_level}</Chip></td>
                           <td className="muted">{sinceLabel(c.created_at)}</td>
                           <td style={{ textAlign: 'right' }}>

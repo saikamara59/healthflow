@@ -22,8 +22,8 @@ const NAV = [
     items: [
       { path: '/compare', label: 'Plan comparison', icon: 'compare' },
       { path: '/translator', label: 'Coverage translator', icon: 'translate' },
-      { path: '/plan', label: 'Temporal plan', icon: 'history' },
-      { path: '/network', label: 'Network verify', icon: 'network' },
+      { path: '/plan', label: 'Deadline planner', icon: 'history' },
+      { path: '/network', label: 'Network check', icon: 'network' },
       { path: '/calculator', label: 'Cost calculator', icon: 'calculator' },
       { path: '/appeals', label: 'Claim appeals', icon: 'appeal' },
     ],
@@ -47,6 +47,7 @@ const NAV = [
   },
 ];
 
+/** Renders the primary workspace navigation and its responsive drawer state. */
 export default function Sidebar({ open, onClose }) {
   const { user, logout } = useAuth();
   const brokerName = user?.email?.split('@')[0] || 'Broker';

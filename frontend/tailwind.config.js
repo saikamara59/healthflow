@@ -56,11 +56,11 @@ export default {
         "inverse-primary": "#a8c8ff",
       },
       fontFamily: {
-        logo: ["Saira Stencil One", "sans-serif"],
-        display: ["Merriweather", "serif"],
-        headline: ["Manrope", "sans-serif"],
-        body: ["Inter", "sans-serif"],
-        label: ["Inter", "sans-serif"],
+        logo: ["DM Sans", "sans-serif"],
+        display: ["Lora", "serif"],
+        headline: ["Lora", "serif"],
+        body: ["DM Sans", "sans-serif"],
+        label: ["DM Sans", "sans-serif"],
       },
       borderRadius: {
         DEFAULT: "0.25rem",

@@ -15,7 +15,7 @@ const MD_COMPONENTS = {
 };
 
 /**
- * Renders an agent's freeform markdown response with Times New Roman prose
+ * Renders an agent's freeform markdown response with Merriweather prose
  * styling. Tables, lists, bold, and headings come through via remark-gfm so
  * we don't ship raw asterisks and pipes to the user. remark-breaks converts
  * single newlines to <br> so letter-style output (appeal letters, etc.)

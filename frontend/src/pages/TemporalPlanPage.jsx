@@ -10,11 +10,11 @@ import useLayout from '../components/ui/useLayout';
 const EVENT_TYPE_OPTIONS = [
   { value: 'open_enrollment', label: 'Open Enrollment' },
   { value: 'medicare_aep', label: 'Medicare AEP' },
-  { value: 'sep_job_loss', label: 'SEP — Job loss', isSep: true },
-  { value: 'sep_marriage', label: 'SEP — Marriage', isSep: true },
-  { value: 'sep_birth', label: 'SEP — Birth or adoption', isSep: true },
-  { value: 'sep_move', label: 'SEP — Move', isSep: true },
-  { value: 'sep_divorce', label: 'SEP — Divorce', isSep: true },
+  { value: 'sep_job_loss', label: 'SEP: Job loss', isSep: true },
+  { value: 'sep_marriage', label: 'SEP: Marriage', isSep: true },
+  { value: 'sep_birth', label: 'SEP: Birth or adoption', isSep: true },
+  { value: 'sep_move', label: 'SEP: Move', isSep: true },
+  { value: 'sep_divorce', label: 'SEP: Divorce', isSep: true },
   { value: 'pa_appeal', label: 'Prior Authorization appeal', isPaAppeal: true },
 ];
 
@@ -64,6 +64,7 @@ const daysBetween = (a, b) => {
 
 // ── Input card ──────────────────────────────────────────────────────────────
 
+/** Collects the event details needed to generate a deadline plan. */
 function InputCard({ onSubmit, loading }) {
   const [mode, setMode] = useState('structured');
   const [eventType, setEventType] = useState('sep_job_loss');
@@ -89,7 +90,7 @@ function InputCard({ onSubmit, loading }) {
   return (
     <div className="card card-pad" style={{ padding: 28, marginBottom: 28 }}>
       <div className="between" style={{ marginBottom: 18 }}>
-        <div className="eyebrow">Plan a temporal event</div>
+        <div className="eyebrow">Create a deadline plan</div>
         <div className="row" style={{ gap: 4 }}>
           <button
             className={`btn sm ${mode === 'structured' ? 'primary' : 'ghost'}`}
@@ -168,7 +169,7 @@ function InputCard({ onSubmit, loading }) {
           />
           <div className="row" style={{ justifyContent: 'flex-end', marginTop: 12, gap: 8 }}>
             <span className="muted" style={{ fontSize: 12 }}>
-              The agent will infer the event type and trigger date.
+              HealthFlow will identify the event type and trigger date from the description.
             </span>
             <button className="btn accent" onClick={submit} disabled={loading || !text.trim()} type="button">
               {loading ? 'Generating…' : <>Generate plan <Icon name="arrow_r" size={14} /></>}
@@ -237,6 +238,7 @@ function TimelineMarker({ pct, label, date, align, tone }) {
   );
 }
 
+/** Plots a deadline and its recommended actions on a proportional timeline. */
 function Timeline({ triggerDate, deadline, actions, today }) {
   const total = Math.max(1, daysBetween(triggerDate, deadline));
   const todayPct = Math.max(0, Math.min(100, (daysBetween(triggerDate, today) / total) * 100));
@@ -250,7 +252,7 @@ function Timeline({ triggerDate, deadline, actions, today }) {
       <div className="between" style={{ marginBottom: 18 }}>
         <div className="eyebrow">Timeline</div>
         <div className="muted mono" style={{ fontSize: 11 }}>
-          {total} days · today is {fmtDateShort(today)}
+          {total} days. Today is {fmtDateShort(today)}
         </div>
       </div>
       <div style={{ position: 'relative', padding: '40px 0 50px' }}>
@@ -269,7 +271,7 @@ function Timeline({ triggerDate, deadline, actions, today }) {
             return (
               <div
                 key={a.step}
-                title={`#${a.step} · ${fmtDateShort(a.target_date)}`}
+                title={`Step ${a.step}, ${fmtDateShort(a.target_date)}`}
                 style={{
                   position: 'absolute', left: `${a.pct}%`, top: -4,
                   width: 12, height: 12, marginLeft: -6, borderRadius: '50%',
@@ -499,6 +501,7 @@ const DEMO_PAYLOADS = {
   },
 };
 
+/** Generates and displays an ordered action plan for a time-sensitive event. */
 export default function TemporalPlanPage() {
   const { openMenu, openNotifications } = useLayout();
   const [state, setState] = useState({ status: 'idle', plan: null, error: null, lastPayload: null });
@@ -526,20 +529,20 @@ export default function TemporalPlanPage() {
   return (
     <>
       <TopBar
-        crumbs={['Tools', 'Plan']}
+        crumbs={['Tools', 'Deadline planner']}
         onMenuClick={openMenu}
         onNotificationsClick={openNotifications}
       />
       <div className="page">
         <div className="page-head">
           <div>
-            <div className="eyebrow" style={{ marginBottom: 14 }}>Temporal Plan Agent</div>
+            <div className="eyebrow" style={{ marginBottom: 14 }}>Deadline planner</div>
             <h1 className="page-title">
-              Turn a deadline into a <em>plan.</em>
+              Turn a deadline into an action plan.
             </h1>
             <p className="page-sub">
-              Describe what just happened — a life event, a denial, an enrollment window —
-              and the agent returns an ordered action list, anchored to the real dates.
+              Describe a life event, denial, or enrollment window. HealthFlow creates an ordered action list
+              tied to the relevant dates.
             </p>
           </div>
           <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>

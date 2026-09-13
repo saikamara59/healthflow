@@ -7,6 +7,7 @@ import Avatar from '../components/ui/Avatar';
 import Chip from '../components/ui/Chip';
 import useLayout from '../components/ui/useLayout';
 
+/** Confirms workspace setup and directs the broker to their first client task. */
 export default function OnboardingSuccessPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -35,8 +36,8 @@ export default function OnboardingSuccessPage() {
               <em>{client?.full_name || 'New client'}</em> is now<br />in your book.
             </h1>
             <p className="page-sub" style={{ margin: '16px auto 0' }}>
-              Run a comparison, translate their plan documents, or verify their provider network — whatever kicks
-              off the relationship.
+              Run a comparison, explain their plan documents, or check their provider network. Start with the task
+              that is most useful for this client.
             </p>
           </div>
         </div>

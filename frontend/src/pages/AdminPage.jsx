@@ -27,6 +27,7 @@ function isLocked(broker) {
   return new Date(broker.locked_until).getTime() > Date.now();
 }
 
+/** Provides administrators with broker access controls and recent activity records. */
 export default function AdminPage() {
   const { user } = useAuth();
   const { openMenu, openNotifications } = useLayout();
@@ -60,9 +61,8 @@ export default function AdminPage() {
     const locked = brokers.filter(isLocked).length;
     const pending = brokers.filter((b) => !b.is_active).length;
     const admins = brokers.filter((b) => b.role === 'admin').length;
-    const since = Date.now() - 24 * 3600 * 1000;
-    const last24 = audit.filter((a) => new Date(a.created_at).getTime() > since).length;
-    return { total: brokers.length, locked, pending, admins, last24 };
+    const recentTools = new Set(audit.map((a) => a.agent)).size;
+    return { total: brokers.length, locked, pending, admins, recentTools };
   }, [brokers, audit]);
 
   const unlock = async (broker) => {
@@ -129,11 +129,11 @@ export default function AdminPage() {
       <div className="page wide">
         <div className="page-head">
           <div>
-            <div className="eyebrow" style={{ marginBottom: 14 }}>Administration · Workspace</div>
-            <h1 className="page-title">The <em>controls</em> behind your agency.</h1>
+            <div className="eyebrow" style={{ marginBottom: 14 }}>Administration</div>
+            <h1 className="page-title">Workspace administration</h1>
             <p className="page-sub">
-              Manage broker access, unlock accounts that hit the rate limiter, and replay any
-              agent-driven case for forensic review. Only visible to admins.
+              Manage broker access, unlock accounts that reach the sign-in limit, and review recorded cases.
+              Only administrators can see this page.
             </p>
           </div>
         </div>
@@ -152,7 +152,7 @@ export default function AdminPage() {
             <div className="stat">
               <div className="label">Team</div>
               <div className="value num">{loading ? '—' : stats.total}</div>
-              <div className="delta">{stats.admins} admin · {stats.total - stats.admins} broker</div>
+              <div className="delta">{stats.admins} admin, {stats.total - stats.admins} broker</div>
             </div>
             <div className="stat">
               <div className="label">Pending approval</div>
@@ -164,14 +164,14 @@ export default function AdminPage() {
               </div>
             </div>
             <div className="stat">
-              <div className="label">Agent invocations (24h)</div>
-              <div className="value num">{loading ? '—' : stats.last24}</div>
-              <div className="delta">across {new Set(audit.map((a) => a.agent)).size || 0} agents</div>
+              <div className="label">Tools represented</div>
+              <div className="value num">{loading ? '—' : stats.recentTools}</div>
+              <div className="delta">across the recent entries below</div>
             </div>
             <div className="stat">
-              <div className="label">Audit log retention</div>
-              <div className="value num">∞</div>
-              <div className="delta">append-only, HIPAA-grade</div>
+              <div className="label">Recent entries loaded</div>
+              <div className="value num">{loading ? '—' : audit.length}</div>
+              <div className="delta">latest activity available for review</div>
             </div>
           </div>
         </div>
@@ -277,14 +277,13 @@ export default function AdminPage() {
         </div>
 
         <div className="section-head">
-          <h2>Forensics replay</h2>
-          <div className="after">Reconstruct a case timeline from the audit log</div>
+          <h2>Case history</h2>
+          <div className="after">Review recorded activity for a case</div>
         </div>
         <div className="card card-pad" style={{ marginBottom: 36 }}>
           <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.6, marginBottom: 16 }}>
-            Paste a <code>case_id</code> from the audit log below. The replay walks every agent invocation
-            tagged to that case and joins it against PHI access events within a configurable window. The
-            backend self-audits every replay query into <code>forensics_access_log</code>.
+            Paste a <code>case_id</code> from the activity list below to review its recorded tool runs and
+            related access events.
           </p>
           <div className="replay-input-row">
             <input
@@ -300,7 +299,7 @@ export default function AdminPage() {
               onClick={runReplay}
               disabled={replayLoading || !replayCaseId.trim()}
             >
-              <Icon name="history" size={14} /> {replayLoading ? 'Replaying…' : 'Replay'}
+              <Icon name="history" size={14} /> {replayLoading ? 'Loading…' : 'View history'}
             </button>
           </div>
 
@@ -314,11 +313,11 @@ export default function AdminPage() {
             <div style={{ marginTop: 12 }}>
               <div className="row" style={{ gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
                 <div>
-                  <div className="eyebrow">Invocations</div>
+                  <div className="eyebrow">Tool runs</div>
                   <div className="num" style={{ fontSize: 22 }}>{replayResult.invocations?.length || 0}</div>
                 </div>
                 <div>
-                  <div className="eyebrow">Integrity</div>
+                  <div className="eyebrow">Record status</div>
                   <div style={{ fontSize: 14 }}>
                     <Chip tone={replayResult.integrity?.tamper_evidence === 'clean' ? 'pos' : 'warn'} dot>
                       {replayResult.integrity?.tamper_evidence || 'unknown'}
@@ -332,8 +331,8 @@ export default function AdminPage() {
               </div>
               {(replayResult.invocations || []).length === 0 ? (
                 <div className="muted" style={{ fontSize: 13 }}>
-                  No invocations found for this case under your tenant scope. Forensics is scoped to
-                  the admin's own broker_id — to populate, log in as this admin and run a comparison.
+                  No tool runs were found for this case in your agency workspace. Run a comparison while signed in
+                  as this administrator to create an entry.
                 </div>
               ) : (
                 <div className="card" style={{ background: 'var(--bg-2)' }}>
@@ -342,11 +341,11 @@ export default function AdminPage() {
                       <span className="mono muted ri-time">{sinceLabel(inv.timestamp)}</span>
                       <Chip>{inv.agent}</Chip>
                       <span className="mono ri-endpoint">
-                        {inv.endpoint} · {inv.event_type}
+                        {inv.endpoint}, {inv.event_type}
                       </span>
                       <span className="muted mono ri-duration">
                         {inv.duration_ms != null ? `${inv.duration_ms}ms` : '—'}
-                        {inv.phi_row_count > 0 && ` · ${inv.phi_row_count} PHI`}
+                        {inv.phi_row_count > 0 && `, ${inv.phi_row_count} personal-data rows`}
                       </span>
                     </div>
                   ))}
@@ -357,15 +356,14 @@ export default function AdminPage() {
         </div>
 
         <div className="section-head">
-          <h2>Audit log</h2>
-          <div className="after">Most-recent agent invocations across the workspace</div>
+          <h2>Recorded tool activity</h2>
+          <div className="after">Most recent tool runs across the workspace</div>
         </div>
         <div className="card card-pad" style={{ marginBottom: 60 }}>
           {loading && <div className="loader" />}
           {!loading && audit.length === 0 && (
             <div className="muted" style={{ fontSize: 13 }}>
-              No agent invocations recorded yet. Run a plan comparison or coverage translation to
-              populate the log.
+              No tool runs recorded yet. Run a plan comparison or coverage translation to add activity.
             </div>
           )}
           {!loading && audit.length > 0 && (
@@ -387,14 +385,14 @@ export default function AdminPage() {
                       {a.endpoint}
                       {a.case_id && (
                         <>
-                          {' · case '}
+                          {' case '}
                           <span
                             onClick={() => {
                               setReplayCaseId(a.case_id);
                               document.querySelector('.page.wide')?.scrollTo?.({ top: 0, behavior: 'smooth' });
                               window.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
-                            title="Click to copy into the forensics replay input"
+                            title="Use this ID in the case history field"
                             style={{
                               color: 'var(--accent)',
                               cursor: 'pointer',
