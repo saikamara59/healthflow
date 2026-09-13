@@ -144,16 +144,16 @@ export default function PlanComparisonPage() {
         <div className="page-head">
           <div>
             <div className="eyebrow" style={{ marginBottom: 14 }}>
-              {selectedClient ? `For · ${selectedClient.full_name} · ${zip}` : `ZIP ${zip}`}
+              {selectedClient ? `For ${selectedClient.full_name}, ZIP ${zip}` : `ZIP ${zip}`}
             </div>
             <h1 className="page-title">
               {step === 'results' && cheapestIdx >= 0
-                ? <>Plans compared,<br /><em>one clear choice.</em></>
-                : <><em>Compare</em> Medicare Advantage plans.</>}
+                ? <>Comparison results</>
+                : <>Compare Medicare Advantage plans.</>}
             </h1>
             <p className="page-sub">
-              Real-time CMS plan filings for the ZIP you enter, ranked by total cost given the client's medications
-              and expected procedures. Star rating is CMS 2026.
+              Plan data from the current CMS snapshot, ranked by estimated annual cost using the client's medications
+              and expected procedures. Star ratings come from the same snapshot.
             </p>
           </div>
         </div>
@@ -176,9 +176,9 @@ export default function PlanComparisonPage() {
                     else setClientId('');
                   }}
                 >
-                  <option value="">— none —</option>
+                  <option value="">None</option>
                   {clientOptions.map((c) => (
-                    <option key={c.id} value={c.id}>{c.full_name} · ZIP {c.zip_code}</option>
+                    <option key={c.id} value={c.id}>{c.full_name}, ZIP {c.zip_code}</option>
                   ))}
                 </select>
               </div>
@@ -320,7 +320,7 @@ export default function PlanComparisonPage() {
                 }}
               >
                 <Icon name="check" size={14} /> {selectToast}
-                {clientId ? ' — saved to client history.' : ''}
+                {clientId ? '. Saved to client history.' : ''}
               </div>
             )}
 
@@ -338,14 +338,14 @@ export default function PlanComparisonPage() {
                     className={`plan-card ${isBest ? 'best' : ''}`}
                     style={isSelected ? { boxShadow: '0 0 0 2px var(--accent)' } : undefined}
                   >
-                    {isBest && <span className="best-tag">Best value</span>}
+                    {isBest && <span className="best-tag">Lowest estimated annual cost</span>}
                     <div>
                       <div className="eyebrow">{p.plan_type}</div>
                       <h3 style={{ fontFamily: 'var(--serif)', fontSize: 22, lineHeight: 1.2, marginTop: 6 }}>{p.plan_name}</h3>
                       <div className="row" style={{ gap: 10, marginTop: 10 }}>
                         <Stars value={p.star_rating} />
                         <span className="muted mono" style={{ fontSize: 11 }}>
-                          {p.star_rating?.toFixed(1)} · {p.drug_coverage ? 'Rx included' : 'No Rx'}
+                          {p.star_rating?.toFixed(1)}, {p.drug_coverage ? 'Rx included' : 'No Rx'}
                         </span>
                       </div>
                     </div>
@@ -469,7 +469,7 @@ export default function PlanComparisonPage() {
               decisionId={result.decision_id}
               open={whyOpen}
               onClose={() => setWhyOpen(false)}
-              recordedBy={user?.email ? `You · ${user.email}` : 'You'}
+              recordedBy={user?.email ? `You, ${user.email}` : 'You'}
             />
           </>
         )}

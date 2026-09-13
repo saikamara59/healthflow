@@ -72,7 +72,7 @@ async function request(method, path, body = null) {
     // password" on a failed login). Fall back to a friendlier phrasing
     // than the verbatim HTTP status text.
     const errorData = await res.json().catch(() => ({}))
-    const error = new Error(errorData.detail || 'Your session ended — please sign in again.')
+    const error = new Error(errorData.detail || 'Your session ended. Please sign in again.')
     error.status = 401
     error.data = errorData
     throw error

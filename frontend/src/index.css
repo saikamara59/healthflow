@@ -4,7 +4,7 @@
 
 /* =====================================================================
  * HealthFlow design system
- * Instrument Serif (display) + Geist sans (UI) + Geist Mono (eyebrows)
+ * Lora (display) + DM Sans (UI) + Merriweather (long-form results)
  * Off-white warm bg, deep teal-slate accent, desaturated semantic tones
  * ===================================================================== */
 
@@ -35,9 +35,10 @@
   --radius: 6px;
   --radius-lg: 10px;
 
-  --serif: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
-  --sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --mono: 'Geist Mono', ui-monospace, Menlo, monospace;
+  --serif: 'Lora', Georgia, serif;
+  --sans: 'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --prose: 'Merriweather', Georgia, serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 html[data-mode="dark"] {
@@ -110,7 +111,6 @@ body {
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  font-feature-settings: "ss01", "cv11";
 }
 button { font-family: inherit; cursor: pointer; border: 0; background: none; color: inherit; padding: 0; }
 input, textarea, select { font-family: inherit; color: inherit; }
@@ -124,7 +124,7 @@ a { color: inherit; text-decoration: none; }
    The element children are emitted by react-markdown — we style them as prose
    so heading/list/table syntax stops leaking through as raw punctuation. */
 .agent-output {
-  font-family: 'Times New Roman', Times, serif;
+  font-family: var(--prose);
   color: var(--ink);
   font-size: 15px;
   line-height: 1.6;
@@ -134,7 +134,7 @@ a { color: inherit; text-decoration: none; }
 .agent-output > :last-child { margin-bottom: 0; }
 .agent-output p { margin: 0 0 12px; line-height: 1.6; }
 .agent-output h1, .agent-output h2, .agent-output h3, .agent-output h4 {
-  font-family: 'Times New Roman', Times, serif;
+  font-family: var(--prose);
   font-weight: 700;
   line-height: 1.25;
   margin: 24px 0 10px;
@@ -320,11 +320,10 @@ a { color: inherit; text-decoration: none; }
   .compare-rec-aside { border-left: 0; border-top: 1px solid var(--line); padding: 22px 20px; }
 }
 .eyebrow {
-  font-family: var(--mono);
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--ink-3);
 }
 .num { font-feature-settings: "tnum", "ss01"; font-variant-numeric: tabular-nums; }
@@ -381,10 +380,10 @@ html[data-mode="dark"] .brand-mark {
   font-size: 19px;
 }
 
-/* v2 wordmark — "Health" inherits color, "Flow" carries the brand gradient.
+/* Wordmark: "Health" inherits color, "Flow" carries the brand gradient.
    Rendered by the BrandWordmark component; reused in sidebar, login, landing. */
 .hf-wordmark {
-  font-family: 'Space Grotesk', var(--sans);
+  font-family: var(--sans);
   font-weight: 700;
   letter-spacing: -0.015em;
   color: inherit;
@@ -398,15 +397,15 @@ html[data-mode="dark"] .brand-mark {
   color: transparent;
 }
 .brand-tag {
-  font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.14em;
-  color: var(--ink-4); text-transform: uppercase; margin-left: auto;
+  font-family: var(--sans); font-size: 10px; letter-spacing: 0.02em;
+  color: var(--ink-4); margin-left: auto;
   align-self: center;
 }
 
 .nav-group { margin-top: 10px; }
 .nav-group-label {
-  font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
-  text-transform: uppercase; color: var(--ink-4);
+  font-family: var(--sans); font-size: 11px; letter-spacing: 0.01em;
+  color: var(--ink-4);
   padding: 6px 10px 8px;
 }
 .nav-item {
@@ -489,8 +488,8 @@ html[data-mode="dark"] .brand-mark {
 @media (max-width: 900px) { .page { padding: 24px 20px; } }
 
 .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 40px; margin-bottom: 36px; flex-wrap: wrap; }
-.page-title { font-family: var(--serif); font-size: 48px; line-height: 1.05; letter-spacing: -0.02em; }
-.page-title em { font-style: italic; color: var(--accent); }
+.page-title { font-family: var(--serif); font-size: 48px; line-height: 1.08; letter-spacing: -0.01em; }
+.page-title em { font-style: normal; color: inherit; }
 .page-sub { color: var(--ink-3); margin-top: 10px; max-width: 560px; font-size: 14.5px; }
 @media (max-width: 900px) { .page-title { font-size: 36px; } }
 
@@ -542,7 +541,7 @@ html[data-mode="dark"] .brand-mark {
 .stat .value { font-family: var(--serif); font-size: 38px; line-height: 1; letter-spacing: -0.02em; }
 .stat .value .unit { font-size: 18px; color: var(--ink-3); margin-left: 4px; }
 .stat .delta {
-  font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+  font-family: var(--sans); font-size: 11.5px; color: var(--ink-3);
   margin-top: 10px; display: flex; align-items: center; gap: 6px;
 }
 .stat .delta.pos { color: var(--pos); }
@@ -671,8 +670,8 @@ html[data-mode="dark"] .brand-mark {
 .plan-card .best-tag {
   position: absolute; top: -9px; left: 20px;
   background: var(--accent); color: #fff;
-  font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em;
-  padding: 3px 8px; border-radius: 3px; text-transform: uppercase;
+  font-family: var(--sans); font-size: 10.5px; letter-spacing: 0;
+  padding: 3px 8px; border-radius: 3px;
 }
 .plan-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 0; }
 .plan-metric .k { font-size: 11.5px; color: var(--ink-3); }
@@ -763,7 +762,7 @@ html[data-mode="dark"] .brand-mark {
 .kv-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px 40px; }
 @media (max-width: 700px) { .kv-grid { grid-template-columns: repeat(2, 1fr); gap: 20px 24px; } }
 .kv { display: flex; flex-direction: column; gap: 4px; }
-.kv .k { font-size: 11.5px; color: var(--ink-3); font-family: var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
+.kv .k { font-size: 11.5px; color: var(--ink-3); font-family: var(--sans); letter-spacing: 0; }
 .kv .v { font-size: 15px; color: var(--ink); }
 
 .section-head { display: flex; align-items: baseline; justify-content: space-between; margin: 32px 0 16px; gap: 16px; flex-wrap: wrap; }
@@ -795,7 +794,7 @@ html[data-mode="dark"] .brand-mark {
   font-size: 13.5px; line-height: 1.6;
 }
 .msg.user .bubble { background: var(--ink); color: var(--bg); }
-.msg .bub-label { font-family: var(--mono); font-size: 10px; color: var(--ink-4); margin-bottom: 4px; letter-spacing: 0.1em; text-transform: uppercase; }
+.msg .bub-label { font-family: var(--sans); font-size: 10.5px; color: var(--ink-4); margin-bottom: 4px; letter-spacing: 0; }
 
 /* scrollbars */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -810,7 +809,7 @@ html[data-mode="dark"] .brand-mark {
     repeating-linear-gradient(135deg, var(--bg-2) 0 8px, var(--bg-3) 8px 16px);
   overflow: hidden;
   display: flex; align-items: center; justify-content: center;
-  color: var(--ink-4); font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-4); font-family: var(--sans); font-size: 10.5px; letter-spacing: 0;
 }
 
 /* grids */
@@ -998,13 +997,13 @@ html[data-density="compact"] .act-row { padding: 9px 0; }
 /* sections */
 .why-section { padding: 20px 0; border-top: 1px solid var(--line); margin-top: 16px; }
 .why-section-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
-.why-section-note { font-size: 11px; color: var(--ink-4); font-family: var(--mono); }
+.why-section-note { font-size: 11px; color: var(--ink-4); font-family: var(--sans); }
 
 /* inputs kv grid */
 .why-kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .why-kv { display: flex; flex-direction: column; gap: 3px; padding: 11px 13px; background: var(--card); }
 .why-kv:last-child:nth-child(odd) { grid-column: span 2; }
-.why-kv-k { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.why-kv-k { font-family: var(--sans); font-size: 10.5px; letter-spacing: 0; color: var(--ink-3); }
 .why-kv-v { font-size: 14px; color: var(--ink); }
 
 /* ranked against */
@@ -1042,7 +1041,7 @@ html[data-density="compact"] .act-row { padding: 9px 0; }
 .why-foot-seal .ic { color: var(--accent); }
 .why-foot-grid { display: flex; flex-wrap: wrap; gap: 10px 24px; margin-bottom: 14px; }
 .why-foot-kv { display: flex; flex-direction: column; gap: 2px; }
-.why-foot-k { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-4); }
+.why-foot-k { font-family: var(--sans); font-size: 10px; letter-spacing: 0; color: var(--ink-4); }
 .why-foot-v { font-size: 13px; color: var(--ink); }
 .why-foot-id {
   display: flex; flex-direction: column; gap: 3px;

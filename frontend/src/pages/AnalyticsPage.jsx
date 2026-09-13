@@ -76,7 +76,7 @@ export default function AnalyticsPage() {
             <div className="eyebrow" style={{ marginBottom: 14 }}>Book-level view</div>
             <h1 className="page-title"><em>Analytics</em></h1>
             <p className="page-sub">
-              Trends across your entire book — income mix, age distribution, and tool use.
+              Trends across your clients, including income level, age distribution, and tool use.
             </p>
           </div>
         </div>

@@ -5,9 +5,9 @@ import Icon from './ui/Icon';
 import Stars from './ui/Stars';
 import AgentMarkdown from './ui/AgentMarkdown';
 
-// "Why this recommendation" — the audit-grade Decision Record drawer.
+// "Why this recommendation" decision record drawer.
 // Reads GET /decisions/{decisionId} (captured at /compare time) and renders it
-// as a defensible, attributable record. Mirrors the design in why_panel.jsx.
+// with its inputs, source details, and recorded activity.
 
 function currency(v) {
   if (v == null || Number.isNaN(v)) return '—';
@@ -28,7 +28,7 @@ function formatRecordedAt(iso) {
   if (Number.isNaN(d.getTime())) return iso;
   const date = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  return `${date} · ${time}`;
+  return `${date}, ${time}`;
 }
 
 function cap(s) {
@@ -213,14 +213,14 @@ export default function DecisionRecordPanel({ decisionId, open, onClose, recorde
               )}
             </div>
 
-            {/* Footer attribution */}
+            {/* Record details */}
             <footer className="why-foot">
               <div className="why-foot-seal">
                 <Icon name="appeal" size={15} />
-                <span>Signed &amp; recorded</span>
+                <span>Saved to the decision record</span>
               </div>
               <div className="why-foot-grid">
-                <div className="why-foot-kv"><span className="why-foot-k">Agent</span><span className="why-foot-v mono">{record.agent_type}</span></div>
+                <div className="why-foot-kv"><span className="why-foot-k">Tool</span><span className="why-foot-v mono">{record.agent_type}</span></div>
                 <div className="why-foot-kv"><span className="why-foot-k">Model</span><span className="why-foot-v mono">{record.model_used || '—'}</span></div>
                 <div className="why-foot-kv"><span className="why-foot-k">Recorded by</span><span className="why-foot-v">{recordedBy || 'You'}</span></div>
               </div>

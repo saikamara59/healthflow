@@ -5,12 +5,12 @@ import useLayout from '../components/ui/useLayout';
 const RESOURCES = [
   {
     title: 'Plan comparison',
-    desc: 'How the cost ranking works, what CMS data feeds it, and how to override the recommendation.',
+    desc: 'How cost ranking works, which CMS snapshot is used, and how to review a recommendation.',
     icon: 'compare',
   },
   {
-    title: 'Temporal plan',
-    desc: 'Map a client\'s next 12 months — enrollment windows, renewal dates, and the SEPs they\'re eligible for.',
+    title: 'Deadline planner',
+    desc: 'Create an action list for enrollment windows, renewal dates, and eligible special enrollment periods.',
     icon: 'history',
   },
   {
@@ -19,13 +19,13 @@ const RESOURCES = [
     icon: 'translate',
   },
   {
-    title: 'Network verification',
+    title: 'Network check',
     desc: 'How the NPI registry and formulary lookups work. Warning codes and what to do about them.',
     icon: 'network',
   },
   {
     title: 'Cost calculator',
-    desc: 'The math behind annual projections — premiums, deductible burn, copays, and OOP caps.',
+    desc: 'The math behind annual estimates, including premiums, deductibles, copays, and out-of-pocket limits.',
     icon: 'calculator',
   },
   {
@@ -34,8 +34,8 @@ const RESOURCES = [
     icon: 'appeal',
   },
   {
-    title: 'Feedback & RLHF',
-    desc: 'How your ratings feed the weekly reward model and improve agent outputs.',
+    title: 'Feedback',
+    desc: 'How broker ratings help identify useful results and responses that need review.',
     icon: 'feedback',
   },
 ];
@@ -51,8 +51,8 @@ export default function SupportPage() {
             <div className="eyebrow" style={{ marginBottom: 14 }}>How it works</div>
             <h1 className="page-title"><em>Support</em></h1>
             <p className="page-sub">
-              Short explainers for each tool, plus a direct line if something's unclear. HealthFlow is new — if you
-              hit a rough edge, tell us.
+              Short explainers for each tool, plus a direct line if something is unclear. If you encounter a problem,
+              tell us what happened.
             </p>
           </div>
         </div>
@@ -76,7 +76,7 @@ export default function SupportPage() {
         <div className="card card-pad" style={{ maxWidth: 720 }}>
           <p style={{ fontSize: 14, color: 'var(--ink-2)', lineHeight: 1.7, marginBottom: 20 }}>
             HealthFlow is built and maintained by Saidu Kamara. For feature requests, bug reports, or a walkthrough of
-            the tools, email directly — typical response within one business day.
+            the tools, email directly. We typically respond within one business day.
           </p>
           <a href="mailto:mhsaidu@gmail.com" className="btn accent">
             <Icon name="send" size={14} /> Email support

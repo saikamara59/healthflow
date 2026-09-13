@@ -57,7 +57,7 @@ export default function NotificationPanel({ open, onClose }) {
           }}
         >
           <div>
-            <div className="eyebrow">Live feed</div>
+            <div className="eyebrow">Recent activity</div>
             <h2 style={{ fontFamily: 'var(--serif)', fontSize: 26, letterSpacing: '-0.01em', marginTop: 4 }}>
               Notifications
             </h2>
@@ -71,8 +71,8 @@ export default function NotificationPanel({ open, onClose }) {
           {loading && <div className="empty"><div className="loader" /></div>}
           {!loading && history.length === 0 && (
             <div className="empty">
-              <div className="empty-title">All quiet</div>
-              <div>Run a comparison or verification to start receiving activity notifications here.</div>
+              <div className="empty-title">No notifications yet</div>
+              <div>Completed comparisons and checks will appear here.</div>
             </div>
           )}
           {!loading && history.length > 0 && (
@@ -114,7 +114,7 @@ export default function NotificationPanel({ open, onClose }) {
                     </div>
                     <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
                       {h.client_name ? <>Ran on <strong style={{ color: 'var(--ink-2)' }}>{h.client_name}</strong></> : 'Anonymous session'}
-                      {h.response_summary?.plans && <> · {h.response_summary.plans} plans returned</>}
+                      {h.response_summary?.plans && <>, {h.response_summary.plans} plans returned</>}
                     </div>
                   </div>
                   <Chip tone={h.action_type === 'appeal' ? 'accent' : h.action_type === 'verify' ? 'warn' : 'pos'}>

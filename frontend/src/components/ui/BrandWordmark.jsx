@@ -1,10 +1,10 @@
 /**
- * Canonical HealthFlow wordmark — v2 identity.
+ * Canonical HealthFlow wordmark.
  *
  * "Health" inherits the surrounding text color so it adapts to any surface;
- * "Flow" always carries the teal → cyan brand gradient. Set in Space Grotesk
+ * "Flow" always carries the teal-to-cyan brand gradient. Set in DM Sans
  * to pair with the BrandLogo mark. Reuse this everywhere the name appears so
- * the Health/Flow split and gradient stay consistent — never hand-type the
+ * the Health/Flow split and gradient stay consistent; never hand-type the
  * word with a one-off font class.
  *
  * Sizing/color come from the caller (a className or inline style), so this

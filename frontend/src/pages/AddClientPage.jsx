@@ -61,7 +61,7 @@ export default function AddClientPage() {
       <div className="page">
         <div style={{ marginBottom: 20 }}>
           <a onClick={() => navigate('/clients')} className="muted" style={{ fontSize: 13, cursor: 'pointer' }}>
-            ← All clients
+            Back to clients
           </a>
         </div>
         <div className="page-head">
@@ -70,7 +70,7 @@ export default function AddClientPage() {
             <h1 className="page-title"><em>Add</em> a client.</h1>
             <p className="page-sub">
               Only name, ZIP, and age are required. Add medications, procedures, and providers if you already have
-              them — they make comparisons more accurate.
+              them. These details make comparisons more accurate.
             </p>
           </div>
         </div>

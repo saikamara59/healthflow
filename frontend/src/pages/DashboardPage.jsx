@@ -7,7 +7,6 @@ import Icon from '../components/ui/Icon';
 import Chip from '../components/ui/Chip';
 import Avatar from '../components/ui/Avatar';
 import Sparkline from '../components/ui/Sparkline';
-import Donut from '../components/ui/Donut';
 import useLayout from '../components/ui/useLayout';
 
 function formatDate(d = new Date()) {
@@ -57,9 +56,7 @@ export default function DashboardPage() {
     return acc;
   }, {});
   const lowIncome = byIncome.low || 0;
-  const retention = total ? Math.round(((total - lowIncome * 0.2) / total) * 100) : 0;
-
-  // Priority: most recently updated 4
+  // Recently updated clients
   const priority = [...clients]
     .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
     .slice(0, 4);
@@ -84,20 +81,20 @@ export default function DashboardPage() {
       />
       <div className="page">
         <div className="page-head">
-          <div style={{ fontFamily: '"Trebuchet MS"' }}>
+          <div>
             <div className="eyebrow" style={{ marginBottom: 14 }}>{formatDate()}</div>
             <h1 className="page-title">
-              Good morning, {firstName} —<br />
+              Good morning, {firstName}.<br />
               {total > 0 ? (
-                <><em>{total} client{total === 1 ? '' : 's'}</em> in your book.</>
+                <>{total} client{total === 1 ? '' : 's'} in your workspace.</>
               ) : (
-                <><em>ready when you are.</em></>
+                <>Your workspace is ready.</>
               )}
             </h1>
             <p className="page-sub">
               {total === 0
-                ? 'Add your first client to get started. HealthFlow will track their renewals, flag network changes, and draft appeals.'
-                : 'A live snapshot of your book: who needs attention, what you ran today, and what\'s coming up.'}
+                ? 'Add your first client to start comparing plans and recording results.'
+                : 'Review recently updated clients and completed activity.'}
             </p>
           </div>
           <div className="row">
@@ -119,7 +116,7 @@ export default function DashboardPage() {
                 <div className="value num">{loading ? '—' : total}</div>
                 {total > 1 && <Sparkline data={sparkData} w={70} h={26} />}
               </div>
-              <div className="delta">{totalProviders} providers · {totalRx} Rx</div>
+              <div className="delta">{totalProviders} providers, {totalRx} prescriptions</div>
             </div>
             <div className="stat">
               <div className="label">Avg. age</div>
@@ -127,9 +124,9 @@ export default function DashboardPage() {
               <div className="delta">across your book</div>
             </div>
             <div className="stat">
-              <div className="label">Actions logged</div>
+              <div className="label">Recorded activities</div>
               <div className="value num">{loading ? '—' : history.length}</div>
-              <div className="delta">comparisons · appeals · verifications</div>
+              <div className="delta">comparisons, appeals, and checks</div>
             </div>
             <div className="stat">
               <div className="label">Low-income clients</div>
@@ -143,9 +140,9 @@ export default function DashboardPage() {
           {/* Priority */}
           <div style={{ gridColumn: 'span 8' }}>
             <div className="section-head">
-              <h2>Priority today</h2>
+              <h2>Recently updated clients</h2>
               <div className="after">
-                Most recent activity ·{' '}
+                Sorted by latest update.{' '}
                 <a style={{ color: 'var(--accent)', cursor: 'pointer' }} onClick={() => navigate('/clients')}>
                   View all clients
                 </a>
@@ -189,7 +186,7 @@ export default function DashboardPage() {
                         {c.full_name}
                       </div>
                       <div className="muted" style={{ fontSize: 13 }}>
-                        ZIP {c.zip_code} · Age {c.age} · {c.income_level} income · {rxCount} Rx · {drCount} providers
+                        ZIP {c.zip_code}, age {c.age}, {c.income_level} income, {rxCount} prescriptions, {drCount} providers
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
@@ -206,7 +203,7 @@ export default function DashboardPage() {
               <h2>Activity</h2>
               <div className="after">
                 <a style={{ color: 'var(--accent)', cursor: 'pointer' }} onClick={() => navigate('/activity')}>
-                  Full timeline →
+                  View activity
                 </a>
               </div>
             </div>
@@ -230,7 +227,7 @@ export default function DashboardPage() {
                         <span className="act-time mono">{sinceLabel(a.created_at)}</span>
                         <Chip tone={tone}>{a.action_type}</Chip>
                         <div className="act-body">
-                          <span className="who">{a.client_name || 'Unknown client'}</span><span className="muted what"> · {a.action_type} session run</span>
+                          <span className="who">{a.client_name || 'Unknown client'}</span><span className="muted what">. {a.action_type} completed</span>
                         </div>
                         <Icon name="chev_r" size={14} className="ink-4" />
                       </div>
@@ -244,21 +241,10 @@ export default function DashboardPage() {
           {/* Right column */}
           <div style={{ gridColumn: 'span 4' }}>
             <div className="section-head">
-              <h2>Book health</h2>
-              <div className="after">Income mix</div>
+              <h2>Client overview</h2>
+              <div className="after">Income level</div>
             </div>
             <div className="card card-pad">
-              <div className="row" style={{ gap: 20, marginBottom: 16 }}>
-                <Donut value={retention} size={72} stroke={7} />
-                <div>
-                  <div style={{ fontFamily: 'var(--serif)', fontSize: 28, letterSpacing: '-0.01em' }}>
-                    {retention}
-                    <span style={{ fontSize: 14, color: 'var(--ink-3)' }}>%</span>
-                  </div>
-                  <div className="muted" style={{ fontSize: 12.5 }}>Projected retention</div>
-                </div>
-              </div>
-              <div className="divider dashed" style={{ margin: '4px 0 14px' }} />
               {[
                 { k: 'High income', v: byIncome.high || 0, tone: 'accent' },
                 { k: 'Medium income', v: byIncome.medium || 0, tone: 'pos' },
@@ -279,14 +265,14 @@ export default function DashboardPage() {
 
             <div className="section-head">
               <h2>Jump to a tool</h2>
-              <div className="after">Common flows</div>
+              <div className="after">Tools</div>
             </div>
             <div className="card card-pad">
               {[
                 { icon: 'compare', label: 'Plan comparison', path: '/compare' },
                 { icon: 'translate', label: 'Coverage translator', path: '/translator' },
-                { icon: 'history', label: 'Temporal plan', path: '/plan' },
-                { icon: 'network', label: 'Network verify', path: '/network' },
+                { icon: 'history', label: 'Deadline planner', path: '/plan' },
+                { icon: 'network', label: 'Network check', path: '/network' },
                 { icon: 'calculator', label: 'Cost calculator', path: '/calculator' },
                 { icon: 'appeal', label: 'Claim appeal', path: '/appeals' },
               ].map((t, i, a) => (

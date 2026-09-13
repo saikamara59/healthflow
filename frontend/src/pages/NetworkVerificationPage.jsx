@@ -63,18 +63,18 @@ export default function NetworkVerificationPage() {
   return (
     <>
       <TopBar
-        crumbs={['Tools', 'Network verify']}
+        crumbs={['Tools', 'Network check']}
         onMenuClick={openMenu}
         onNotificationsClick={openNotifications}
       />
       <div className="page wide">
         <div className="page-head">
           <div>
-            <div className="eyebrow" style={{ marginBottom: 14 }}>Provider &amp; formulary check</div>
-            <h1 className="page-title"><em>Verify</em> the network,<br />before you enroll.</h1>
+            <div className="eyebrow" style={{ marginBottom: 14 }}>Provider and formulary check</div>
+            <h1 className="page-title">Check coverage before enrollment.</h1>
             <p className="page-sub">
-              Enter a client's doctors and prescriptions to see which Medicare Advantage plans keep everyone
-              in-network and on-formulary.
+              Check available provider and formulary data for a client's plans. Confirm network and drug coverage
+              directly with the plan before enrollment.
             </p>
           </div>
         </div>
@@ -88,9 +88,9 @@ export default function NetworkVerificationPage() {
                 value={clientId}
                 onChange={(e) => applyClient(clients.find((x) => x.id === e.target.value))}
               >
-                <option value="">— none —</option>
+                <option value="">None</option>
                 {clients.map((c) => (
-                  <option key={c.id} value={c.id}>{c.full_name} · ZIP {c.zip_code}</option>
+                  <option key={c.id} value={c.id}>{c.full_name}, ZIP {c.zip_code}</option>
                 ))}
               </select>
             </div>
@@ -158,7 +158,7 @@ export default function NetworkVerificationPage() {
 
           <div className="row" style={{ justifyContent: 'flex-end', marginTop: 20, gap: 10 }}>
             <button type="submit" className="btn accent" disabled={running || (providers.length === 0 && rx.length === 0)}>
-              {running ? <><span className="loader" /> Checking…</> : <><Icon name="network" size={14} /> Verify coverage</>}
+              {running ? <><span className="loader" /> Checking…</> : <><Icon name="network" size={14} /> Check coverage</>}
             </button>
           </div>
         </form>
@@ -199,7 +199,7 @@ export default function NetworkVerificationPage() {
                     </div>
                     <div className="grid-2">
                       <div>
-                        <div className="eyebrow" style={{ marginBottom: 10 }}>Providers · {providersIn}/{providersTotal} in-network</div>
+                        <div className="eyebrow" style={{ marginBottom: 10 }}>Providers: {providersIn}/{providersTotal} listed in network</div>
                         {plan.provider_results.length === 0 && <div className="muted" style={{ fontSize: 13 }}>No providers entered.</div>}
                         {plan.provider_results.map((p, i, a) => (
                           <div key={i} className="between" style={{ padding: '8px 0', borderBottom: i < a.length - 1 ? '1px dashed var(--line)' : 0 }}>
@@ -219,7 +219,7 @@ export default function NetworkVerificationPage() {
                       </div>
 
                       <div>
-                        <div className="eyebrow" style={{ marginBottom: 10 }}>Formulary · {formularyCovered}/{formularyTotal} covered</div>
+                        <div className="eyebrow" style={{ marginBottom: 10 }}>Formulary: {formularyCovered}/{formularyTotal} covered</div>
                         {plan.formulary_results.length === 0 && <div className="muted" style={{ fontSize: 13 }}>No prescriptions entered.</div>}
                         {plan.formulary_results.map((f, i, a) => (
                           <div key={i} className="between" style={{ padding: '8px 0', borderBottom: i < a.length - 1 ? '1px dashed var(--line)' : 0 }}>
