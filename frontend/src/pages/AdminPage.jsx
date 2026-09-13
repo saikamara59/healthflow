@@ -60,9 +60,8 @@ export default function AdminPage() {
     const locked = brokers.filter(isLocked).length;
     const pending = brokers.filter((b) => !b.is_active).length;
     const admins = brokers.filter((b) => b.role === 'admin').length;
-    const since = Date.now() - 24 * 3600 * 1000;
-    const last24 = audit.filter((a) => new Date(a.created_at).getTime() > since).length;
-    return { total: brokers.length, locked, pending, admins, last24 };
+    const recentTools = new Set(audit.map((a) => a.agent)).size;
+    return { total: brokers.length, locked, pending, admins, recentTools };
   }, [brokers, audit]);
 
   const unlock = async (broker) => {
@@ -164,14 +163,14 @@ export default function AdminPage() {
               </div>
             </div>
             <div className="stat">
-              <div className="label">Tool runs (24h)</div>
-              <div className="value num">{loading ? '—' : stats.last24}</div>
-              <div className="delta">across {new Set(audit.map((a) => a.agent)).size || 0} tools</div>
+              <div className="label">Tools represented</div>
+              <div className="value num">{loading ? '—' : stats.recentTools}</div>
+              <div className="delta">across the recent entries below</div>
             </div>
             <div className="stat">
-              <div className="label">Recorded tool activity</div>
+              <div className="label">Recent entries loaded</div>
               <div className="value num">{loading ? '—' : audit.length}</div>
-              <div className="delta">available for case review</div>
+              <div className="delta">latest activity available for review</div>
             </div>
           </div>
         </div>
