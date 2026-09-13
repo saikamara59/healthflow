@@ -444,9 +444,10 @@
 }
 @media (max-width: 560px) {
   .lp-nav-inner { width: calc(100% - 24px); padding: 8px 10px; gap: 10px; }
-  .lp-nav-cta { gap: 0; }
-  .lp-nav-cta > a:first-child { display: none; }
+  .lp-nav-cta { gap: 8px; }
+  .lp-nav-cta > a:first-child { display: inline-flex; font-size: 12px; white-space: nowrap; }
   .lp-nav-cta .lp-btn { height: 36px; padding: 0 12px; font-size: 12px; white-space: nowrap; }
+  .lp-nav-cta .lp-btn svg { display: none; }
   .lp-wrap { padding: 0 20px; }
   .lp-hero-stats { grid-template-columns: 1fr; }
   .steps { grid-template-columns: 1fr; }
