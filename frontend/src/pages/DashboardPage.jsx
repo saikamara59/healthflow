@@ -272,7 +272,7 @@ export default function DashboardPage() {
               {[
                 { icon: 'compare', label: 'Plan comparison', path: '/compare' },
                 { icon: 'translate', label: 'Coverage translator', path: '/translator' },
-                { icon: 'history', label: 'Deadline planner', path: '/plan' },
+                { icon: 'calendar', label: 'Deadline planner', path: '/plan' },
                 { icon: 'network', label: 'Network check', path: '/network' },
                 { icon: 'calculator', label: 'Cost calculator', path: '/calculator' },
                 { icon: 'appeal', label: 'Claim appeal', path: '/appeals' },

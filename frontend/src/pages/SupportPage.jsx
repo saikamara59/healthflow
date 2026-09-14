@@ -11,7 +11,7 @@ const RESOURCES = [
   {
     title: 'Deadline planner',
     desc: 'Create an action list for enrollment windows, renewal dates, and eligible special enrollment periods.',
-    icon: 'history',
+    icon: 'calendar',
   },
   {
     title: 'Coverage translator',
