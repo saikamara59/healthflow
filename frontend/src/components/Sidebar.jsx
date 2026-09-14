@@ -22,7 +22,7 @@ const NAV = [
     items: [
       { path: '/compare', label: 'Plan comparison', icon: 'compare' },
       { path: '/translator', label: 'Coverage translator', icon: 'translate' },
-      { path: '/plan', label: 'Deadline planner', icon: 'history' },
+      { path: '/plan', label: 'Deadline planner', icon: 'calendar' },
       { path: '/network', label: 'Network check', icon: 'network' },
       { path: '/calculator', label: 'Cost calculator', icon: 'calculator' },
       { path: '/appeals', label: 'Claim appeals', icon: 'appeal' },
@@ -122,7 +122,7 @@ export default function Sidebar({ open, onClose }) {
                   className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                 >
                   <span className="nav-dot" />
-                  <Icon name={item.icon} className="nav-ic" />
+                  <Icon name={item.icon} size={20} className="nav-ic" />
                   <span>{item.label}</span>
                   {item.countKey && counts[item.countKey] != null && (
                     <span className="nav-count">{counts[item.countKey]}</span>
