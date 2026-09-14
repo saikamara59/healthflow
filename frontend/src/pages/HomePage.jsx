@@ -185,7 +185,6 @@ export default function HomePage() {
         <div className="lp-wrap">
           <div className="lp-hero-grid">
             <div>
-              <span className="lp-eyebrow glass-chip"><span className="pulse"></span> Built for Medicare brokers</span>
               <h1 className="lp-h1">Compare coverage options and keep a clear supporting record.</h1>
               <p className="lp-hero-sub">
                 HealthFlow helps Medicare brokers compare plans, explain benefits, and draft appeals.
@@ -211,17 +210,13 @@ export default function HomePage() {
               </div>
               <svg viewBox="0 0 460 360" role="img" aria-label="A client request is routed to focused tools and recorded in an activity log.">
                 <path className="flow-path" d="M120 64 C 180 64, 180 120, 230 120" />
-                <path className="flow-dash" d="M120 64 C 180 64, 180 120, 230 120" />
                 <path className="flow-path" d="M340 120 C 380 120, 380 175, 410 175" />
                 <path className="flow-path" d="M230 140 C 150 150, 120 175, 120 185" />
                 <path className="flow-path" d="M230 140 C 200 175, 210 175, 215 185" />
                 <path className="flow-path" d="M286 140 C 300 175, 305 175, 312 185" />
-                <path className="flow-dash" d="M230 140 C 150 150, 120 175, 120 185" />
-                <path className="flow-dash" d="M286 140 C 300 175, 305 175, 312 185" />
                 <path className="flow-path" d="M120 235 C 120 270, 200 280, 230 290" />
                 <path className="flow-path" d="M215 235 C 230 270, 230 280, 230 290" />
                 <path className="flow-path" d="M312 235 C 312 270, 260 280, 230 290" />
-                <path className="flow-dash" d="M215 235 C 230 270, 230 280, 230 290" />
                 <g>
                   <rect className="flow-rect" x="20" y="44" width="100" height="40" rx="8" />
                   <text className="flow-node-label" x="38" y="62">Request</text>
@@ -256,7 +251,6 @@ export default function HomePage() {
                   <rect className="flow-rect" x="120" y="290" width="220" height="46" rx="8" />
                   <text className="flow-node-label" x="138" y="311">Activity record</text>
                   <text className="flow-node-sub" x="138" y="324">source, timestamp, outcome</text>
-                  <circle className="flow-dot-pulse" cx="322" cy="313" r="3" />
                 </g>
               </svg>
             </div>

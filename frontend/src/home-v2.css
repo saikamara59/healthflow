@@ -174,15 +174,6 @@
 /* ---------- hero ---------- */
 .lp-hero { padding-top: 70px; padding-bottom: 80px; }
 .lp-hero-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 56px; align-items: center; }
-.lp-eyebrow {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 6px 13px; border-radius: 999px;
-  font-family: var(--sans); font-size: 12px; font-weight: 600; letter-spacing: 0; color: var(--accent-deep);
-  margin-bottom: 26px;
-}
-.lp-eyebrow .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-3); box-shadow: 0 0 0 0 oklch(0.65 0.15 185 / 0.6); animation: pls 2.2s infinite; }
-@keyframes pls { 0% { box-shadow: 0 0 0 0 oklch(0.65 0.15 185 / 0.55); } 70% { box-shadow: 0 0 0 8px oklch(0.65 0.15 185 / 0); } 100% { box-shadow: 0 0 0 0 oklch(0.65 0.15 185 / 0); } }
-
 .lp-h1 {
   font-family: var(--display); font-weight: 700;
   font-size: 58px; line-height: 1.08; letter-spacing: -0.01em;
@@ -206,18 +197,12 @@
 .flowcard { padding: 22px; border-radius: 20px; }
 .fc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; padding: 0 4px; }
 .fc-title { font-family: var(--sans); font-size: 11.5px; letter-spacing: 0; color: var(--ink-3); }
-.fc-live { display: inline-flex; align-items: center; gap: 6px; font-family: var(--sans); font-size: 11px; color: var(--accent); }
-.fc-live .d { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-3); animation: pls 2s infinite; }
 .flowcard svg { width: 100%; height: auto; display: block; }
 .flow-rect { fill: oklch(1 0 0 / 0.55); stroke: var(--glass-edge); stroke-width: 1; }
 .flow-rect.accent { fill: oklch(0.92 0.05 200 / 0.7); stroke: oklch(0.55 0.12 205 / 0.4); }
 .flow-node-label { font-family: var(--sans); font-size: 9px; letter-spacing: 0.01em; fill: var(--ink); font-weight: 600; }
 .flow-node-sub { font-family: var(--sans); font-size: 8.5px; fill: var(--ink-3); }
 .flow-path { stroke: oklch(0.6 0.08 220 / 0.3); stroke-width: 1.4; fill: none; }
-.flow-dash { stroke: var(--accent-3); stroke-width: 1.6; fill: none; stroke-dasharray: 4 6; opacity: 0.9; animation: dash 1.2s linear infinite; }
-@keyframes dash { to { stroke-dashoffset: -20; } }
-.flow-dot-pulse { fill: var(--accent-3); animation: pls 1.8s infinite; }
-
 /* ---------- trust strip ---------- */
 .lp-trust { padding: 8px 0 0; }
 .lp-trust-inner {
