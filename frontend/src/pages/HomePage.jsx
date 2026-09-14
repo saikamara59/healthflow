@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import Icon from '../components/ui/Icon';
 import BrandLogo from '../components/ui/BrandLogo';
 import BrandWordmark from '../components/ui/BrandWordmark';
 import '../home-v2.css';
@@ -22,7 +23,7 @@ const ARROW_LG = (
 
 const AGENTS = [
   {
-    key: 'compare', icon: 'M21 3 3 21M9 3h12v12M15 21H3V9',
+    key: 'compare', icon: 'compare',
     title: 'Plan comparison', tab: 'Compares plans using a client’s medications and providers',
     desc: 'Compares Medicare Advantage plans using the client’s prescriptions, providers, and budget, then ranks them by estimated annual cost.',
     inLbl: 'Input', in: [['zip', '10025'], ['age', '67'], ['rx', '3 meds']],
@@ -30,7 +31,7 @@ const AGENTS = [
     chips: ['CMS snapshot', 'formulary checked', 'structured result'],
   },
   {
-    key: 'translate', icon: 'M5 8h14M7 5l5 6-5 6M13 13l4 8 4-8M15 17h8',
+    key: 'translate', icon: 'translate',
     title: 'Coverage translator', tab: 'Explains plan benefits in plain language',
     desc: 'Answers benefit questions in plain language and cites the section used, so brokers can review the source directly.',
     inLbl: 'Asked', in: [['q', 'ER copay if admitted?']],
@@ -38,7 +39,7 @@ const AGENTS = [
     chips: ['section citations', 'source-based answers'],
   },
   {
-    key: 'plan', icon: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2',
+    key: 'plan', icon: 'calendar',
     title: 'Deadline planner', tab: 'Creates a dated action list',
     desc: 'Uses a denial, life change, or enrollment window to create an ordered action plan tied to the relevant deadline.',
     inLbl: 'Event', in: [['type', 'SEP'], ['trigger', 'May 1']],
@@ -46,7 +47,7 @@ const AGENTS = [
     chips: ['date-anchored', 'owner-assigned'],
   },
   {
-    key: 'verify', icon: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10zM9 12l2 2 4-4',
+    key: 'verify', icon: 'network',
     title: 'Network check', tab: 'Checks providers and pharmacies before enrollment',
     desc: 'Checks available provider and pharmacy data for the selected plan. Brokers should confirm network status with the plan before enrollment.',
     inLbl: 'Checking', in: [['Dr. Patel', 'cardiology'], ['pharmacy', 'mail-order']],
@@ -54,7 +55,7 @@ const AGENTS = [
     chips: ['provider data', 'manual confirmation'],
   },
   {
-    key: 'appeal', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M9 13h6M9 17h3',
+    key: 'appeal', icon: 'appeal',
     title: 'Appeal drafter', tab: 'Drafts denial appeals with cited guidance',
     desc: 'Drafts a denial appeal using the denial letter, plan language, and relevant guidance for a broker to review before filing.',
     inLbl: 'Denial', in: [['claim', 'cardiac cath'], ['carrier', 'Cigna']],
@@ -302,7 +303,7 @@ export default function HomePage() {
                   onClick={() => setActive(ag.key)}
                 >
                   <span className="ti">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={ag.icon} /></svg>
+                    <Icon name={ag.icon} size={20} />
                   </span>
                   <span>
                     <span className="tt">{ag.title}</span>

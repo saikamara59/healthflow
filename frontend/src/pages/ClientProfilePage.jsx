@@ -297,7 +297,7 @@ export default function ClientProfilePage() {
               <div className="card card-pad">
                 {[
                   { icon: 'compare', label: 'Compare plans', path: '/compare' },
-                  { icon: 'history', label: 'Deadline planner', path: '/plan' },
+                  { icon: 'calendar', label: 'Deadline planner', path: '/plan' },
                   { icon: 'translate', label: 'Translate coverage', path: '/translator' },
                   { icon: 'network', label: 'Verify network', path: '/network' },
                   { icon: 'calculator', label: 'Estimate costs', path: '/calculator' },

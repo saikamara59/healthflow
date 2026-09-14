@@ -288,7 +288,7 @@ export default function PlanComparisonPage() {
                       <div className="eyebrow">Recommendation</div>
                       {result.decision_id && (
                         <button className="why-trigger" onClick={() => setWhyOpen(true)}>
-                          <Icon name="spark" size={13} /> Why this?
+                          <Icon name="info" size={13} /> Why this?
                         </button>
                       )}
                     </div>

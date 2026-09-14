@@ -449,7 +449,7 @@ function LoadingState() {
   return (
     <div className="card card-pad" style={{ padding: 48, textAlign: 'center' }}>
       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, color: 'var(--ink-3)', fontSize: 14 }}>
-        <Icon name="spark" size={16} />
+        <Icon name="calendar" size={16} />
         <span>Generating action plan…</span>
       </div>
       <div
