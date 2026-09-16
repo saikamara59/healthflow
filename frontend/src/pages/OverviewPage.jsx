@@ -1,303 +1,56 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import api from '../api/client';
-import TopBar from '../components/TopBar';
-import Icon from '../components/ui/Icon';
-import Chip from '../components/ui/Chip';
-import Avatar from '../components/ui/Avatar';
-import Sparkline from '../components/ui/Sparkline';
-import useLayout from '../components/ui/useLayout';
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import api from '../api/client'
+import { workspaceApi } from '../api/workspace'
+import TopBar from '../components/TopBar'
+import useLayout from '../components/ui/useLayout'
+import Avatar from '../components/ui/Avatar'
+import QuickTools from '../components/workspace/QuickTools'
 
-function formatDate(d = new Date()) {
-  return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-}
+const SUMMARY = [
+  { key: 'clients', label: 'Clients', href: '/clients' },
+  { key: 'organizations', label: 'Organizations', href: '/organizations' },
+  { key: 'open_tasks', label: 'Open tasks', href: '/today' },
+  { key: 'overdue_tasks', label: 'Overdue tasks', href: '/today' },
+  { key: 'appointments_next_seven_days', label: 'Upcoming appointments', href: '/scheduling' },
+]
 
-function sinceLabel(iso) {
-  if (!iso) return '—';
-  const diff = Date.now() - new Date(iso).getTime();
-  const days = Math.max(0, Math.floor(diff / 86400000));
-  if (days === 0) return 'today';
-  if (days === 1) return 'yesterday';
-  if (days < 7) return `${days}d ago`;
-  if (days < 30) return `${Math.floor(days / 7)}w ago`;
-  return `${Math.floor(days / 30)}mo ago`;
-}
-
-/** Presents the broker's workspace overview, active clients, and recent work. */
 export default function OverviewPage() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const { openMenu, openNotifications } = useLayout();
-
-  const [clients, setClients] = useState([]);
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { openMenu, openNotifications } = useLayout()
+  const [overview, setOverview] = useState(null)
+  const [clients, setClients] = useState([])
+  const [toolHistory, setToolHistory] = useState([])
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    Promise.all([
-      api.get('/clients').catch(() => []),
-      api.get('/history?limit=8').catch(() => []),
-    ]).then(([c, h]) => {
-      setClients(Array.isArray(c) ? c : []);
-      setHistory(Array.isArray(h) ? h : []);
-      setLoading(false);
-    });
-  }, []);
+    let alive = true
+    Promise.all([workspaceApi.getOverview(), api.get('/history?limit=8'), api.get('/clients')]).then(([summary, history, clientData]) => {
+      if (!alive) return
+      setOverview(summary)
+      setToolHistory(Array.isArray(history) ? history : [])
+      setClients(Array.isArray(clientData) ? clientData : [])
+    }).catch(() => { if (alive) setError('Overview could not be loaded. Try refreshing the page.') })
+    return () => { alive = false }
+  }, [])
 
-  const firstName = (user?.email?.split('@')[0] || 'Broker').replace(/^./, (c) => c.toUpperCase());
-  const total = clients.length;
-  const totalRx = clients.reduce((s, c) => s + (c.prescriptions?.length || 0), 0);
-  const totalProviders = clients.reduce((s, c) => s + (c.doctors?.length || 0), 0);
-  const avgAge = total ? Math.round(clients.reduce((s, c) => s + (c.age || 0), 0) / total) : 0;
+  const activity = [
+    ...(overview?.recent_activity || []).map((item) => ({ id: `workspace-${item.id}`, kind: 'Workspace', title: item.summary, date: item.created_at, href: item.client_id ? `/clients/${item.client_id}` : null })),
+    ...toolHistory.map((item) => ({ id: `tool-${item.id}`, kind: 'Tool', title: `${item.action_type || 'Action'}${item.client_name ? ` · ${item.client_name}` : ''}`, date: item.created_at, href: item.client_id ? `/clients/${item.client_id}` : '/history' })),
+  ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10)
+  const recentClients = [...clients].sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)).slice(0, 5)
 
-  const byIncome = clients.reduce((acc, c) => {
-    const k = (c.income_level || 'unknown').toLowerCase();
-    acc[k] = (acc[k] || 0) + 1;
-    return acc;
-  }, {});
-  const lowIncome = byIncome.low || 0;
-  // Recently updated clients
-  const priority = [...clients]
-    .sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at))
-    .slice(0, 4);
-
-  // Sparkline: synthesize from running total of client creation
-  const sortedByCreate = [...clients].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-  const sparkData = [];
-  sortedByCreate.forEach((_, i) => sparkData.push(i + 1));
-  if (sparkData.length < 2) sparkData.push(sparkData[0] || 0);
-
-  return (
-    <>
-      <TopBar
-        crumbs={['Workspace', 'Overview']}
-        onMenuClick={openMenu}
-        onNotificationsClick={openNotifications}
-        action={
-          <button className="btn accent" onClick={() => navigate('/clients/new')}>
-            <Icon name="plus" size={14} /> New client
-          </button>
-        }
-      />
-      <div className="page">
-        <div className="page-head">
-          <div>
-            <div className="eyebrow" style={{ marginBottom: 14 }}>{formatDate()}</div>
-            <h1 className="page-title">
-              Good morning, {firstName}.<br />
-              {total > 0 ? (
-                <>{total} client{total === 1 ? '' : 's'} in your workspace.</>
-              ) : (
-                <>Your workspace is ready.</>
-              )}
-            </h1>
-            <p className="page-sub">
-              {total === 0
-                ? 'Add your first client to start comparing plans and recording results.'
-                : 'Review recently updated clients and completed activity.'}
-            </p>
-          </div>
-          <div className="row">
-            <button className="btn" onClick={() => navigate('/history')}>
-              <Icon name="download" size={14} /> Activity log
-            </button>
-            <button className="btn primary" onClick={() => navigate('/compare')}>
-              <Icon name="compare" size={14} /> Run comparison
-            </button>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="card">
-          <div className="stat-grid">
-            <div className="stat">
-              <div className="label">Active clients</div>
-              <div className="between" style={{ alignItems: 'flex-end' }}>
-                <div className="value num">{loading ? '—' : total}</div>
-                {total > 1 && <Sparkline data={sparkData} w={70} h={26} />}
-              </div>
-              <div className="delta">{totalProviders} providers, {totalRx} prescriptions</div>
-            </div>
-            <div className="stat">
-              <div className="label">Avg. age</div>
-              <div className="value num">{loading ? '—' : avgAge || '—'}</div>
-              <div className="delta">across your book</div>
-            </div>
-            <div className="stat">
-              <div className="label">Recorded activities</div>
-              <div className="value num">{loading ? '—' : history.length}</div>
-              <div className="delta">comparisons, appeals, and checks</div>
-            </div>
-            <div className="stat">
-              <div className="label">Low-income clients</div>
-              <div className="value num">{loading ? '—' : lowIncome}</div>
-              <div className="delta">eligible for LIS / Extra Help review</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid-12" style={{ marginTop: 32 }}>
-          {/* Priority */}
-          <div style={{ gridColumn: 'span 8' }}>
-            <div className="section-head">
-              <h2>Recently updated clients</h2>
-              <div className="after">
-                Sorted by latest update.{' '}
-                <a style={{ color: 'var(--accent)', cursor: 'pointer' }} onClick={() => navigate('/clients')}>
-                  View all clients
-                </a>
-              </div>
-            </div>
-            <div className="card">
-              {loading && <div className="empty"><div className="loader" /></div>}
-              {!loading && priority.length === 0 && (
-                <div className="empty">
-                  <div className="empty-title">No clients yet</div>
-                  <div>Add your first client to begin tracking renewals and running comparisons.</div>
-                  <div style={{ marginTop: 18 }}>
-                    <button className="btn accent" onClick={() => navigate('/clients/new')}>
-                      <Icon name="plus" size={14} /> Add client
-                    </button>
-                  </div>
-                </div>
-              )}
-              {!loading && priority.map((c, i) => {
-                const rxCount = c.prescriptions?.length || 0;
-                const drCount = c.doctors?.length || 0;
-                const chipTone = rxCount > 3 ? 'warn' : drCount > 2 ? 'accent' : 'pos';
-                const chipLabel = rxCount > 3 ? 'Complex Rx' : drCount > 2 ? 'Multi-provider' : 'Active';
-                return (
-                  <div
-                    key={c.id}
-                    onClick={() => navigate(`/clients/${c.id}`)}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '44px 1fr auto auto',
-                      gap: 16,
-                      alignItems: 'center',
-                      padding: '18px 24px',
-                      borderBottom: i < priority.length - 1 ? '1px solid var(--line)' : 0,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <Avatar name={c.full_name} size="md" />
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 15, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {c.full_name}
-                      </div>
-                      <div className="muted" style={{ fontSize: 13 }}>
-                        ZIP {c.zip_code}, age {c.age}, {c.income_level} income, {rxCount} prescriptions, {drCount} providers
-                      </div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div className="eyebrow">#{c.id.slice(0, 6)}</div>
-                      <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>{sinceLabel(c.updated_at || c.created_at)}</div>
-                    </div>
-                    <Chip tone={chipTone}>{chipLabel}</Chip>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="section-head">
-              <h2>Activity</h2>
-              <div className="after">
-                <a style={{ color: 'var(--accent)', cursor: 'pointer' }} onClick={() => navigate('/activity')}>
-                  View activity
-                </a>
-              </div>
-            </div>
-            <div className="card card-pad">
-              {loading && <div className="loader" />}
-              {!loading && history.length === 0 && (
-                <div className="muted" style={{ fontSize: 13, padding: 12 }}>
-                  No actions yet. Run a plan comparison or verify a network to see activity here.
-                </div>
-              )}
-              {!loading && history.length > 0 && (
-                <div className="activity">
-                  {history.slice(0, 6).map((a, i) => {
-                    const tone = a.action_type === 'appeal' ? 'accent' : a.action_type === 'verify' ? 'warn' : a.action_type === 'compare' ? 'pos' : '';
-                    return (
-                      <div
-                        key={a.id || i}
-                        className="act-row"
-                        onClick={() => a.client_id && navigate(`/clients/${a.client_id}`)}
-                      >
-                        <span className="act-time mono">{sinceLabel(a.created_at)}</span>
-                        <Chip tone={tone}>{a.action_type}</Chip>
-                        <div className="act-body">
-                          <span className="who">{a.client_name || 'Unknown client'}</span><span className="muted what">. {a.action_type} completed</span>
-                        </div>
-                        <Icon name="chev_r" size={14} className="ink-4" />
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Right column */}
-          <div style={{ gridColumn: 'span 4' }}>
-            <div className="section-head">
-              <h2>Client overview</h2>
-              <div className="after">Income level</div>
-            </div>
-            <div className="card card-pad">
-              {[
-                { k: 'High income', v: byIncome.high || 0, tone: 'accent' },
-                { k: 'Medium income', v: byIncome.medium || 0, tone: 'pos' },
-                { k: 'Low income', v: byIncome.low || 0, tone: 'warn' },
-              ].map((r) => (
-                <div key={r.k} className="between" style={{ padding: '6px 0' }}>
-                  <div className="row" style={{ gap: 10 }}>
-                    <span
-                      className={`risk-dot ${r.tone === 'pos' ? 'low' : r.tone === 'warn' ? 'med' : ''}`}
-                      style={r.tone === 'accent' ? { background: 'var(--accent)' } : {}}
-                    />
-                    <span>{r.k}</span>
-                  </div>
-                  <span className="num mono" style={{ fontSize: 13 }}>{r.v}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="section-head">
-              <h2>Jump to a tool</h2>
-              <div className="after">Tools</div>
-            </div>
-            <div className="card card-pad">
-              {[
-                { icon: 'compare', label: 'Plan comparison', path: '/compare' },
-                { icon: 'translate', label: 'Coverage translator', path: '/translator' },
-                { icon: 'calendar', label: 'Deadline planner', path: '/plan' },
-                { icon: 'network', label: 'Network check', path: '/network' },
-                { icon: 'calculator', label: 'Cost calculator', path: '/calculator' },
-                { icon: 'appeal', label: 'Claim appeal', path: '/appeals' },
-              ].map((t, i, a) => (
-                <div
-                  key={t.path}
-                  onClick={() => navigate(t.path)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    padding: '10px 0',
-                    borderBottom: i < a.length - 1 ? '1px dashed var(--line)' : 0,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Icon name={t.icon} size={16} className="ink-4" />
-                  <span style={{ fontSize: 13.5, flex: 1 }}>{t.label}</span>
-                  <Icon name="chev_r" size={13} className="ink-4" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
-  );
+  return <>
+    <TopBar crumbs={['Daily', 'Overview']} onMenuClick={openMenu} onNotificationsClick={openNotifications} />
+    <main className="page"><div className="page-head"><div><div className="eyebrow">Across your workspace</div><h1 className="page-title">Overview</h1><p className="page-sub">Clients, organizations, open work, and recent activity in one place.</p></div><Link to="/today" className="btn accent">Go to Today</Link></div>
+      {error && <p role="alert" className="workspace-error">{error}</p>}
+      {!overview && !error && <p role="status">Loading Overview…</p>}
+      {overview && <>
+        <div className="workspace-summary">{SUMMARY.map((item) => <Link to={item.href} className="card workspace-summary-card" key={item.key}><span>{item.label}</span><strong>{overview[item.key]}</strong></Link>)}</div>
+        <div className="today-grid"><div className="today-main">
+          <section className="card workspace-section"><div className="between"><h2>Recent activity</h2><Link to="/activity">View activity</Link></div>{activity.length ? <ul className="workspace-list">{activity.map((item) => <li className="workspace-list-row" key={item.id}><span className="workspace-tag">{item.kind}</span><div className="workspace-row-copy">{item.href ? <Link to={item.href}>{item.title}</Link> : <strong>{item.title}</strong>}<small>{new Date(item.date).toLocaleString()}</small></div></li>)}</ul> : <p className="workspace-empty">No activity yet. Your work will appear here.</p>}</section>
+          <section className="card workspace-section"><div className="between"><h2>Recently updated clients</h2><Link to="/clients">View clients</Link></div>{recentClients.length ? <ul className="workspace-list">{recentClients.map((client) => <li className="workspace-list-row" key={client.id}><Avatar name={client.full_name} size="sm" /><div className="workspace-row-copy"><Link to={`/clients/${client.id}`}>{client.full_name}</Link><small>Updated {new Date(client.updated_at || client.created_at).toLocaleDateString()}</small></div></li>)}</ul> : <p className="workspace-empty">No clients yet. <Link to="/clients/new">Add your first client</Link>.</p>}</section>
+        </div><aside className="today-rail"><QuickTools /><section className="card workspace-section"><h2>More views</h2><div className="workspace-tools"><Link className="workspace-tool" to="/analytics">Analytics</Link><Link className="workspace-tool" to="/feedback">Feedback</Link><Link className="workspace-tool" to="/leads">Leads</Link><Link className="workspace-tool" to="/plan">Deadline planner</Link></div></section></aside></div>
+      </>}
+    </main>
+  </>
 }

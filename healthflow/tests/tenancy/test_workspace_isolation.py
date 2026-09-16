@@ -58,3 +58,87 @@ async def test_task_queries_show_only_the_current_brokers_records(db_session_fac
                 assert [task.id for task in result.scalars().all()] == [expected_task.id]
             finally:
                 current_broker_id.reset(token)
+
+
+async def _auth(client, email):
+    await client.post('/auth/register', json={
+        'email': email, 'password': 'securepass123!', 'full_name': 'Isolation Broker',
+    })
+    await client.post('/__test/activate-broker', json={'email': email})
+    login = await client.post('/auth/login', json={
+        'email': email, 'password': 'securepass123!',
+    })
+    return {'Authorization': f"Bearer {login.json()['access_token']}"}
+
+
+@pytest.mark.asyncio
+async def test_workspace_api_never_exposes_or_mutates_another_brokers_records(client):
+    owner = await _auth(client, 'matrix-owner@example.com')
+    outsider = await _auth(client, 'matrix-outsider@example.com')
+    organization = await client.post('/organizations', json={
+        'name': 'Private Harbor', 'kind': 'carrier',
+    }, headers=owner)
+    organization_id = organization.json()['id']
+    contact = await client.post(f'/organizations/{organization_id}/contacts', json={
+        'full_name': 'Private Dana',
+    }, headers=owner)
+    contact_id = contact.json()['id']
+    task = await client.post('/tasks', json={
+        'title': 'Private renewal', 'organization_id': organization_id,
+        'contact_id': contact_id, 'due_at': '2030-01-01T10:00:00Z',
+    }, headers=owner)
+    task_id = task.json()['id']
+    appointment = await client.post('/appointments', json={
+        'title': 'Private meeting', 'organization_id': organization_id,
+        'contact_id': contact_id, 'starts_at': '2030-01-01T10:00:00Z',
+        'ends_at': '2030-01-01T11:00:00Z',
+    }, headers=owner)
+    appointment_id = appointment.json()['id']
+    await client.post(f'/tasks/{task_id}/complete', headers=owner)
+    await client.put('/workspace/preferences', json={
+        'timezone_name': 'America/Chicago',
+    }, headers=owner)
+
+    hidden_requests = [
+        ('get', f'/organizations/{organization_id}', None),
+        ('put', f'/organizations/{organization_id}', {'name': 'Stolen'}),
+        ('post', f'/organizations/{organization_id}/archive', None),
+        ('post', f'/organizations/{organization_id}/restore', None),
+        ('post', f'/organizations/{organization_id}/contacts', {'full_name': 'Intruder'}),
+        ('put', f'/organizations/{organization_id}/contacts/{contact_id}', {'full_name': 'Stolen'}),
+        ('post', f'/organizations/{organization_id}/contacts/{contact_id}/archive', None),
+        ('post', f'/organizations/{organization_id}/contacts/{contact_id}/restore', None),
+        ('get', f'/tasks/{task_id}', None),
+        ('put', f'/tasks/{task_id}', {'title': 'Stolen'}),
+        ('post', f'/tasks/{task_id}/complete', None),
+        ('post', f'/tasks/{task_id}/reopen', None),
+        ('get', f'/appointments/{appointment_id}', None),
+        ('put', f'/appointments/{appointment_id}', {'title': 'Stolen'}),
+        ('post', f'/appointments/{appointment_id}/complete', None),
+        ('post', f'/appointments/{appointment_id}/cancel', None),
+        ('post', f'/appointments/{appointment_id}/restore-scheduled', None),
+    ]
+    for method, path, payload in hidden_requests:
+        response = await client.request(method.upper(), path, json=payload, headers=outsider)
+        assert response.status_code == 404, (method, path, response.text)
+
+    for path in (
+        '/organizations?include_contacts=true', '/tasks', '/appointments',
+        '/workspace/activity', '/workspace/today?local_date=2030-01-01',
+        '/workspace/overview', '/workspace/search?q=Private',
+    ):
+        response = await client.get(path, headers=outsider)
+        assert response.status_code == 200, (path, response.text)
+        assert 'Private' not in response.text, path
+    assert (await client.get('/workspace/preferences', headers=outsider)).json() == {
+        'timezone_name': 'UTC', 'is_configured': False,
+    }
+    for payload in (
+        {'title': 'Intruder task', 'organization_id': organization_id},
+        {'title': 'Intruder task', 'contact_id': contact_id},
+    ):
+        assert (await client.post('/tasks', json=payload, headers=outsider)).status_code == 404
+    assert (await client.post('/appointments', json={
+        'title': 'Intruder meeting', 'starts_at': '2030-01-02T10:00:00Z',
+        'ends_at': '2030-01-02T11:00:00Z', 'contact_id': contact_id,
+    }, headers=outsider)).status_code == 404

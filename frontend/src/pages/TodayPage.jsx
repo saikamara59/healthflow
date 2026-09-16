@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import api from '../api/client'
 import TopBar from '../components/TopBar'
 import Icon from '../components/ui/Icon'
@@ -12,7 +13,9 @@ import QuickCreateModal from '../components/workspace/QuickCreateModal'
 
 export default function TodayPage() {
   const { openMenu, openNotifications } = useLayout()
+  const location = useLocation()
   const [today, setToday] = useState(null)
+  const [openTasks, setOpenTasks] = useState([])
   const [clients, setClients] = useState([])
   const [organizations, setOrganizations] = useState([])
   const [error, setError] = useState('')
@@ -20,8 +23,9 @@ export default function TodayPage() {
   const triggerRef = useRef(null)
 
   const refresh = useCallback(async () => {
-    const data = await workspaceApi.getToday()
+    const [data, tasks] = await Promise.all([workspaceApi.getToday(), workspaceApi.listTasks('status=open')])
     setToday(data)
+    setOpenTasks(tasks)
     return data
   }, [])
 
@@ -29,9 +33,10 @@ export default function TodayPage() {
     let alive = true
     async function load() {
       try {
-        const [preference, initialToday, clientData, organizationData] = await Promise.all([
-          workspaceApi.getPreferences(), workspaceApi.getToday(), api.get('/clients'), workspaceApi.listOrganizations(true),
+        const [preference, initialToday, clientData, organizationData, tasks] = await Promise.all([
+          workspaceApi.getPreferences(), workspaceApi.getToday(), api.get('/clients'), workspaceApi.listOrganizations(true), workspaceApi.listTasks('status=open'),
         ])
+        if (!alive) return
         let result = initialToday
         if (!preference.is_configured) {
           const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
@@ -40,6 +45,7 @@ export default function TodayPage() {
         }
         if (!alive) return
         setToday(result)
+        setOpenTasks(tasks)
         setClients(Array.isArray(clientData) ? clientData : [])
         setOrganizations(Array.isArray(organizationData) ? organizationData : [])
       } catch {
@@ -49,6 +55,14 @@ export default function TodayPage() {
     load()
     return () => { alive = false }
   }, [])
+
+  useEffect(() => {
+    const taskId = new URLSearchParams(location.search).get('task')
+    if (!taskId || !today) return
+    const target = document.getElementById(`task-${taskId}`)
+    target?.scrollIntoView({ block: 'center' })
+    target?.focus()
+  }, [location.search, today, openTasks])
 
   function openCreate(mode, initialValues = {}, trigger = null) {
     triggerRef.current = trigger || document.activeElement
@@ -79,6 +93,8 @@ export default function TodayPage() {
   function appointmentFromMail(message) {
     openCreate('appointment', { title: message.subject, notes: `Sample email from ${message.sender} (${message.organization}): ${message.preview}` })
   }
+  const featuredTaskIds = new Set([...(today?.overdue_tasks || []), ...(today?.due_today_tasks || [])].map((task) => task.id))
+  const otherOpenTasks = openTasks.filter((task) => !featuredTaskIds.has(task.id))
 
   return <>
     <TopBar crumbs={['Daily', 'Today']} onMenuClick={openMenu} onNotificationsClick={openNotifications} />
@@ -90,13 +106,14 @@ export default function TodayPage() {
       {!today && !error && <p role="status">Loading Today…</p>}
       {today && <div className="today-grid">
         <div className="today-main">
-          <TaskList title="Overdue" tasks={today.overdue_tasks} onToggle={completeTask} emptyText="Nothing overdue. You're caught up." />
-          <TaskList title="Due today" tasks={today.due_today_tasks} onToggle={completeTask} emptyText="No tasks due today." />
+          <TaskList title="Overdue" tasks={today.overdue_tasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="Nothing overdue. You're caught up." />
+          <TaskList title="Due today" tasks={today.due_today_tasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="No tasks due today." />
+          <TaskList title="Other open tasks" tasks={otherOpenTasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="No other open tasks." />
           <MockInbox onCreateTask={taskFromMail} onCreateAppointment={appointmentFromMail} />
         </div>
-        <aside className="today-rail"><MyMeetings today={today.appointments_today} upcoming={today.appointments_next_seven_days} onStatusChange={changeAppointment} /><QuickTools /></aside>
+        <aside className="today-rail"><MyMeetings today={today.appointments_today} upcoming={today.appointments_next_seven_days} onStatusChange={changeAppointment} timeZone={today.timezone_name} /><QuickTools /></aside>
       </div>}
-      {modal && <QuickCreateModal key={`${modal.mode}-${modal.initialValues.title || ''}`} mode={modal.mode} initialValues={modal.initialValues} clients={clients} organizations={organizations} onClose={closeCreate} onCreated={created} />}
+      {modal && <QuickCreateModal key={`${modal.mode}-${modal.initialValues.title || ''}`} mode={modal.mode} initialValues={modal.initialValues} clients={clients} organizations={organizations} timeZone={today?.timezone_name} onClose={closeCreate} onCreated={created} />}
     </main>
   </>
 }
