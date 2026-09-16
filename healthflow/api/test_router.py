@@ -6,17 +6,23 @@ import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import delete, update as sa_update
+from sqlalchemy import delete, select, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from healthflow.auth.tenant_context import system_context
 from healthflow.database.config import async_session_factory, get_db
 from healthflow.database.models import (
     ActionHistory,
+    Appointment,
     Broker,
+    BrokerPreference,
+    Contact,
     Feedback,
+    Organization,
+    Task,
+    WorkspaceActivity,
 )
-from healthflow.seed_data import seed_for_worker
+from healthflow.seed_data import seed_for_worker, worker_email
 
 
 test_router = APIRouter(prefix="/__test", tags=["test"])
@@ -35,21 +41,30 @@ async def reset_db(body: ResetRequest) -> dict:
     """Wipe and re-seed only the requesting worker's broker-scoped data.
 
     The broker itself is sticky (created once, never deleted) so JWTs stay
-    valid across resets. Client/ActionHistory/Feedback rows owned by this
-    broker are deleted and the canonical client set is re-inserted.
+    valid across resets. Broker-owned workspace rows are removed before
+    Client rows are replaced, so linked records cannot outlive their Clients.
     """
     async with _reset_lock:
         async with async_session_factory() as session:
             with system_context(f"e2e reset for worker {body.worker_id}"):
-                broker = await seed_for_worker(session, body.worker_id)
-                # seed_for_worker already wiped + re-inserted Client rows; also
-                # wipe ActionHistory and Feedback rows owned by this broker.
-                await session.execute(
-                    delete(ActionHistory).where(ActionHistory.broker_id == broker.id)
-                )
-                await session.execute(
-                    delete(Feedback).where(Feedback.broker_id == broker.id)
-                )
+                broker = (
+                    await session.execute(
+                        select(Broker).where(Broker.email == worker_email(body.worker_id))
+                    )
+                ).scalar_one_or_none()
+                if broker is not None:
+                    for model in (
+                        WorkspaceActivity,
+                        Appointment,
+                        Task,
+                        Contact,
+                        Organization,
+                        BrokerPreference,
+                        ActionHistory,
+                        Feedback,
+                    ):
+                        await session.execute(delete(model).where(model.broker_id == broker.id))
+                await seed_for_worker(session, body.worker_id)
                 # PromptVariant is intentionally not wiped: it is a global table
                 # (no broker_id column) — wiping it per-worker would destroy rows
                 # owned by other workers.

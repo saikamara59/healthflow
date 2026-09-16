@@ -33,6 +33,7 @@ from healthflow.feedback.router import feedback_router
 from healthflow.agents.temporal_awareness.routes import temporal_router
 from healthflow.forensics.routes import forensics_router
 from healthflow.decisions.router import decisions_router
+from healthflow.workspace.organizations_router import organizations_router
 
 
 @asynccontextmanager
@@ -94,6 +95,7 @@ app.include_router(feedback_router)
 app.include_router(temporal_router)
 app.include_router(forensics_router)
 app.include_router(decisions_router)
+app.include_router(organizations_router)
 
 
 if (
