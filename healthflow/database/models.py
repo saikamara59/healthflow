@@ -95,6 +95,132 @@ class Client(Base):
     actions: Mapped[list["ActionHistory"]] = relationship(back_populates="client", cascade="all, delete-orphan")
 
 
+class BrokerPreference(Base):
+    __tablename__ = "broker_preferences"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    broker_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("brokers.id"), unique=True, index=True, nullable=False
+    )
+    timezone_name: Mapped[str] = mapped_column(
+        String(64), default="UTC", server_default="UTC", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+
+class Organization(Base):
+    __tablename__ = "organizations"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    broker_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("brokers.id"), index=True, nullable=False
+    )
+    name: Mapped[str] = mapped_column(EncryptedString(2000), nullable=False)
+    kind: Mapped[str] = mapped_column(String(30), nullable=False)
+    website: Mapped[str | None] = mapped_column(EncryptedString(2000), nullable=True)
+    phone: Mapped[str | None] = mapped_column(EncryptedString(2000), nullable=True)
+    notes: Mapped[str | None] = mapped_column(EncryptedString(8000), nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+
+class Contact(Base):
+    __tablename__ = "contacts"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    broker_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("brokers.id"), index=True, nullable=False
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("organizations.id"), index=True, nullable=False
+    )
+    full_name: Mapped[str] = mapped_column(EncryptedString(2000), nullable=False)
+    role: Mapped[str | None] = mapped_column(EncryptedString(2000), nullable=True)
+    email: Mapped[str | None] = mapped_column(EncryptedString(2000), nullable=True)
+    phone: Mapped[str | None] = mapped_column(EncryptedString(2000), nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+
+class Task(Base):
+    __tablename__ = "tasks"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    broker_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("brokers.id"), index=True, nullable=False
+    )
+    client_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("clients.id"), index=True)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("organizations.id"), index=True
+    )
+    contact_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("contacts.id"), index=True)
+    title: Mapped[str] = mapped_column(EncryptedString(4000), nullable=False)
+    notes: Mapped[str | None] = mapped_column(EncryptedString(12000), nullable=True)
+    priority: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="open", server_default="open", nullable=False)
+    is_follow_up: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
+    due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+
+class Appointment(Base):
+    __tablename__ = "appointments"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    broker_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("brokers.id"), index=True, nullable=False
+    )
+    client_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("clients.id"), index=True)
+    organization_id: Mapped[uuid.UUID | None] = mapped_column(
+        GUID(), ForeignKey("organizations.id"), index=True
+    )
+    contact_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("contacts.id"), index=True)
+    title: Mapped[str] = mapped_column(EncryptedString(4000), nullable=False)
+    notes: Mapped[str | None] = mapped_column(EncryptedString(12000), nullable=True)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), default="scheduled", server_default="scheduled", nullable=False
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    canceled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+
+class WorkspaceActivity(Base):
+    __tablename__ = "workspace_activity"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    broker_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("brokers.id"), index=True, nullable=False
+    )
+    client_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("clients.id"), index=True)
+    entity_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    entity_id: Mapped[uuid.UUID] = mapped_column(GUID(), index=True, nullable=False)
+    action: Mapped[str] = mapped_column(String(30), nullable=False)
+    summary: Mapped[str] = mapped_column(EncryptedString(4000), nullable=False)
+    details: Mapped[dict] = mapped_column(EncryptedJSON(), default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, index=True, nullable=False
+    )
+
+
 class ActionHistory(Base):
     __tablename__ = "action_history"
 
