@@ -37,6 +37,7 @@ from healthflow.workspace.organizations_router import organizations_router
 from healthflow.workspace.activity_router import activity_router
 from healthflow.workspace.tasks_router import tasks_router
 from healthflow.workspace.appointments_router import appointments_router
+from healthflow.workspace.dashboard_router import dashboard_router
 
 
 @asynccontextmanager
@@ -102,6 +103,7 @@ app.include_router(organizations_router)
 app.include_router(activity_router)
 app.include_router(tasks_router)
 app.include_router(appointments_router)
+app.include_router(dashboard_router)
 
 
 if (

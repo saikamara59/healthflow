@@ -192,3 +192,38 @@ class WorkspaceActivityResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class BrokerPreferenceUpdate(BaseModel):
+    timezone_name: str = Field(min_length=1, max_length=64)
+
+
+class BrokerPreferenceResponse(BaseModel):
+    timezone_name: str
+    is_configured: bool
+
+
+class TodayResponse(BaseModel):
+    timezone_name: str
+    local_date: str
+    overdue_tasks: list[TaskResponse]
+    due_today_tasks: list[TaskResponse]
+    appointments_today: list[AppointmentResponse]
+    appointments_next_seven_days: list[AppointmentResponse]
+
+
+class OverviewResponse(BaseModel):
+    clients: int
+    organizations: int
+    open_tasks: int
+    overdue_tasks: int
+    appointments_next_seven_days: int
+    recent_activity: list[WorkspaceActivityResponse]
+
+
+class SearchResult(BaseModel):
+    kind: Literal["client", "organization", "contact", "task", "appointment"]
+    id: UUID
+    title: str
+    subtitle: str
+    href: str
