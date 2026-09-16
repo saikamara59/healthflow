@@ -37,12 +37,14 @@ from healthflow.decisions.router import decisions_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize database tables on startup (for development/testing)."""
+    """Initialize database tables and optional agent telemetry on startup."""
     from healthflow.database.config import engine
     from healthflow.database.models import Base
+    from healthflow.logs.invocation import configure_agent_logfire
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    configure_agent_logfire()
     yield
 
 

@@ -30,6 +30,11 @@ os.environ.setdefault("FRONTEND_BASE_URL", "https://test.example.com")
 # tests that mock Anthropic and assert on the mocked response.
 os.environ.setdefault("HEALTHFLOW_ENABLE_TEST_ROUTES", "1")
 
+# A developer may have a real Logfire token in their shell or .env. Keep tests
+# offline by default; the observability tests explicitly replace this value
+# and capture records with an in-memory exporter.
+os.environ["LOGFIRE_TOKEN"] = ""
+
 # Point the healthflow-agents package at this repo's public drug reference DB
 # (the package's CostEstimator resolves it via env var, not repo-relative path).
 from pathlib import Path as _Path
