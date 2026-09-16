@@ -32,13 +32,35 @@ from healthflow.auth.tenant_context import (
     _in_system_context,
     current_broker_id,
 )
-from healthflow.database.models import ActionHistory, Client, DecisionRecord, Feedback
+from healthflow.database.models import (
+    ActionHistory,
+    Appointment,
+    BrokerPreference,
+    Client,
+    Contact,
+    DecisionRecord,
+    Feedback,
+    Organization,
+    Task,
+    WorkspaceActivity,
+)
 
 logger = logging.getLogger(__name__)
 
 
 # Explicit registry — adding a future PHI model is a one-line change here.
-TENANT_SCOPED_MODELS: frozenset[type] = frozenset({Client, ActionHistory, Feedback, DecisionRecord})
+TENANT_SCOPED_MODELS: frozenset[type] = frozenset({
+    Client,
+    ActionHistory,
+    Feedback,
+    DecisionRecord,
+    BrokerPreference,
+    Organization,
+    Contact,
+    Task,
+    Appointment,
+    WorkspaceActivity,
+})
 
 
 def _statement_targets_tenant_model(orm_execute_state) -> type | None:

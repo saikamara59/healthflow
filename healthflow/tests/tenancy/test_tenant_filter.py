@@ -50,9 +50,20 @@ async def session_with_filter():
     await engine.dispose()
 
 
-def test_registry_lists_phi_tables_only():
+def test_registry_lists_tenant_scoped_tables():
     names = {m.__tablename__ for m in TENANT_SCOPED_MODELS}
-    assert names == {"clients", "action_history", "feedback", "decision_records"}
+    assert names == {
+        "clients",
+        "action_history",
+        "feedback",
+        "decision_records",
+        "broker_preferences",
+        "organizations",
+        "contacts",
+        "tasks",
+        "appointments",
+        "workspace_activity",
+    }
 
 
 @pytest.mark.anyio
