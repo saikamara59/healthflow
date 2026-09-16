@@ -388,6 +388,7 @@ React Frontend → Nginx → FastAPI Backend → Harness → Tools + Agents → 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `ANTHROPIC_API_KEY` | (required) | Claude API key for AI recommendations |
+| `LOGFIRE_TOKEN` | unset | Optional Logfire project write token. Exports only allowlisted agent invocation metadata (agent, operation, duration, success/failure), not prompts, responses, identifiers, details, or exception text. |
 | `DATABASE_URL` | `sqlite+aiosqlite:///healthflow.db` | Database connection string |
 | `JWT_SECRET` | **(required, fail-loud)** | JWT signing secret. Module-import raises if unset or set to the legacy default. Generate with `python -c "import secrets; print(secrets.token_urlsafe(32))"`. |
 | `PHI_ENCRYPTION_KEY` | **(required, fail-loud)** | AES-256 key (base64-encoded 32 bytes) for column-level PHI encryption. Generate with `python -c "import secrets, base64; print(base64.b64encode(secrets.token_bytes(32)).decode())"`. Rotate by adding `PHI_ENCRYPTION_KEY_V2` alongside (new writes use the highest version). |
@@ -397,6 +398,12 @@ React Frontend → Nginx → FastAPI Backend → Harness → Tools + Agents → 
 | `FRONTEND_BASE_URL` | (required for password reset) | Public origin used to build reset links: `${FRONTEND_BASE_URL}/reset-password?token=...`. |
 | `REDIS_URL` | `redis://localhost:6379` | Redis connection (optional) |
 | `HEALTHFLOW_TEST_MODE` | unset | **Test-only.** When `1`, registers `/__test/reset` and short-circuits Anthropic calls to deterministic stubs. Never set this in production. |
+
+To see new agent calls in Logfire, add `LOGFIRE_TOKEN` to the backend runtime
+environment (a Fly runtime secret for the public demo), then look for service
+`healthflow-agent-invocations` and event `healthflow agent invocation`. The
+database `agent_invocation_log` remains the authoritative invocation record;
+Logfire is an optional, metadata-only view. Earlier calls are not backfilled.
 
 ---
 
