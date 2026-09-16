@@ -4,7 +4,12 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import LoginPage from './pages/LoginPage'
 import HomePage from './pages/HomePage'
-import DashboardPage from './pages/DashboardPage'
+import OverviewPage from './pages/OverviewPage'
+import TodayPage from './pages/TodayPage'
+import OrganizationsPage from './pages/OrganizationsPage'
+import OrganizationDetailPage from './pages/OrganizationDetailPage'
+import FollowUpsPage from './pages/FollowUpsPage'
+import SchedulingPage from './pages/SchedulingPage'
 import ClientListPage from './pages/ClientListPage'
 import ClientProfilePage from './pages/ClientProfilePage'
 import AddClientPage from './pages/AddClientPage'
@@ -30,7 +35,7 @@ import AdminRoute from './components/AdminRoute'
 // every time they hit the root URL.
 function HomeGate() {
   const { isAuthenticated } = useAuth()
-  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <HomePage />
+  return isAuthenticated ? <Navigate to="/today" replace /> : <HomePage />
 }
 
 export default function App() {
@@ -47,7 +52,13 @@ export default function App() {
               </ProtectedRoute>
             }
           >
-            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="today" element={<TodayPage />} />
+            <Route path="overview" element={<OverviewPage />} />
+            <Route path="dashboard" element={<Navigate to="/overview" replace />} />
+            <Route path="organizations" element={<OrganizationsPage />} />
+            <Route path="organizations/:id" element={<OrganizationDetailPage />} />
+            <Route path="follow-ups" element={<FollowUpsPage />} />
+            <Route path="scheduling" element={<SchedulingPage />} />
             <Route path="clients" element={<ClientListPage />} />
             <Route path="clients/new" element={<AddClientPage />} />
             <Route path="clients/success" element={<OnboardingSuccessPage />} />

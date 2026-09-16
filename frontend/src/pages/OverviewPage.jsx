@@ -25,7 +25,7 @@ function sinceLabel(iso) {
 }
 
 /** Presents the broker's workspace overview, active clients, and recent work. */
-export default function DashboardPage() {
+export default function OverviewPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { openMenu, openNotifications } = useLayout();

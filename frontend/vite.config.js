@@ -23,6 +23,10 @@ export default defineConfig({
     proxy: {
       '/auth': proxyToBackend,
       '/clients': proxyToBackend,
+      '/organizations': proxyToBackend,
+      '/tasks': proxyToBackend,
+      '/appointments': proxyToBackend,
+      '/workspace': proxyToBackend,
       '/compare': proxyToBackend,
       '/calculate': proxyToBackend,
       '/translate': proxyToBackend,
