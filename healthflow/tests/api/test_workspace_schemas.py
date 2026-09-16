@@ -31,3 +31,24 @@ def test_organization_create_rejects_unknown_kind():
 
     with pytest.raises(ValidationError):
         OrganizationCreate(name="Harbor Health", kind="not-a-kind")
+
+
+@pytest.mark.parametrize(
+    ("schema_name", "field"),
+    [
+        ("OrganizationUpdate", "name"),
+        ("OrganizationUpdate", "kind"),
+        ("ContactUpdate", "full_name"),
+        ("TaskUpdate", "title"),
+        ("AppointmentUpdate", "title"),
+        ("AppointmentUpdate", "starts_at"),
+        ("AppointmentUpdate", "ends_at"),
+    ],
+)
+def test_update_rejects_explicit_null_for_required_fields(schema_name, field):
+    """Clearing a required field must fail validation before a database write."""
+    from healthflow.workspace import schemas
+
+    schema = getattr(schemas, schema_name)
+    with pytest.raises(ValidationError):
+        schema.model_validate({field: None})

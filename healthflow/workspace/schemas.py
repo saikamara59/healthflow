@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, Field, field_validator, model_validator
 
 
 OrganizationKind = Literal["carrier", "provider_office", "employer", "agency", "other"]
@@ -34,6 +34,13 @@ class OrganizationUpdate(BaseModel):
     phone: str | None = Field(default=None, max_length=50)
     notes: str | None = Field(default=None, max_length=4000)
 
+    @field_validator("name", "kind", mode="before")
+    @classmethod
+    def required_fields_cannot_be_cleared(cls, value):
+        if value is None:
+            raise ValueError("Required field cannot be null")
+        return value
+
 
 class ContactCreate(BaseModel):
     full_name: str = Field(min_length=1, max_length=200)
@@ -47,6 +54,13 @@ class ContactUpdate(BaseModel):
     role: str | None = Field(default=None, max_length=200)
     email: str | None = Field(default=None, max_length=320)
     phone: str | None = Field(default=None, max_length=50)
+
+    @field_validator("full_name", mode="before")
+    @classmethod
+    def full_name_cannot_be_cleared(cls, value):
+        if value is None:
+            raise ValueError("Required field cannot be null")
+        return value
 
 
 class TaskCreate(LinkedRecordFields):
@@ -63,6 +77,13 @@ class TaskUpdate(LinkedRecordFields):
     priority: TaskPriority | None = None
     due_at: AwareDatetime | None = None
     is_follow_up: bool | None = None
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def title_cannot_be_cleared(cls, value):
+        if value is None:
+            raise ValueError("Required field cannot be null")
+        return value
 
 
 class AppointmentCreate(LinkedRecordFields):
@@ -83,6 +104,13 @@ class AppointmentUpdate(LinkedRecordFields):
     notes: str | None = Field(default=None, max_length=6000)
     starts_at: AwareDatetime | None = None
     ends_at: AwareDatetime | None = None
+
+    @field_validator("title", "starts_at", "ends_at", mode="before")
+    @classmethod
+    def required_fields_cannot_be_cleared(cls, value):
+        if value is None:
+            raise ValueError("Required field cannot be null")
+        return value
 
 
 class ContactResponse(BaseModel):

@@ -17,8 +17,22 @@ def _as_utc(value: datetime) -> datetime:
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 
+def _optional_utc(value: datetime | None) -> datetime | None:
+    return _as_utc(value) if value is not None else None
+
+
 def contact_response(contact: Contact) -> ContactResponse:
-    return ContactResponse.model_validate(contact)
+    return ContactResponse(
+        id=contact.id,
+        organization_id=contact.organization_id,
+        full_name=contact.full_name,
+        role=contact.role,
+        email=contact.email,
+        phone=contact.phone,
+        archived_at=_optional_utc(contact.archived_at),
+        created_at=_as_utc(contact.created_at),
+        updated_at=_as_utc(contact.updated_at),
+    )
 
 
 def organization_response(
@@ -35,11 +49,11 @@ def organization_response(
         website=organization.website,
         phone=organization.phone,
         notes=organization.notes,
-        archived_at=organization.archived_at,
+        archived_at=_optional_utc(organization.archived_at),
         contact_count=len(active_contacts),
         contacts=[contact_response(contact) for contact in active_contacts] if include_contacts else [],
-        created_at=organization.created_at,
-        updated_at=organization.updated_at,
+        created_at=_as_utc(organization.created_at),
+        updated_at=_as_utc(organization.updated_at),
     )
 
 
@@ -61,16 +75,16 @@ def task_response(
         priority=task.priority,
         status=task.status,
         is_follow_up=task.is_follow_up,
-        due_at=task.due_at,
-        completed_at=task.completed_at,
+        due_at=_optional_utc(task.due_at),
+        completed_at=_optional_utc(task.completed_at),
         is_overdue=(
             task.status == "open" and task.due_at is not None and _as_utc(task.due_at) < now
         ),
         client_name=client_name,
         organization_name=organization_name,
         contact_name=contact_name,
-        created_at=task.created_at,
-        updated_at=task.updated_at,
+        created_at=_as_utc(task.created_at),
+        updated_at=_as_utc(task.updated_at),
     )
 
 
@@ -91,19 +105,28 @@ def appointment_response(
         contact_id=appointment.contact_id,
         title=appointment.title,
         notes=appointment.notes,
-        starts_at=appointment.starts_at,
-        ends_at=appointment.ends_at,
+        starts_at=_as_utc(appointment.starts_at),
+        ends_at=_as_utc(appointment.ends_at),
         status=appointment.status,
         presentation_status=presentation_status,
-        completed_at=appointment.completed_at,
-        canceled_at=appointment.canceled_at,
+        completed_at=_optional_utc(appointment.completed_at),
+        canceled_at=_optional_utc(appointment.canceled_at),
         client_name=client_name,
         organization_name=organization_name,
         contact_name=contact_name,
-        created_at=appointment.created_at,
-        updated_at=appointment.updated_at,
+        created_at=_as_utc(appointment.created_at),
+        updated_at=_as_utc(appointment.updated_at),
     )
 
 
 def activity_response(activity: WorkspaceActivity) -> WorkspaceActivityResponse:
-    return WorkspaceActivityResponse.model_validate(activity)
+    return WorkspaceActivityResponse(
+        id=activity.id,
+        client_id=activity.client_id,
+        entity_type=activity.entity_type,
+        entity_id=activity.entity_id,
+        action=activity.action,
+        summary=activity.summary,
+        details=activity.details,
+        created_at=_as_utc(activity.created_at),
+    )

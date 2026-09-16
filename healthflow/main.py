@@ -34,6 +34,8 @@ from healthflow.agents.temporal_awareness.routes import temporal_router
 from healthflow.forensics.routes import forensics_router
 from healthflow.decisions.router import decisions_router
 from healthflow.workspace.organizations_router import organizations_router
+from healthflow.workspace.activity_router import activity_router
+from healthflow.workspace.tasks_router import tasks_router
 
 
 @asynccontextmanager
@@ -96,6 +98,8 @@ app.include_router(temporal_router)
 app.include_router(forensics_router)
 app.include_router(decisions_router)
 app.include_router(organizations_router)
+app.include_router(activity_router)
+app.include_router(tasks_router)
 
 
 if (
