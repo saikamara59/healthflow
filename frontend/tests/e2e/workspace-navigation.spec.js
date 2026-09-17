@@ -69,6 +69,7 @@ test('a Contact save refresh cannot replace a different Organization route', asy
   const refreshStarted = new Promise((resolve) => { signalRefresh = resolve })
   const heldRefresh = new Promise((resolve) => { releaseRefresh = resolve })
   await authedPage.route(`**/organizations/${firstId}`, async (route) => {
+    if (route.request().resourceType() !== 'fetch') { await route.continue(); return }
     requestCount += 1
     if (requestCount > 1) { signalRefresh(); await heldRefresh }
     await route.continue()
