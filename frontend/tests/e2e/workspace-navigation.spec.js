@@ -33,6 +33,27 @@ test('broker creates an organization and contact', async ({ authedPage }) => {
   await expect(authedPage.getByText('Dana Ruiz')).toBeVisible()
 })
 
+test('repeated Contact form submits create only one record', async ({ authedPage }) => {
+  await authedPage.goto('/organizations')
+  await authedPage.getByRole('button', { name: 'New Organization' }).click()
+  await authedPage.getByLabel('Organization name').fill('Single Contact Harbor')
+  await authedPage.getByRole('button', { name: 'Create Organization' }).click()
+  await authedPage.getByRole('link', { name: 'Single Contact Harbor' }).click()
+  await authedPage.getByRole('button', { name: 'New Contact' }).click()
+  await authedPage.getByLabel('Contact name').fill('Dana Ruiz')
+  await authedPage.locator('.workspace-inline-form').evaluate((form) => {
+    form.requestSubmit()
+    form.requestSubmit()
+  })
+  await expect(authedPage.getByText('Dana Ruiz')).toBeVisible()
+  const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
+  const response = await authedPage.request.get(`/organizations/${authedPage.url().split('/').pop()}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  expect(response.ok()).toBe(true)
+  expect((await response.json()).contacts.filter((item) => item.full_name === 'Dana Ruiz')).toHaveLength(1)
+})
+
 test('archived organizations can be restored from the directory', async ({ authedPage }) => {
   await authedPage.goto('/organizations')
   await authedPage.getByRole('button', { name: 'New Organization' }).click()
@@ -47,6 +68,22 @@ test('archived organizations can be restored from the directory', async ({ authe
   await expect(authedPage.getByRole('link', { name: 'Restore Harbor' })).toHaveCount(0)
   await authedPage.getByRole('button', { name: 'Show active' }).click()
   await expect(authedPage.getByRole('link', { name: 'Restore Harbor' })).toBeVisible()
+})
+
+test('a failed Organization list refresh does not report a failed save', async ({ authedPage }) => {
+  await authedPage.goto('/organizations')
+  await expect(authedPage.getByLabel('Filter Organizations')).toBeVisible()
+  await authedPage.route('**/organizations?include_contacts=false&include_archived=false', (route) =>
+    route.fulfill({ status: 503, contentType: 'application/json', body: '{"detail":"Unavailable"}' }))
+  await authedPage.getByRole('button', { name: 'New Organization' }).click()
+  await authedPage.getByLabel('Organization name').fill('Saved Harbor')
+  await authedPage.getByRole('button', { name: 'Create Organization' }).click()
+  await expect(authedPage.getByRole('alert')).toContainText('Organization saved, but the list could not refresh')
+  await expect(authedPage.getByRole('button', { name: 'Create Organization' })).toHaveCount(0)
+  const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
+  const response = await authedPage.request.get('/organizations', { headers: { Authorization: `Bearer ${token}` } })
+  expect(response.ok()).toBe(true)
+  expect((await response.json()).filter((item) => item.name === 'Saved Harbor')).toHaveLength(1)
 })
 
 test('broker creates a follow-up', async ({ authedPage }) => {

@@ -38,9 +38,11 @@ export default function OrganizationsPage() {
       const body = { name: name.trim(), kind, phone: phone.trim() || null, website: website.trim() || null, notes: notes.trim() || null }
       if (editing === 'new') await workspaceApi.createOrganization(body)
       else await workspaceApi.updateOrganization(editing, body)
-      setEditing(null); await load()
-    } catch (err) { setError(err.message || 'Organization could not be saved.') }
+      setEditing(null)
+    } catch (err) { setError(err.message || 'Organization could not be saved.'); return }
     finally { savingRef.current = false; setSaving(false) }
+    try { await load() }
+    catch { setError('Organization saved, but the list could not refresh. Reload to see the update.') }
   }
   async function archive(id) {
     if (!window.confirm('Archive this Organization? Its Contacts will be hidden from the active directory.')) return

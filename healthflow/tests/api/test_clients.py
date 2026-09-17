@@ -1,4 +1,9 @@
+import uuid
+
 import pytest
+from sqlalchemy import select
+
+from healthflow.database.models import DecisionRecord
 
 
 async def _register_and_login(client, email="crud@example.com"):
@@ -192,7 +197,7 @@ async def test_delete_client(client):
 
 
 @pytest.mark.asyncio
-async def test_delete_client_detaches_workspace_records(client):
+async def test_delete_client_detaches_workspace_records(client, db_session):
     token = await _register_and_login(client, "delete-linked-client@example.com")
     headers = {"Authorization": f"Bearer {token}"}
     created = await client.post("/clients", json={
@@ -206,10 +211,27 @@ async def test_delete_client_detaches_workspace_records(client):
         "starts_at": "2030-01-15T10:00:00Z", "ends_at": "2030-01-15T11:00:00Z",
     }, headers=headers)
     await client.post(f"/tasks/{task.json()['id']}/complete", headers=headers)
+    history = await client.post("/history", json={
+        "client_id": client_id, "action_type": "comparison",
+        "request_data": {}, "response_summary": {},
+    }, headers=headers)
+    assert history.status_code == 201
+    decision_id = uuid.uuid4()
+    db_session.add(DecisionRecord(
+        id=decision_id, broker_id=uuid.UUID(created.json()["broker_id"]),
+        client_id=uuid.UUID(client_id), agent_type="compare", content={},
+    ))
+    await db_session.commit()
     assert (await client.delete(f"/clients/{client_id}", headers=headers)).status_code == 204
     assert (await client.get(f"/tasks/{task.json()['id']}", headers=headers)).json()["client_id"] is None
     assert (await client.get(f"/appointments/{appointment.json()['id']}", headers=headers)).json()["client_id"] is None
     assert (await client.get("/workspace/activity", headers=headers)).json()[0]["client_id"] is None
+    assert (await client.get("/history", headers=headers)).json() == []
+    db_session.expire_all()
+    record = (await db_session.execute(
+        select(DecisionRecord).where(DecisionRecord.id == decision_id)
+    )).scalar_one()
+    assert record.client_id is None
 
 
 @pytest.mark.asyncio

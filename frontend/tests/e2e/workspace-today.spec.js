@@ -1,10 +1,14 @@
 import { test, expect } from '../fixtures'
+import { dateInZone } from '../../src/api/workspaceTime'
 
 test('broker creates and completes a task without leaving Today', async ({ authedPage }) => {
   await authedPage.goto('/today')
   await authedPage.getByRole('button', { name: 'New Task' }).click()
   await authedPage.getByLabel('Task title').fill('Call Maria about renewal')
-  await authedPage.getByLabel('Due date').fill(new Date().toISOString().slice(0, 10))
+  const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
+  const preferences = await authedPage.request.get('/workspace/preferences', { headers: { Authorization: `Bearer ${token}` } })
+  expect(preferences.ok()).toBe(true)
+  await authedPage.getByLabel('Due date').fill(dateInZone(new Date(), (await preferences.json()).timezone_name))
   await authedPage.getByRole('button', { name: 'Create Task', exact: true }).click()
   const row = authedPage.getByRole('listitem', { name: /Call Maria about renewal/i })
   await expect(row).toBeVisible()
