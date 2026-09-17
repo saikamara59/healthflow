@@ -63,19 +63,17 @@ test('a Contact save refresh cannot replace a different Organization route', asy
   expect(first.ok()).toBe(true)
   expect(second.ok()).toBe(true)
   const firstId = (await first.json()).id
-  let requestCount = 0
+  await authedPage.goto(`/organizations/${firstId}`)
+  await expect(authedPage.getByRole('heading', { name: 'First Harbor' })).toBeVisible()
   let signalRefresh
   let releaseRefresh
   const refreshStarted = new Promise((resolve) => { signalRefresh = resolve })
   const heldRefresh = new Promise((resolve) => { releaseRefresh = resolve })
   await authedPage.route(`**/organizations/${firstId}`, async (route) => {
-    if (route.request().resourceType() !== 'fetch') { await route.continue(); return }
-    requestCount += 1
-    if (requestCount > 1) { signalRefresh(); await heldRefresh }
+    signalRefresh()
+    await heldRefresh
     await route.continue()
   })
-  await authedPage.goto(`/organizations/${firstId}`)
-  await expect(authedPage.getByRole('heading', { name: 'First Harbor' })).toBeVisible()
   await authedPage.getByRole('button', { name: 'New Contact' }).click()
   await authedPage.getByLabel('Contact name').fill('Dana Ruiz')
   await authedPage.getByRole('button', { name: 'Create Contact' }).click()
