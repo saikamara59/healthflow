@@ -60,7 +60,7 @@ test('archived organizations can be restored from the directory', async ({ authe
   await authedPage.getByLabel('Organization name').fill('Restore Harbor')
   await authedPage.getByRole('button', { name: 'Create Organization' }).click()
   authedPage.once('dialog', (dialog) => dialog.accept())
-  await authedPage.getByRole('button', { name: 'Archive' }).click()
+  await authedPage.getByRole('button', { name: 'Archive', exact: true }).click()
   await expect(authedPage.getByRole('link', { name: 'Restore Harbor' })).toHaveCount(0)
   await authedPage.getByRole('button', { name: 'Show archived' }).click()
   await expect(authedPage.getByRole('link', { name: 'Restore Harbor' })).toBeVisible()
