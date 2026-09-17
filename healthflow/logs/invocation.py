@@ -24,6 +24,7 @@ Five behaviors that distinguish this from a one-line ORM insert:
    no engine connections leak on exception paths.
 """
 import logging
+import os
 import time
 import uuid
 from contextlib import contextmanager
@@ -40,6 +41,66 @@ from healthflow.logs.audit import AuditLogger
 from healthflow.logs._sync_engine import sync_url as _sync_url
 
 logger = logging.getLogger(__name__)
+
+# Only these code-owned operation names may leave the host. Never export the
+# record's case/broker IDs, details, or exception message to Logfire.
+_LOGFIRE_AGENT_EVENTS = {
+    "comparison": frozenset({"recommend"}),
+    "cost_calculator": frozenset({"calculate"}),
+    "network": frozenset({"verify"}),
+    "translation": frozenset({"translate"}),
+    "appeal": frozenset({"process_appeal", "process_denial_record"}),
+    "temporal_awareness": frozenset({"generate_plan"}),
+}
+_logfire_enabled = False
+
+
+def configure_agent_logfire() -> None:
+    """Enable metadata-only agent records when a Logfire token is available."""
+    global _logfire_enabled
+    _logfire_enabled = False
+    if not os.getenv("LOGFIRE_TOKEN", "").strip():
+        return
+
+    try:
+        import logfire
+
+        # Do not instrument Pydantic AI: its spans can include prompts,
+        # responses, and exception messages. Only the allowlisted record below
+        # is exported. Disable argument introspection as a second guard.
+        logfire.configure(
+            service_name="healthflow-agent-invocations",
+            send_to_logfire="if-token-present",
+            console=False,
+            inspect_arguments=False,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Logfire agent tracing unavailable (%s); continuing without it",
+            type(exc).__name__,
+        )
+    else:
+        _logfire_enabled = True
+
+
+def _emit_logfire_invocation(record: "_InvocationRecord") -> None:
+    if not _logfire_enabled:
+        return
+    if record.event_type not in _LOGFIRE_AGENT_EVENTS.get(record.agent, ()):
+        return
+
+    try:
+        import logfire
+
+        logfire.info(
+            "healthflow agent invocation",
+            agent=record.agent,
+            operation=record.event_type,
+            duration_ms=record.duration_ms,
+            status="failed" if record.error is not None else "succeeded",
+        )
+    except Exception as exc:
+        logger.warning("Logfire agent record failed (%s)", type(exc).__name__)
 
 
 @dataclass
@@ -113,6 +174,7 @@ class InvocationLogger:
         finally:
             record.duration_ms = int((time.monotonic() - start) * 1000)
             self._write(record)
+            _emit_logfire_invocation(record)
 
     def _write(self, record: _InvocationRecord) -> None:
         """Best-effort insert. Any DB failure → text-log fallback, never raises."""

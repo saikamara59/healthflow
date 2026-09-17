@@ -42,16 +42,17 @@ from healthflow.workspace.dashboard_router import dashboard_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize database tables on startup (for development/testing)."""
-    from healthflow.database.config import engine
+    """Initialize database tables and optional agent telemetry on startup."""
+    from healthflow.database.config import async_session_factory, engine
     from healthflow.database.models import Base
+    from healthflow.logs.invocation import configure_agent_logfire
     from healthflow.workspace.search_index import backfill_search_index
-    from healthflow.database.config import async_session_factory
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     async with async_session_factory() as session:
         await backfill_search_index(session)
+    configure_agent_logfire()
     yield
 
 

@@ -20,4 +20,5 @@ pyyaml>=6.0
 
 # The four PydanticAI successor Ports plus the original AppealAgent, shared
 # contracts/tools, and PHI redaction layer. Logfire remains opt-in at runtime.
+logfire>=4.40,<5  # host imports the SDK directly for metadata-only invocation records
 healthflow-agents[pydantic-ai] @ git+https://github.com/saikamara59/healthflow-agents.git@v0.5.0
