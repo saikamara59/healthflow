@@ -199,3 +199,23 @@ async def test_logfire_configuration_failure_does_not_block_startup(
 
     assert "Logfire agent tracing unavailable" in caplog.text
     assert "test-token" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_search_backfill_does_not_block_application_readiness(
+    monkeypatch, startup_database
+):
+    from healthflow.workspace import search_index
+
+    started = asyncio.Event()
+    blocked = asyncio.Event()
+
+    async def slow_backfill(session):
+        started.set()
+        await blocked.wait()
+
+    monkeypatch.setattr(search_index, "backfill_search_index", slow_backfill)
+    async with asyncio.timeout(2):
+        async with main.lifespan(main.app):
+            await started.wait()
+            assert not blocked.is_set()

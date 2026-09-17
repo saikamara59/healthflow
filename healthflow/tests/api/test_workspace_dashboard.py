@@ -31,6 +31,11 @@ async def test_preferences_default_to_utc_and_reject_invalid_zones(client):
         "/workspace/preferences", json={"timezone_name": "Not/AZone"}, headers=headers
     )
     assert invalid.status_code == 422
+    for name in ("/etc/passwd", "../UTC"):
+        malformed = await client.put(
+            "/workspace/preferences", json={"timezone_name": name}, headers=headers
+        )
+        assert malformed.status_code == 422
     saved = await client.put(
         "/workspace/preferences", json={"timezone_name": "America/New_York"}, headers=headers
     )
@@ -108,6 +113,29 @@ async def test_overview_counts_only_current_broker_records(client):
 
 
 @pytest.mark.asyncio
+async def test_overview_returns_only_five_recent_clients_without_listing_the_book(client):
+    owner = await _headers(client, "overview-recent-owner@example.com")
+    outsider = await _headers(client, "overview-recent-outsider@example.com")
+    for index in range(7):
+        response = await client.post("/clients", json={
+            "full_name": f"Recent Client {index}", "zip_code": "10001", "age": 40,
+            "income_level": "medium", "doctors": [], "prescriptions": [], "procedures": [],
+        }, headers=owner)
+        assert response.status_code == 201
+    await client.post("/clients", json={
+        "full_name": "Other Broker", "zip_code": "10001", "age": 40,
+        "income_level": "medium", "doctors": [], "prescriptions": [], "procedures": [],
+    }, headers=outsider)
+    result = await client.get("/workspace/overview", headers=owner)
+    assert result.status_code == 200
+    assert result.json()["clients"] == 7
+    assert len(result.json()["recent_clients"]) == 5
+    assert {entry["full_name"] for entry in result.json()["recent_clients"]} == {
+        f"Recent Client {index}" for index in range(2, 7)
+    }
+
+
+@pytest.mark.asyncio
 async def test_search_matches_encrypted_names_without_cross_broker_leak(client):
     owner = await _headers(client, "search-owner@example.com")
     outsider = await _headers(client, "search-outsider@example.com")
@@ -127,6 +155,24 @@ async def test_search_matches_encrypted_names_without_cross_broker_leak(client):
         ("Harbor Health", f"/organizations/{owned.json()['id']}")
     ]
     assert (await client.get("/workspace/search?q=h", headers=owner)).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_archived_search_matches_do_not_exhaust_candidate_limit(client):
+    headers = await _headers(client, "search-archived-candidates@example.com")
+    for index in range(27):
+        archived = await client.post(
+            "/organizations", json={"name": f"Harbor Old {index}", "kind": "agency"},
+            headers=headers,
+        )
+        assert archived.status_code == 201
+        await client.post(f"/organizations/{archived.json()['id']}/archive", headers=headers)
+    active = await client.post(
+        "/organizations", json={"name": "Harbor Active", "kind": "carrier"}, headers=headers
+    )
+    result = await client.get("/workspace/search?q=Harbor&limit=1", headers=headers)
+    assert result.status_code == 200
+    assert [item["id"] for item in result.json()] == [active.json()["id"]]
 
 
 @pytest.mark.asyncio

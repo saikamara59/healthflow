@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
+import { workspaceApi } from '../api/workspace';
 import TopBar from '../components/TopBar';
 import Icon from '../components/ui/Icon';
 import Chip from '../components/ui/Chip';
@@ -35,9 +36,15 @@ export default function ActivityPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/history?limit=200')
-      .then((d) => setHistory(Array.isArray(d) ? d : []))
-      .catch(() => setHistory([]))
+    Promise.allSettled([api.get('/history?limit=200'), workspaceApi.listActivity()])
+      .then(([tools, workspace]) => {
+        const toolEntries = tools.status === 'fulfilled' && Array.isArray(tools.value) ? tools.value : [];
+        const workspaceEntries = workspace.status === 'fulfilled' && Array.isArray(workspace.value) ? workspace.value : [];
+        setHistory([
+          ...toolEntries.map((entry) => ({ ...entry, kind: 'Tool' })),
+          ...workspaceEntries.map((entry) => ({ ...entry, kind: 'Workspace', action_type: entry.action })),
+        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -53,7 +60,7 @@ export default function ActivityPage() {
             <div className="eyebrow" style={{ marginBottom: 14 }}>{history.length} recorded activities</div>
             <h1 className="page-title"><em>Activity</em></h1>
             <p className="page-sub">
-              A record of completed comparisons, checks, calculations, and appeals, grouped by day.
+              Completed workspace work and tool activity, grouped by day.
             </p>
           </div>
         </div>
@@ -63,7 +70,7 @@ export default function ActivityPage() {
           <div className="card card-pad">
             <div className="empty">
               <div className="empty-title">Nothing logged yet</div>
-              <div>Run any tool on a client to start building a timeline.</div>
+              <div>Complete a task, update an appointment, or run a tool to start a timeline.</div>
             </div>
           </div>
         )}
@@ -82,11 +89,11 @@ export default function ActivityPage() {
                   >
                     <span className="act-time mono">{sinceLabel(a.created_at)}</span>
                     <Chip tone={a.action_type === 'appeal' ? 'accent' : a.action_type === 'verify' ? 'warn' : 'pos'}>
-                      {a.action_type}
+                      {a.kind === 'Workspace' ? a.action : a.action_type}
                     </Chip>
                     <div className="act-body">
-                      <span className="who">{a.client_name || 'Session'}</span>
-                      <span className="muted">. {a.action_type.replace(/_/g, ' ')} completed</span>
+                      <span className="who">{a.kind === 'Workspace' ? a.summary : a.client_name || 'Session'}</span>
+                      {a.kind === 'Tool' && <span className="muted"> · {a.action_type.replace(/_/g, ' ')} completed</span>}
                     </div>
                     {a.client_id && <Icon name="chev_r" size={14} className="ink-4" />}
                   </div>

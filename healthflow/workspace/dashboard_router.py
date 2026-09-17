@@ -4,7 +4,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import distinct, func, select
+from sqlalchemy import and_, distinct, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from healthflow.auth.dependencies import get_current_broker
@@ -26,6 +26,7 @@ from healthflow.workspace.schemas import (
     BrokerPreferenceResponse,
     BrokerPreferenceUpdate,
     OverviewResponse,
+    RecentClientResponse,
     SearchResult,
     TodayResponse,
 )
@@ -47,7 +48,7 @@ async def _preference(db: AsyncSession, broker: Broker) -> BrokerPreference | No
 def _zone(name: str) -> ZoneInfo:
     try:
         return ZoneInfo(name)
-    except ZoneInfoNotFoundError:
+    except (ZoneInfoNotFoundError, ValueError):
         raise HTTPException(status_code=422, detail="Invalid time zone") from None
 
 
@@ -162,31 +163,40 @@ async def get_overview(
     zone = _zone(preference.timezone_name if preference is not None else "UTC")
     now = datetime.now(timezone.utc)
     day_start, _, week_end = _day_bounds(now.astimezone(zone).date(), zone)
-    clients = (await db.execute(select(Client))).scalars().all()
-    organizations = (
-        await db.execute(select(Organization).where(Organization.archived_at.is_(None)))
-    ).scalars().all()
-    tasks = (await db.execute(select(Task).where(Task.status == "open"))).scalars().all()
-    appointments = (
-        await db.execute(select(Appointment).where(Appointment.status == "scheduled"))
-    ).scalars().all()
+    clients = await db.scalar(select(func.count(Client.id)).where(Client.broker_id == broker.id))
+    organizations = await db.scalar(select(func.count(Organization.id)).where(
+        Organization.broker_id == broker.id, Organization.archived_at.is_(None)
+    ))
+    tasks = await db.scalar(select(func.count(Task.id)).where(
+        Task.broker_id == broker.id, Task.status == "open"
+    ))
+    overdue_tasks = await db.scalar(select(func.count(Task.id)).where(
+        Task.broker_id == broker.id, Task.status == "open",
+        Task.due_at.is_not(None), Task.due_at < now,
+    ))
+    upcoming_appointments = await db.scalar(select(func.count(Appointment.id)).where(
+        Appointment.broker_id == broker.id, Appointment.status == "scheduled",
+        Appointment.starts_at >= day_start, Appointment.starts_at < week_end,
+    ))
     activity = (
         await db.execute(
             select(WorkspaceActivity).order_by(WorkspaceActivity.created_at.desc()).limit(10)
         )
     ).scalars().all()
+    recent_clients = (await db.execute(
+        select(Client).where(Client.broker_id == broker.id)
+        .order_by(Client.updated_at.desc(), Client.id.desc()).limit(5)
+    )).scalars().all()
     return OverviewResponse(
-        clients=len(clients),
-        organizations=len(organizations),
-        open_tasks=len(tasks),
-        overdue_tasks=sum(
-            task.due_at is not None and _as_utc(task.due_at) < now for task in tasks
-        ),
-        appointments_next_seven_days=sum(
-            day_start <= _as_utc(appointment.starts_at) < week_end
-            for appointment in appointments
-        ),
+        clients=clients,
+        organizations=organizations,
+        open_tasks=tasks,
+        overdue_tasks=overdue_tasks,
+        appointments_next_seven_days=upcoming_appointments,
         recent_activity=[activity_response(entry) for entry in activity],
+        recent_clients=[RecentClientResponse(
+            id=client.id, full_name=client.full_name, updated_at=client.updated_at
+        ) for client in recent_clients],
     )
 
 
@@ -206,10 +216,28 @@ async def search_workspace(
         for version in blind_index_versions()
         for gram in grams
     ]
+    # Exclude archived records in SQL so they cannot exhaust the bounded
+    # candidate pool before an active result is considered.
+    active_organizations = select(Organization.id).where(
+        Organization.broker_id == broker.id, Organization.archived_at.is_(None)
+    )
+    active_contacts = select(Contact.id).join(
+        Organization, Contact.organization_id == Organization.id
+    ).where(
+        Contact.broker_id == broker.id, Contact.archived_at.is_(None),
+        Organization.broker_id == broker.id, Organization.archived_at.is_(None),
+    )
+    eligible = or_(
+        WorkspaceSearchToken.kind.in_(("client", "task", "appointment")),
+        and_(WorkspaceSearchToken.kind == "organization",
+             WorkspaceSearchToken.record_id.in_(active_organizations)),
+        and_(WorkspaceSearchToken.kind == "contact",
+             WorkspaceSearchToken.record_id.in_(active_contacts)),
+    )
     # Candidate IDs are bounded in SQL before any encrypted title is loaded.
     matches = (await db.execute(
         select(WorkspaceSearchToken.kind, WorkspaceSearchToken.record_id)
-        .where(WorkspaceSearchToken.digest.in_(digests))
+        .where(WorkspaceSearchToken.digest.in_(digests), eligible)
         .group_by(
             WorkspaceSearchToken.kind,
             WorkspaceSearchToken.record_id,

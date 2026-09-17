@@ -33,6 +33,22 @@ test('broker creates an organization and contact', async ({ authedPage }) => {
   await expect(authedPage.getByText('Dana Ruiz')).toBeVisible()
 })
 
+test('archived organizations can be restored from the directory', async ({ authedPage }) => {
+  await authedPage.goto('/organizations')
+  await authedPage.getByRole('button', { name: 'New Organization' }).click()
+  await authedPage.getByLabel('Organization name').fill('Restore Harbor')
+  await authedPage.getByRole('button', { name: 'Create Organization' }).click()
+  authedPage.once('dialog', (dialog) => dialog.accept())
+  await authedPage.getByRole('button', { name: 'Archive' }).click()
+  await expect(authedPage.getByRole('link', { name: 'Restore Harbor' })).toHaveCount(0)
+  await authedPage.getByRole('button', { name: 'Show archived' }).click()
+  await expect(authedPage.getByRole('link', { name: 'Restore Harbor' })).toBeVisible()
+  await authedPage.getByRole('button', { name: 'Restore' }).click()
+  await expect(authedPage.getByRole('link', { name: 'Restore Harbor' })).toHaveCount(0)
+  await authedPage.getByRole('button', { name: 'Show active' }).click()
+  await expect(authedPage.getByRole('link', { name: 'Restore Harbor' })).toBeVisible()
+})
+
 test('broker creates a follow-up', async ({ authedPage }) => {
   await authedPage.goto('/follow-ups')
   await authedPage.getByRole('button', { name: 'New Follow-up' }).click()
@@ -66,11 +82,56 @@ test('keyboard search finds a Broker task', async ({ authedPage }) => {
   await expect(authedPage.getByRole('listitem', { name: 'Review Harbor renewal' })).toBeFocused()
 })
 
+test('search reveals a completed task outside the Today sections', async ({ authedPage }) => {
+  await authedPage.goto('/today')
+  const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
+  const headers = { Authorization: `Bearer ${token}` }
+  const created = await authedPage.request.post('/tasks', { headers, data: { title: 'Review archived renewal' } })
+  expect(created.ok()).toBe(true)
+  const taskId = (await created.json()).id
+  expect((await authedPage.request.post(`/tasks/${taskId}/complete`, { headers })).ok()).toBe(true)
+  await authedPage.getByRole('button', { name: 'Search workspace' }).click()
+  await authedPage.getByRole('searchbox', { name: 'Search workspace' }).fill('archived renewal')
+  await authedPage.getByRole('option', { name: /Review archived renewal/i }).click()
+  await expect(authedPage).toHaveURL(new RegExp(`task=${taskId}`))
+  await expect(authedPage.getByRole('heading', { name: 'Search result' })).toBeVisible()
+  await expect(authedPage.getByRole('listitem', { name: 'Review archived renewal' })).toBeVisible()
+})
+
+test('search reveals an appointment outside the selected week', async ({ authedPage }) => {
+  await authedPage.goto('/scheduling')
+  const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
+  const headers = { Authorization: `Bearer ${token}` }
+  const created = await authedPage.request.post('/appointments', { headers, data: {
+    title: 'Far future Harbor review', starts_at: '2030-01-15T10:00:00Z', ends_at: '2030-01-15T11:00:00Z',
+  } })
+  expect(created.ok()).toBe(true)
+  const appointmentId = (await created.json()).id
+  await authedPage.getByRole('button', { name: 'Search workspace' }).click()
+  await authedPage.getByRole('searchbox', { name: 'Search workspace' }).fill('Far future Harbor')
+  await authedPage.getByRole('option', { name: /Far future Harbor review/i }).click()
+  await expect(authedPage).toHaveURL(new RegExp(`appointment=${appointmentId}`))
+  await expect(authedPage.getByRole('heading', { name: 'Search result' })).toBeVisible()
+  await expect(authedPage.getByText('Far future Harbor review')).toBeVisible()
+})
+
 test('Overview shows live workspace counts', async ({ authedPage }) => {
   await authedPage.goto('/overview')
   await expect(authedPage.getByRole('heading', { name: 'Overview' })).toBeVisible()
   await expect(authedPage.getByText('Open tasks')).toBeVisible()
   await expect(authedPage.getByText('Upcoming appointments')).toBeVisible()
+})
+
+test('Activity includes completed workspace tasks', async ({ authedPage }) => {
+  await authedPage.goto('/today')
+  await authedPage.getByRole('button', { name: 'New Task' }).click()
+  await authedPage.getByLabel('Task title').fill('Send renewal packet')
+  await authedPage.getByRole('button', { name: 'Create Task', exact: true }).click()
+  await authedPage.getByRole('listitem', { name: 'Send renewal packet' }).getByRole('checkbox').click()
+  await authedPage.goto('/overview')
+  await expect(authedPage.getByText('Completed Send renewal packet')).toBeVisible()
+  await authedPage.getByRole('link', { name: 'View activity' }).click()
+  await expect(authedPage.getByText('Completed Send renewal packet')).toBeVisible()
 })
 
 test('Broker can change the workspace time zone in Settings', async ({ authedPage }) => {

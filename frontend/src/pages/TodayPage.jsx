@@ -19,6 +19,7 @@ export default function TodayPage() {
   const location = useLocation()
   const [today, setToday] = useState(null)
   const [otherTasks, setOtherTasks] = useState([])
+  const [targetTask, setTargetTask] = useState(null)
   const [hasMoreTasks, setHasMoreTasks] = useState(false)
   const [loadingMoreTasks, setLoadingMoreTasks] = useState(false)
   const [clients, setClients] = useState([])
@@ -27,10 +28,13 @@ export default function TodayPage() {
   const [modal, setModal] = useState(null)
   const triggerRef = useRef(null)
   const loadingMoreRef = useRef(false)
+  const taskGenerationRef = useRef(0)
 
   const refresh = useCallback(async () => {
+    const generation = ++taskGenerationRef.current
     const data = await workspaceApi.getToday()
     const tasks = await workspaceApi.listTasks(otherTaskQuery(data.timezone_name), { limit: OTHER_TASK_PAGE_SIZE })
+    if (generation !== taskGenerationRef.current) return data
     setToday(data)
     setOtherTasks(tasks)
     setHasMoreTasks(tasks.length === OTHER_TASK_PAGE_SIZE)
@@ -39,12 +43,13 @@ export default function TodayPage() {
 
   useEffect(() => {
     let alive = true
+    const generation = ++taskGenerationRef.current
     async function load() {
       try {
         const [preference, initialToday, clientData, organizationData] = await Promise.all([
           workspaceApi.getPreferences(), workspaceApi.getToday(), api.get('/clients'), workspaceApi.listOrganizations(true),
         ])
-        if (!alive) return
+        if (!alive || generation !== taskGenerationRef.current) return
         let result = initialToday
         if (!preference.is_configured) {
           const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
@@ -52,7 +57,7 @@ export default function TodayPage() {
           result = await workspaceApi.getToday()
         }
         const tasks = await workspaceApi.listTasks(otherTaskQuery(result.timezone_name), { limit: OTHER_TASK_PAGE_SIZE })
-        if (!alive) return
+        if (!alive || generation !== taskGenerationRef.current) return
         setToday(result)
         setOtherTasks(tasks)
         setHasMoreTasks(tasks.length === OTHER_TASK_PAGE_SIZE)
@@ -63,7 +68,7 @@ export default function TodayPage() {
       }
     }
     load()
-    return () => { alive = false }
+    return () => { alive = false; taskGenerationRef.current += 1 }
   }, [])
 
   useEffect(() => {
@@ -72,21 +77,34 @@ export default function TodayPage() {
     const target = document.getElementById(`task-${taskId}`)
     target?.scrollIntoView({ block: 'center' })
     target?.focus()
-  }, [location.search, today, otherTasks])
+  }, [location.search, today, otherTasks, targetTask])
+
+  useEffect(() => {
+    const taskId = new URLSearchParams(location.search).get('task')
+    let alive = true
+    setTargetTask(null)
+    if (taskId) workspaceApi.getTask(taskId).then((task) => {
+      if (alive) setTargetTask(task)
+    }).catch(() => { if (alive) setError('The matching Task could not be loaded.') })
+    return () => { alive = false }
+  }, [location.search])
 
   async function loadMoreTasks() {
     if (!today || !hasMoreTasks || loadingMoreRef.current) return
     loadingMoreRef.current = true
     setLoadingMoreTasks(true)
+    const generation = taskGenerationRef.current
     try {
       const page = await workspaceApi.listTasks(otherTaskQuery(today.timezone_name), { limit: OTHER_TASK_PAGE_SIZE, offset: otherTasks.length })
+      if (generation !== taskGenerationRef.current) return
       setOtherTasks((current) => [...current, ...page])
       setHasMoreTasks(page.length === OTHER_TASK_PAGE_SIZE)
-    } catch { setError('More Tasks could not be loaded. Try again.') }
+    } catch { if (generation === taskGenerationRef.current) setError('More Tasks could not be loaded. Try again.') }
     finally { loadingMoreRef.current = false; setLoadingMoreTasks(false) }
   }
 
   function openCreate(mode, initialValues = {}, trigger = null) {
+    if (!today) return
     triggerRef.current = trigger || document.activeElement
     setModal({ mode, initialValues })
   }
@@ -101,6 +119,14 @@ export default function TodayPage() {
   async function completeTask(task) {
     try { await workspaceApi.completeTask(task.id); await refresh() }
     catch { setError('The task could not be completed. Try again.') }
+  }
+  async function toggleTargetTask(task) {
+    try {
+      if (task.status === 'completed') await workspaceApi.reopenTask(task.id)
+      else await workspaceApi.completeTask(task.id)
+      setTargetTask(await workspaceApi.getTask(task.id))
+      await refresh()
+    } catch { setError('The task could not be updated. Try again.') }
   }
   async function changeAppointment(item, action) {
     try {
@@ -119,12 +145,13 @@ export default function TodayPage() {
     <TopBar crumbs={['Daily', 'Today']} onMenuClick={openMenu} onNotificationsClick={openNotifications} />
     <main className="page">
       <div className="page-head"><div><div className="eyebrow">Your day at a glance</div><h1 className="page-title">Today</h1><p className="page-sub">The work and conversations that need your attention.</p></div>
-        <div className="quick-create-actions"><button className="btn accent" onClick={(event) => openCreate('task', {}, event.currentTarget)}><Icon name="plus" size={16} /> New Task</button><button className="btn" onClick={(event) => openCreate('appointment', {}, event.currentTarget)}><Icon name="calendar" size={16} /> New Appointment</button></div>
+        <div className="quick-create-actions"><button className="btn accent" disabled={!today} onClick={(event) => openCreate('task', {}, event.currentTarget)}><Icon name="plus" size={16} /> New Task</button><button className="btn" disabled={!today} onClick={(event) => openCreate('appointment', {}, event.currentTarget)}><Icon name="calendar" size={16} /> New Appointment</button></div>
       </div>
       {error && <p role="alert" className="workspace-error">{error}</p>}
       {!today && !error && <p role="status">Loading Today…</p>}
       {today && <div className="today-grid">
         <div className="today-main">
+          {targetTask && ![...today.overdue_tasks, ...today.due_today_tasks, ...otherTasks].some((task) => task.id === targetTask.id) && <TaskList title="Search result" tasks={[targetTask]} onToggle={toggleTargetTask} timeZone={today.timezone_name} />}
           <TaskList title="Overdue" tasks={today.overdue_tasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="Nothing overdue. You're caught up." />
           <TaskList title="Due today" tasks={today.due_today_tasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="No tasks due today." />
           <TaskList title="Other open tasks" tasks={otherTasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="No other open tasks." />

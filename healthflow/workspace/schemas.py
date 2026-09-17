@@ -212,6 +212,12 @@ class TodayResponse(BaseModel):
     appointments_next_seven_days: list[AppointmentResponse]
 
 
+class RecentClientResponse(BaseModel):
+    id: UUID
+    full_name: str
+    updated_at: datetime
+
+
 class OverviewResponse(BaseModel):
     clients: int
     organizations: int
@@ -219,6 +225,7 @@ class OverviewResponse(BaseModel):
     overdue_tasks: int
     appointments_next_seven_days: int
     recent_activity: list[WorkspaceActivityResponse]
+    recent_clients: list[RecentClientResponse]
 
 
 class SearchResult(BaseModel):

@@ -192,6 +192,27 @@ async def test_delete_client(client):
 
 
 @pytest.mark.asyncio
+async def test_delete_client_detaches_workspace_records(client):
+    token = await _register_and_login(client, "delete-linked-client@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    created = await client.post("/clients", json={
+        "full_name": "Linked Client", "zip_code": "10001", "age": 35,
+        "income_level": "medium", "doctors": [], "prescriptions": [], "procedures": [],
+    }, headers=headers)
+    client_id = created.json()["id"]
+    task = await client.post("/tasks", json={"title": "Follow up", "client_id": client_id}, headers=headers)
+    appointment = await client.post("/appointments", json={
+        "title": "Meeting", "client_id": client_id,
+        "starts_at": "2030-01-15T10:00:00Z", "ends_at": "2030-01-15T11:00:00Z",
+    }, headers=headers)
+    await client.post(f"/tasks/{task.json()['id']}/complete", headers=headers)
+    assert (await client.delete(f"/clients/{client_id}", headers=headers)).status_code == 204
+    assert (await client.get(f"/tasks/{task.json()['id']}", headers=headers)).json()["client_id"] is None
+    assert (await client.get(f"/appointments/{appointment.json()['id']}", headers=headers)).json()["client_id"] is None
+    assert (await client.get("/workspace/activity", headers=headers)).json()[0]["client_id"] is None
+
+
+@pytest.mark.asyncio
 async def test_ownership_check_get(client):
     """Broker A cannot view Broker B's client."""
     token_a = await _register_and_login(client, "broker-a@example.com")

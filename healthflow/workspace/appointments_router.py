@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import AwareDatetime
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from healthflow.auth.dependencies import get_current_broker
@@ -121,13 +121,17 @@ async def complete_appointment(
     broker: Broker = Depends(get_current_broker),
     db: AsyncSession = Depends(get_db),
 ) -> AppointmentResponse:
+    changed = (await db.execute(
+        update(Appointment).where(
+            Appointment.id == appointment_id,
+            Appointment.broker_id == broker.id,
+            Appointment.status == "scheduled",
+        ).values(status="completed", completed_at=datetime.now(timezone.utc))
+        .returning(Appointment.id)
+    )).scalar_one_or_none()
     appointment = await _appointment(db, appointment_id)
-    if appointment.status == "canceled":
-        raise HTTPException(status_code=409, detail="Restore the Appointment before completing it")
-    if appointment.status == "scheduled":
-        appointment.status = "completed"
-        appointment.completed_at = datetime.now(timezone.utc)
-        await db.flush()
+    if changed is not None:
+        await db.refresh(appointment)
         await record_workspace_activity(
             db,
             broker_id=broker.id,
@@ -137,6 +141,9 @@ async def complete_appointment(
             action="completed",
             summary=f"Completed {appointment.title}",
         )
+        return await _response(db, appointment)
+    if appointment.status == "canceled":
+        raise HTTPException(status_code=409, detail="Restore the Appointment before completing it")
     return await _response(db, appointment)
 
 
@@ -146,13 +153,17 @@ async def cancel_appointment(
     broker: Broker = Depends(get_current_broker),
     db: AsyncSession = Depends(get_db),
 ) -> AppointmentResponse:
+    changed = (await db.execute(
+        update(Appointment).where(
+            Appointment.id == appointment_id,
+            Appointment.broker_id == broker.id,
+            Appointment.status == "scheduled",
+        ).values(status="canceled", canceled_at=datetime.now(timezone.utc))
+        .returning(Appointment.id)
+    )).scalar_one_or_none()
     appointment = await _appointment(db, appointment_id)
-    if appointment.status == "completed":
-        raise HTTPException(status_code=409, detail="Restore the Appointment before canceling it")
-    if appointment.status == "scheduled":
-        appointment.status = "canceled"
-        appointment.canceled_at = datetime.now(timezone.utc)
-        await db.flush()
+    if changed is not None:
+        await db.refresh(appointment)
         await record_workspace_activity(
             db,
             broker_id=broker.id,
@@ -162,6 +173,9 @@ async def cancel_appointment(
             action="canceled",
             summary=f"Canceled {appointment.title}",
         )
+        return await _response(db, appointment)
+    if appointment.status == "completed":
+        raise HTTPException(status_code=409, detail="Restore the Appointment before canceling it")
     return await _response(db, appointment)
 
 

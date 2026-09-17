@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from contextlib import nullcontext
@@ -9,7 +9,7 @@ from contextlib import nullcontext
 from healthflow.auth.dependencies import get_current_broker
 from healthflow.auth.tenant_context import system_context
 from healthflow.database.config import get_db
-from healthflow.database.models import Broker, Client, WorkspaceSearchToken
+from healthflow.database.models import Appointment, Broker, Client, Task, WorkspaceActivity, WorkspaceSearchToken
 from healthflow.models.schemas import ClientCreate, ClientResponse, ClientUpdate
 
 
@@ -153,6 +153,10 @@ async def delete_client(
         raise HTTPException(status_code=404, detail="Client not found")
 
     # tenant filter auto-injects AND Client.broker_id = current_broker_id
+    # Preserve broker work/history, but detach it from the removed Client.
+    # These updates must precede the DELETE for databases enforcing foreign keys.
+    for model in (Task, Appointment, WorkspaceActivity):
+        await db.execute(update(model).where(model.client_id == parsed_id).values(client_id=None))
     await db.execute(delete(WorkspaceSearchToken).where(
         WorkspaceSearchToken.kind == "client",
         WorkspaceSearchToken.record_id == parsed_id,

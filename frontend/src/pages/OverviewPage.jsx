@@ -18,17 +18,15 @@ const SUMMARY = [
 export default function OverviewPage() {
   const { openMenu, openNotifications } = useLayout()
   const [overview, setOverview] = useState(null)
-  const [clients, setClients] = useState([])
   const [toolHistory, setToolHistory] = useState([])
   const [error, setError] = useState('')
 
   useEffect(() => {
     let alive = true
-    Promise.all([workspaceApi.getOverview(), api.get('/history?limit=8'), api.get('/clients')]).then(([summary, history, clientData]) => {
+    Promise.all([workspaceApi.getOverview(), api.get('/history?limit=8')]).then(([summary, history]) => {
       if (!alive) return
       setOverview(summary)
       setToolHistory(Array.isArray(history) ? history : [])
-      setClients(Array.isArray(clientData) ? clientData : [])
     }).catch(() => { if (alive) setError('Overview could not be loaded. Try refreshing the page.') })
     return () => { alive = false }
   }, [])
@@ -37,7 +35,7 @@ export default function OverviewPage() {
     ...(overview?.recent_activity || []).map((item) => ({ id: `workspace-${item.id}`, kind: 'Workspace', title: item.summary, date: item.created_at, href: item.client_id ? `/clients/${item.client_id}` : null })),
     ...toolHistory.map((item) => ({ id: `tool-${item.id}`, kind: 'Tool', title: `${item.action_type || 'Action'}${item.client_name ? ` · ${item.client_name}` : ''}`, date: item.created_at, href: item.client_id ? `/clients/${item.client_id}` : '/history' })),
   ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10)
-  const recentClients = [...clients].sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)).slice(0, 5)
+  const recentClients = overview?.recent_clients || []
 
   return <>
     <TopBar crumbs={['Daily', 'Overview']} onMenuClick={openMenu} onNotificationsClick={openNotifications} />

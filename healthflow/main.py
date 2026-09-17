@@ -1,6 +1,7 @@
+import asyncio
 import logging
 import os
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -50,10 +51,29 @@ async def lifespan(app: FastAPI):
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    async with async_session_factory() as session:
-        await backfill_search_index(session)
     configure_agent_logfire()
-    yield
+
+    async def backfill_in_background():
+        # Each batch commits independently, so a restart resumes missing tokens.
+        # A failed attempt retries without making application readiness depend on it.
+        while True:
+            try:
+                async with async_session_factory() as session:
+                    await backfill_search_index(session)
+                return
+            except Exception as exc:
+                logging.getLogger(__name__).warning(
+                    "Workspace search backfill failed (%s); retrying", type(exc).__name__
+                )
+                await asyncio.sleep(60)
+
+    backfill_task = asyncio.create_task(backfill_in_background())
+    try:
+        yield
+    finally:
+        backfill_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await backfill_task
 
 
 app = FastAPI(
