@@ -34,10 +34,14 @@ export default function ActivityPage() {
   const { openMenu, openNotifications } = useLayout();
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     Promise.allSettled([api.get('/history?limit=200'), workspaceApi.listActivity()])
       .then(([tools, workspace]) => {
+        const failures = Number(tools.status === 'rejected') + Number(workspace.status === 'rejected');
+        if (failures === 2) setLoadError('Activity could not be loaded. Try refreshing the page.');
+        else if (failures === 1) setLoadError('Some activity could not be loaded. This timeline may be incomplete.');
         const toolEntries = tools.status === 'fulfilled' && Array.isArray(tools.value) ? tools.value : [];
         const workspaceEntries = workspace.status === 'fulfilled' && Array.isArray(workspace.value) ? workspace.value : [];
         setHistory([
@@ -66,7 +70,8 @@ export default function ActivityPage() {
         </div>
 
         {loading && <div className="empty"><div className="loader" /></div>}
-        {!loading && history.length === 0 && (
+        {loadError && <p role="alert" className="workspace-error">{loadError}</p>}
+        {!loading && !loadError && history.length === 0 && (
           <div className="card card-pad">
             <div className="empty">
               <div className="empty-title">Nothing logged yet</div>

@@ -54,6 +54,42 @@ test('repeated Contact form submits create only one record', async ({ authedPage
   expect((await response.json()).contacts.filter((item) => item.full_name === 'Dana Ruiz')).toHaveLength(1)
 })
 
+test('a Contact save refresh cannot replace a different Organization route', async ({ authedPage }) => {
+  await authedPage.goto('/organizations')
+  const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
+  const headers = { Authorization: `Bearer ${token}` }
+  const first = await authedPage.request.post('/organizations', { headers, data: { name: 'First Harbor', kind: 'provider_office' } })
+  const second = await authedPage.request.post('/organizations', { headers, data: { name: 'Second Harbor', kind: 'provider_office' } })
+  expect(first.ok()).toBe(true)
+  expect(second.ok()).toBe(true)
+  const firstId = (await first.json()).id
+  let requestCount = 0
+  let signalRefresh
+  let releaseRefresh
+  const refreshStarted = new Promise((resolve) => { signalRefresh = resolve })
+  const heldRefresh = new Promise((resolve) => { releaseRefresh = resolve })
+  await authedPage.route(`**/organizations/${firstId}`, async (route) => {
+    requestCount += 1
+    if (requestCount > 1) { signalRefresh(); await heldRefresh }
+    await route.continue()
+  })
+  await authedPage.goto(`/organizations/${firstId}`)
+  await expect(authedPage.getByRole('heading', { name: 'First Harbor' })).toBeVisible()
+  await authedPage.getByRole('button', { name: 'New Contact' }).click()
+  await authedPage.getByLabel('Contact name').fill('Dana Ruiz')
+  await authedPage.getByRole('button', { name: 'Create Contact' }).click()
+  await refreshStarted
+  await authedPage.getByRole('button', { name: 'Search workspace' }).click()
+  await authedPage.getByRole('searchbox', { name: 'Search workspace' }).fill('Second Harbor')
+  await authedPage.getByRole('option', { name: /Second Harbor/i }).click()
+  await expect(authedPage.getByRole('heading', { name: 'Second Harbor' })).toBeVisible()
+  const staleResponse = authedPage.waitForResponse((response) => response.url().endsWith(`/organizations/${firstId}`) && response.ok())
+  releaseRefresh()
+  await staleResponse
+  await expect(authedPage.getByRole('heading', { name: 'Second Harbor' })).toBeVisible()
+  await expect(authedPage.getByRole('heading', { name: 'First Harbor' })).toHaveCount(0)
+})
+
 test('archived organizations can be restored from the directory', async ({ authedPage }) => {
   await authedPage.goto('/organizations')
   await authedPage.getByRole('button', { name: 'New Organization' }).click()
@@ -152,11 +188,47 @@ test('search reveals an appointment outside the selected week', async ({ authedP
   await expect(authedPage.getByText('Far future Harbor review')).toBeVisible()
 })
 
+test('changing a Today search target clears only its lookup error', async ({ authedPage }) => {
+  await authedPage.goto('/today?task=00000000-0000-0000-0000-000000000000')
+  await expect(authedPage.getByRole('alert')).toContainText('matching Task could not be loaded')
+  const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
+  const created = await authedPage.request.post('/tasks', { headers: { Authorization: `Bearer ${token}` }, data: { title: 'Valid target task' } })
+  expect(created.ok()).toBe(true)
+  await authedPage.getByRole('button', { name: 'Search workspace' }).click()
+  await authedPage.getByRole('searchbox', { name: 'Search workspace' }).fill('Valid target task')
+  await authedPage.getByRole('option', { name: /Valid target task/i }).click()
+  await expect(authedPage.getByRole('alert')).toHaveCount(0)
+  await expect(authedPage.getByRole('listitem', { name: 'Valid target task' })).toBeVisible()
+})
+
+test('changing a Scheduling search target clears only its lookup error', async ({ authedPage }) => {
+  await authedPage.goto('/scheduling?appointment=00000000-0000-0000-0000-000000000000')
+  await expect(authedPage.getByRole('alert')).toContainText('matching Appointment could not be loaded')
+  const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
+  const created = await authedPage.request.post('/appointments', { headers: { Authorization: `Bearer ${token}` }, data: {
+    title: 'Valid target meeting', starts_at: '2030-01-15T10:00:00Z', ends_at: '2030-01-15T11:00:00Z',
+  } })
+  expect(created.ok()).toBe(true)
+  await authedPage.getByRole('button', { name: 'Search workspace' }).click()
+  await authedPage.getByRole('searchbox', { name: 'Search workspace' }).fill('Valid target meeting')
+  await authedPage.getByRole('option', { name: /Valid target meeting/i }).click()
+  await expect(authedPage.getByRole('alert')).toHaveCount(0)
+  await expect(authedPage.getByText('Valid target meeting')).toBeVisible()
+})
+
 test('Overview shows live workspace counts', async ({ authedPage }) => {
   await authedPage.goto('/overview')
   await expect(authedPage.getByRole('heading', { name: 'Overview' })).toBeVisible()
   await expect(authedPage.getByText('Open tasks')).toBeVisible()
   await expect(authedPage.getByText('Upcoming appointments')).toBeVisible()
+})
+
+test('Overview keeps workspace data when tool history fails', async ({ authedPage }) => {
+  await authedPage.route('**/history?limit=8', (route) => route.fulfill({ status: 503, body: 'Unavailable' }))
+  await authedPage.goto('/overview')
+  await expect(authedPage.getByRole('heading', { name: 'Overview' })).toBeVisible()
+  await expect(authedPage.getByText('Open tasks')).toBeVisible()
+  await expect(authedPage.getByRole('alert')).toContainText('Tool activity could not be loaded')
 })
 
 test('Activity includes completed workspace tasks', async ({ authedPage }) => {
@@ -169,6 +241,24 @@ test('Activity includes completed workspace tasks', async ({ authedPage }) => {
   await expect(authedPage.getByText('Completed Send renewal packet')).toBeVisible()
   await authedPage.getByRole('link', { name: 'View activity' }).click()
   await expect(authedPage.getByText('Completed Send renewal packet')).toBeVisible()
+})
+
+test('Activity reports a partial source failure without hiding available entries', async ({ authedPage }) => {
+  await authedPage.route('**/history?limit=200', (route) => route.fulfill({ status: 503, body: 'Unavailable' }))
+  await authedPage.route('**/workspace/activity?limit=200', (route) => route.fulfill({ json: [{
+    id: 'sample-entry', action: 'completed', summary: 'Completed available work', created_at: new Date().toISOString(),
+  }] }))
+  await authedPage.goto('/activity')
+  await expect(authedPage.getByRole('alert')).toContainText('timeline may be incomplete')
+  await expect(authedPage.getByText('Completed available work')).toBeVisible()
+})
+
+test('Activity reports a load error when both sources fail', async ({ authedPage }) => {
+  await authedPage.route('**/history?limit=200', (route) => route.fulfill({ status: 503, body: 'Unavailable' }))
+  await authedPage.route('**/workspace/activity?limit=200', (route) => route.fulfill({ status: 503, body: 'Unavailable' }))
+  await authedPage.goto('/activity')
+  await expect(authedPage.getByRole('alert')).toContainText('Activity could not be loaded')
+  await expect(authedPage.getByText('Nothing logged yet')).toHaveCount(0)
 })
 
 test('Broker can change the workspace time zone in Settings', async ({ authedPage }) => {

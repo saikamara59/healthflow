@@ -25,6 +25,7 @@ export default function TodayPage() {
   const [clients, setClients] = useState([])
   const [organizations, setOrganizations] = useState([])
   const [error, setError] = useState('')
+  const [targetError, setTargetError] = useState('')
   const [modal, setModal] = useState(null)
   const triggerRef = useRef(null)
   const loadingMoreRef = useRef(false)
@@ -83,9 +84,10 @@ export default function TodayPage() {
     const taskId = new URLSearchParams(location.search).get('task')
     let alive = true
     setTargetTask(null)
+    setTargetError('')
     if (taskId) workspaceApi.getTask(taskId).then((task) => {
-      if (alive) setTargetTask(task)
-    }).catch(() => { if (alive) setError('The matching Task could not be loaded.') })
+      if (alive) { setTargetTask(task); setTargetError('') }
+    }).catch(() => { if (alive) setTargetError('The matching Task could not be loaded.') })
     return () => { alive = false }
   }, [location.search])
 
@@ -148,6 +150,7 @@ export default function TodayPage() {
         <div className="quick-create-actions"><button className="btn accent" disabled={!today} onClick={(event) => openCreate('task', {}, event.currentTarget)}><Icon name="plus" size={16} /> New Task</button><button className="btn" disabled={!today} onClick={(event) => openCreate('appointment', {}, event.currentTarget)}><Icon name="calendar" size={16} /> New Appointment</button></div>
       </div>
       {error && <p role="alert" className="workspace-error">{error}</p>}
+      {targetError && <p role="alert" className="workspace-error">{targetError}</p>}
       {!today && !error && <p role="status">Loading Today…</p>}
       {today && <div className="today-grid">
         <div className="today-main">

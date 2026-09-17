@@ -16,7 +16,11 @@ export default function OrganizationDetailPage() {
   const [phone, setPhone] = useState('')
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
-  const load = () => workspaceApi.getOrganization(id).then(setOrganization)
+  const activeIdRef = useRef(id)
+  activeIdRef.current = id
+  const load = (organizationId = id) => workspaceApi.getOrganization(organizationId).then((data) => {
+    if (activeIdRef.current === organizationId) setOrganization(data)
+  })
   useEffect(() => {
     let alive = true
     setOrganization(null)
@@ -37,22 +41,25 @@ export default function OrganizationDetailPage() {
   async function save(event) {
     event.preventDefault()
     if (savingRef.current) return
+    const organizationId = id
     savingRef.current = true
     setSaving(true)
     setError('')
     const body = { full_name: fullName.trim(), role: role.trim() || null, email: email.trim() || null, phone: phone.trim() || null }
     try {
-      if (editing === 'new') await workspaceApi.createContact(id, body)
-      else await workspaceApi.updateContact(id, editing, body)
-      setEditing(null)
-    } catch (err) { setError(err.message || 'Contact could not be saved.'); return }
+      if (editing === 'new') await workspaceApi.createContact(organizationId, body)
+      else await workspaceApi.updateContact(organizationId, editing, body)
+      if (activeIdRef.current === organizationId) setEditing(null)
+    } catch (err) { if (activeIdRef.current === organizationId) setError(err.message || 'Contact could not be saved.'); return }
     finally { savingRef.current = false; setSaving(false) }
-    try { await load() }
-    catch { setError('Contact saved, but the list could not refresh. Reload to see the update.') }
+    try { await load(organizationId) }
+    catch { if (activeIdRef.current === organizationId) setError('Contact saved, but the list could not refresh. Reload to see the update.') }
   }
   async function archive(contactId) {
     if (!window.confirm('Archive this Contact?')) return
-    try { await workspaceApi.archiveContact(id, contactId); await load() } catch (err) { setError(err.message || 'Contact could not be archived.') }
+    const organizationId = id
+    try { await workspaceApi.archiveContact(organizationId, contactId); await load(organizationId) }
+    catch (err) { if (activeIdRef.current === organizationId) setError(err.message || 'Contact could not be archived.') }
   }
   const visibleOrganization = organization?.id === id ? organization : null
   const contacts = (visibleOrganization?.contacts || []).filter((item) => !item.archived_at)
