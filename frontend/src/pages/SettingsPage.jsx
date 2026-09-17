@@ -32,11 +32,9 @@ export default function SettingsPage() {
   useEffect(() => {
     let alive = true;
     workspaceApi.getPreferences().then((preference) => {
-      if (alive) setTimezoneName(preference.timezone_name);
+      if (alive) { setTimezoneName(preference.timezone_name); setTimezoneLoaded(true); }
     }).catch(() => {
       if (alive) setTimezoneMsg('Time zone could not be loaded.');
-    }).finally(() => {
-      if (alive) setTimezoneLoaded(true);
     });
     return () => { alive = false; };
   }, []);

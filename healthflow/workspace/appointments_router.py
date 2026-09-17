@@ -10,8 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from healthflow.auth.dependencies import get_current_broker
 from healthflow.database.config import get_db
-from healthflow.database.models import Appointment, Broker, Client, Contact, Organization
+from healthflow.database.models import Appointment, Broker
 from healthflow.workspace.activity import record_workspace_activity
+from healthflow.workspace.linked_names import load_linked_names
 from healthflow.workspace.linking import require_owned_links
 from healthflow.workspace.schemas import AppointmentCreate, AppointmentResponse, AppointmentUpdate
 from healthflow.workspace.serializers import _as_utc, appointment_response
@@ -29,22 +30,16 @@ async def _appointment(db: AsyncSession, appointment_id: UUID) -> Appointment:
     return appointment
 
 
-async def _response(db: AsyncSession, appointment: Appointment) -> AppointmentResponse:
-    linked_names: dict[str, str | None] = {
-        "client_name": None,
-        "organization_name": None,
-        "contact_name": None,
-    }
-    for model, record_id, field, attribute in (
-        (Client, appointment.client_id, "client_name", "full_name"),
-        (Organization, appointment.organization_id, "organization_name", "name"),
-        (Contact, appointment.contact_id, "contact_name", "full_name"),
-    ):
-        if record_id is not None:
-            record = (await db.execute(select(model).where(model.id == record_id))).scalar_one_or_none()
-            if record is not None:
-                linked_names[field] = getattr(record, attribute)
-    return appointment_response(appointment, **linked_names)
+async def _response(
+    db: AsyncSession, appointment: Appointment, names: dict[str, dict[UUID, str]] | None = None
+) -> AppointmentResponse:
+    names = names if names is not None else await load_linked_names(db, [appointment])
+    return appointment_response(
+        appointment,
+        client_name=names["client"].get(appointment.client_id),
+        organization_name=names["organization"].get(appointment.organization_id),
+        contact_name=names["contact"].get(appointment.contact_id),
+    )
 
 
 @appointments_router.post("", response_model=AppointmentResponse, status_code=201)
@@ -69,6 +64,7 @@ async def create_appointment(
 async def list_appointments(
     starts_after: AwareDatetime | None = None,
     starts_before: AwareDatetime | None = None,
+    ends_after: AwareDatetime | None = None,
     broker: Broker = Depends(get_current_broker),
     db: AsyncSession = Depends(get_db),
 ) -> list[AppointmentResponse]:
@@ -77,8 +73,11 @@ async def list_appointments(
         statement = statement.where(Appointment.starts_at >= starts_after)
     if starts_before is not None:
         statement = statement.where(Appointment.starts_at < starts_before)
+    if ends_after is not None:
+        statement = statement.where(Appointment.ends_at > ends_after)
     appointments = (await db.execute(statement)).scalars().all()
-    return [await _response(db, appointment) for appointment in appointments]
+    names = await load_linked_names(db, appointments)
+    return [await _response(db, appointment, names) for appointment in appointments]
 
 
 @appointments_router.get("/{appointment_id}", response_model=AppointmentResponse)

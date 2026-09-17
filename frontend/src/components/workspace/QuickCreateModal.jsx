@@ -44,7 +44,7 @@ export default function QuickCreateModal({ mode, initialValues = {}, clients = [
         if (!(endsAt > startsAt)) { setError('The end must be after the start.'); setSaving(false); return }
         await workspaceApi.createAppointment({ title: title.trim(), notes: notes.trim() || null, starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString(), ...links })
       }
-      onCreated()
+      await onCreated()
     } catch (err) { setError(typeof err.message === 'string' ? err.message : 'Could not save. Try again.') }
     finally { setSaving(false) }
   }

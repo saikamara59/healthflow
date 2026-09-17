@@ -43,6 +43,7 @@ from healthflow.database.models import (
     Organization,
     Task,
     WorkspaceActivity,
+    WorkspaceSearchToken,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,6 +61,7 @@ TENANT_SCOPED_MODELS: frozenset[type] = frozenset({
     Task,
     Appointment,
     WorkspaceActivity,
+    WorkspaceSearchToken,
 })
 
 

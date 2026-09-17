@@ -15,7 +15,8 @@ export default function SchedulingPage() {
   const [start, setStart] = useState(null)
   const [creating, setCreating] = useState(null)
   const [error, setError] = useState('')
-  const refresh = () => workspaceApi.listAppointments(`starts_before=${encodeURIComponent(localToUtc(addCalendarDays(start, 7), '00:00', zone))}`).then(setAppointments)
+  const weekQuery = (day, timeZone) => `ends_after=${encodeURIComponent(localToUtc(day, '00:00', timeZone))}&starts_before=${encodeURIComponent(localToUtc(addCalendarDays(day, 7), '00:00', timeZone))}`
+  const refresh = () => workspaceApi.listAppointments(weekQuery(start, zone)).then(setAppointments)
   useEffect(() => {
     let alive = true
     Promise.all([workspaceApi.getPreferences(), api.get('/clients'), workspaceApi.listOrganizations(true)]).then(([preferences, clientData, orgData]) => {
@@ -26,7 +27,7 @@ export default function SchedulingPage() {
   useEffect(() => {
     if (!zone || !start) return
     let alive = true
-    workspaceApi.listAppointments(`starts_before=${encodeURIComponent(localToUtc(addCalendarDays(start, 7), '00:00', zone))}`).then((items) => {
+    workspaceApi.listAppointments(weekQuery(start, zone)).then((items) => {
       if (alive) setAppointments(items)
     }).catch(() => { if (alive) setError('Scheduling could not be loaded.') })
     return () => { alive = false }
@@ -50,6 +51,6 @@ export default function SchedulingPage() {
         {entries.length ? <ul className="workspace-list">{entries.map((item) => <li className="workspace-list-row" key={item.id}><div className="workspace-row-copy"><strong>{item.title}</strong><small>{new Intl.DateTimeFormat(undefined, { timeZone: zone, hour: 'numeric', minute: '2-digit' }).format(new Date(item.starts_at))}{item.client_name ? ` · ${item.client_name}` : ''}</small></div><div className="workspace-row-actions"><button className="btn sm ghost" onClick={() => status(item, 'complete')}>Complete</button><button className="btn sm ghost" onClick={() => status(item, 'cancel')}>Cancel</button></div></li>)}</ul> : <p className="workspace-empty">No meetings</p>}
       </section>
     })}</div>}
-    {creating && <QuickCreateModal mode="appointment" initialValues={creating} clients={clients} organizations={organizations} timeZone={zone} onClose={() => setCreating(null)} onCreated={async () => { setCreating(null); await refresh() }} />}
+    {creating && <QuickCreateModal mode="appointment" initialValues={creating} clients={clients} organizations={organizations} timeZone={zone} onClose={() => setCreating(null)} onCreated={async () => { setCreating(null); try { await refresh() } catch { setError('Saved, but Scheduling could not refresh. Reload to see the update.') } }} />}
   </main></>
 }

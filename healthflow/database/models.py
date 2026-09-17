@@ -5,6 +5,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
 )
@@ -201,6 +202,21 @@ class Appointment(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
     )
+
+
+class WorkspaceSearchToken(Base):
+    """Broker-private HMAC search gram for an encrypted workspace title."""
+
+    __tablename__ = "workspace_search_tokens"
+    __table_args__ = (Index("ix_workspace_search_tokens_lookup", "broker_id", "digest"),)
+
+    broker_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("brokers.id"), primary_key=True
+    )
+    kind: Mapped[str] = mapped_column(String(20), primary_key=True)
+    record_id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True)
+    key_version: Mapped[str] = mapped_column(String(10), primary_key=True)
+    digest: Mapped[str] = mapped_column(String(64), primary_key=True)
 
 
 class WorkspaceActivity(Base):

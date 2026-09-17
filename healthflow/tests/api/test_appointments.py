@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from sqlalchemy import event
 
 
 async def _headers(client, email: str) -> dict[str, str]:
@@ -33,6 +34,57 @@ async def test_past_scheduled_appointment_needs_follow_up_without_status_change(
     assert created.status_code == 201
     assert created.json()["status"] == "scheduled"
     assert created.json()["presentation_status"] == "needs_follow_up"
+
+
+@pytest.mark.asyncio
+async def test_week_bounds_include_meeting_that_overlaps_first_day(client):
+    headers = await _headers(client, "appointment-week@example.com")
+    for title, start, end in (
+        ("Old meeting", "2026-09-13T10:00:00Z", "2026-09-13T11:00:00Z"),
+        ("Overnight meeting", "2026-09-14T23:30:00Z", "2026-09-15T00:30:00Z"),
+        ("In week", "2026-09-16T10:00:00Z", "2026-09-16T11:00:00Z"),
+    ):
+        assert (await client.post("/appointments", json={
+            "title": title, "starts_at": start, "ends_at": end,
+        }, headers=headers)).status_code == 201
+    response = await client.get(
+        "/appointments?ends_after=2026-09-15T00:00:00Z&starts_before=2026-09-22T00:00:00Z",
+        headers=headers,
+    )
+    assert [item["title"] for item in response.json()] == ["Overnight meeting", "In week"]
+
+
+@pytest.mark.asyncio
+async def test_appointment_list_batch_loads_linked_names(client, db_engine):
+    headers = await _headers(client, "appointment-batch@example.com")
+    org = await client.post(
+        "/organizations", json={"name": "Harbor", "kind": "carrier"}, headers=headers
+    )
+    org_id = org.json()["id"]
+    contact = await client.post(
+        f"/organizations/{org_id}/contacts", json={"full_name": "Dana"}, headers=headers
+    )
+    for index in (1, 2):
+        await client.post("/appointments", json={
+            "title": f"Meeting {index}",
+            "starts_at": f"2026-10-0{index}T10:00:00Z",
+            "ends_at": f"2026-10-0{index}T11:00:00Z",
+            "organization_id": org_id,
+            "contact_id": contact.json()["id"],
+        }, headers=headers)
+
+    statements = []
+    def capture(connection, cursor, statement, parameters, context, executemany):
+        statements.append(statement.lower())
+    event.listen(db_engine.sync_engine, "before_cursor_execute", capture)
+    try:
+        response = await client.get("/appointments", headers=headers)
+    finally:
+        event.remove(db_engine.sync_engine, "before_cursor_execute", capture)
+    assert {item["organization_name"] for item in response.json()} == {"Harbor"}
+    assert {item["contact_name"] for item in response.json()} == {"Dana"}
+    assert sum("from organizations" in sql for sql in statements) == 1
+    assert sum("from contacts" in sql for sql in statements) == 1
 
 
 @pytest.mark.asyncio

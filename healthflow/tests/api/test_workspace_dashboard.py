@@ -3,6 +3,10 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from sqlalchemy import delete, select
+
+from healthflow.database.models import PhiAccessLog, WorkspaceSearchToken
+from healthflow.workspace.search_index import backfill_search_index
 
 
 async def _headers(client, email: str) -> dict[str, str]:
@@ -123,3 +127,54 @@ async def test_search_matches_encrypted_names_without_cross_broker_leak(client):
         ("Harbor Health", f"/organizations/{owned.json()['id']}")
     ]
     assert (await client.get("/workspace/search?q=h", headers=owner)).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_search_index_tracks_renames_and_bounds_phi_reads(client, db_session):
+    headers = await _headers(client, "search-index@example.com")
+    for index in range(12):
+        assert (await client.post(
+            "/organizations", json={"name": f"Unrelated {index}", "kind": "carrier"},
+            headers=headers,
+        )).status_code == 201
+    target = await client.post(
+        "/organizations", json={"name": "Harbor Health", "kind": "carrier"}, headers=headers
+    )
+    target_id = target.json()["id"]
+
+    found = await client.get("/workspace/search?q=Harbor", headers=headers)
+    assert [item["id"] for item in found.json()] == [target_id]
+    audit = (await db_session.execute(
+        select(PhiAccessLog).where(PhiAccessLog.endpoint == "GET /workspace/search")
+    )).scalars().all()
+    organization_reads = [entry for entry in audit if entry.table_name == "organizations"]
+    assert organization_reads and all(entry.row_count <= 1 for entry in organization_reads)
+
+    changed = await client.put(
+        f"/organizations/{target_id}", json={"name": "Blue Harbor"}, headers=headers
+    )
+    assert changed.status_code == 200
+    assert [item["id"] for item in (
+        await client.get("/workspace/search?q=Blue", headers=headers)
+    ).json()] == [target_id]
+    assert (await client.get("/workspace/search?q=Health", headers=headers)).json() == []
+    stored = (await db_session.execute(select(WorkspaceSearchToken.digest))).scalars().all()
+    assert stored and all("Harbor" not in digest for digest in stored)
+
+
+@pytest.mark.asyncio
+async def test_search_backfill_restores_existing_records(client, db_session):
+    headers = await _headers(client, "search-backfill@example.com")
+    created = await client.post(
+        "/organizations", json={"name": "Legacy Harbor", "kind": "carrier"}, headers=headers
+    )
+    await db_session.execute(delete(WorkspaceSearchToken).where(
+        WorkspaceSearchToken.kind == "organization",
+        WorkspaceSearchToken.record_id == created.json()["id"],
+    ))
+    await db_session.commit()
+    assert (await client.get("/workspace/search?q=Legacy", headers=headers)).json() == []
+    await backfill_search_index(db_session)
+    assert [item["id"] for item in (
+        await client.get("/workspace/search?q=Legacy", headers=headers)
+    ).json()] == [created.json()["id"]]

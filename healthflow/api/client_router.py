@@ -9,7 +9,7 @@ from contextlib import nullcontext
 from healthflow.auth.dependencies import get_current_broker
 from healthflow.auth.tenant_context import system_context
 from healthflow.database.config import get_db
-from healthflow.database.models import Broker, Client
+from healthflow.database.models import Broker, Client, WorkspaceSearchToken
 from healthflow.models.schemas import ClientCreate, ClientResponse, ClientUpdate
 
 
@@ -153,6 +153,10 @@ async def delete_client(
         raise HTTPException(status_code=404, detail="Client not found")
 
     # tenant filter auto-injects AND Client.broker_id = current_broker_id
+    await db.execute(delete(WorkspaceSearchToken).where(
+        WorkspaceSearchToken.kind == "client",
+        WorkspaceSearchToken.record_id == parsed_id,
+    ))
     await db.execute(delete(Client).where(Client.id == parsed_id))
     await db.flush()
     return Response(status_code=204)

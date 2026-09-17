@@ -5,14 +5,15 @@ from typing import Literal
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from healthflow.auth.dependencies import get_current_broker
 from healthflow.database.config import get_db
-from healthflow.database.models import Broker, BrokerPreference, Client, Contact, Organization, Task
+from healthflow.database.models import Broker, BrokerPreference, Task
 from healthflow.workspace.activity import record_workspace_activity
+from healthflow.workspace.linked_names import load_linked_names
 from healthflow.workspace.linking import require_owned_links
 from healthflow.workspace.schemas import TaskCreate, TaskResponse, TaskStatus, TaskUpdate
 from healthflow.workspace.serializers import task_response
@@ -28,22 +29,16 @@ async def _task(db: AsyncSession, task_id: UUID) -> Task:
     return task
 
 
-async def _response(db: AsyncSession, task: Task) -> TaskResponse:
-    linked_names: dict[str, str | None] = {
-        "client_name": None,
-        "organization_name": None,
-        "contact_name": None,
-    }
-    for model, record_id, field, attribute in (
-        (Client, task.client_id, "client_name", "full_name"),
-        (Organization, task.organization_id, "organization_name", "name"),
-        (Contact, task.contact_id, "contact_name", "full_name"),
-    ):
-        if record_id is not None:
-            record = (await db.execute(select(model).where(model.id == record_id))).scalar_one_or_none()
-            if record is not None:
-                linked_names[field] = getattr(record, attribute)
-    return task_response(task, **linked_names)
+async def _response(
+    db: AsyncSession, task: Task, names: dict[str, dict[UUID, str]] | None = None
+) -> TaskResponse:
+    names = names if names is not None else await load_linked_names(db, [task])
+    return task_response(
+        task,
+        client_name=names["client"].get(task.client_id),
+        organization_name=names["organization"].get(task.organization_id),
+        contact_name=names["contact"].get(task.contact_id),
+    )
 
 
 async def _timezone(db: AsyncSession, broker_id: UUID, requested: str | None) -> ZoneInfo:
@@ -55,7 +50,7 @@ async def _timezone(db: AsyncSession, broker_id: UUID, requested: str | None) ->
         name = preference.timezone_name if preference is not None else "UTC"
     try:
         return ZoneInfo(name)
-    except ZoneInfoNotFoundError:
+    except (ZoneInfoNotFoundError, ValueError):
         raise HTTPException(status_code=422, detail="Invalid time zone") from None
 
 
@@ -81,9 +76,11 @@ async def create_task(
 async def list_tasks(
     status: TaskStatus | None = None,
     is_follow_up: bool | None = None,
-    schedule: Literal["all", "overdue", "today", "unscheduled"] = "all",
+    schedule: Literal["all", "overdue", "today", "unscheduled", "other"] = "all",
     local_date: date | None = None,
     timezone_name: str | None = None,
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     broker: Broker = Depends(get_current_broker),
     db: AsyncSession = Depends(get_db),
 ) -> list[TaskResponse]:
@@ -92,7 +89,7 @@ async def list_tasks(
         statement = statement.where(Task.status == status)
     if is_follow_up is not None:
         statement = statement.where(Task.is_follow_up == is_follow_up)
-    if schedule in {"overdue", "today"}:
+    if schedule in {"overdue", "today", "other"}:
         zone = await _timezone(db, broker.id, timezone_name)
         current = datetime.now(timezone.utc)
         target_date = local_date or current.astimezone(zone).date()
@@ -102,18 +99,25 @@ async def list_tasks(
         ).astimezone(timezone.utc)
         if schedule == "overdue":
             statement = statement.where(Task.status == "open", Task.due_at < current)
+        elif schedule == "today":
+            cutoff = current if target_date == current.astimezone(zone).date() else day_start
+            statement = statement.where(
+                Task.status == "open",
+                Task.due_at >= cutoff,
+                Task.due_at < day_end,
+            )
         else:
             statement = statement.where(
                 Task.status == "open",
-                Task.due_at >= max(day_start, current),
-                Task.due_at < day_end,
+                or_(Task.due_at.is_(None), Task.due_at >= day_end),
             )
     elif schedule == "unscheduled":
         statement = statement.where(Task.status == "open", Task.due_at.is_(None))
     elif timezone_name is not None:
         await _timezone(db, broker.id, timezone_name)
-    tasks = (await db.execute(statement)).scalars().all()
-    return [await _response(db, task) for task in tasks]
+    tasks = (await db.execute(statement.limit(limit).offset(offset))).scalars().all()
+    names = await load_linked_names(db, tasks)
+    return [await _response(db, task, names) for task in tasks]
 
 
 @tasks_router.get("/{task_id}", response_model=TaskResponse)

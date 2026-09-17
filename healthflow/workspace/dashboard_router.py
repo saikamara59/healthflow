@@ -4,7 +4,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from healthflow.auth.dependencies import get_current_broker
@@ -18,7 +18,9 @@ from healthflow.database.models import (
     Organization,
     Task,
     WorkspaceActivity,
+    WorkspaceSearchToken,
 )
+from healthflow.auth.phi_crypto import blind_index_digest, blind_index_versions
 from healthflow.workspace.appointments_router import _response as appointment_response_with_names
 from healthflow.workspace.schemas import (
     BrokerPreferenceResponse,
@@ -29,6 +31,8 @@ from healthflow.workspace.schemas import (
 )
 from healthflow.workspace.serializers import _as_utc, activity_response
 from healthflow.workspace.tasks_router import _response as task_response_with_names
+from healthflow.workspace.search_index import query_grams
+from healthflow.workspace.linked_names import load_linked_names
 
 
 dashboard_router = APIRouter(prefix="/workspace", tags=["workspace"])
@@ -99,7 +103,9 @@ async def get_today(
     cutoff = now if selected == now.astimezone(zone).date() else day_start
 
     tasks = (
-        await db.execute(select(Task).where(Task.status == "open", Task.due_at.is_not(None)))
+        await db.execute(select(Task).where(
+            Task.status == "open", Task.due_at.is_not(None), Task.due_at < day_end
+        ))
     ).scalars().all()
     overdue = sorted(
         (task for task in tasks if _as_utc(task.due_at) < cutoff),
@@ -110,7 +116,11 @@ async def get_today(
         key=lambda task: task.due_at,
     )
     appointments = (
-        await db.execute(select(Appointment).where(Appointment.status == "scheduled"))
+        await db.execute(select(Appointment).where(
+            Appointment.status == "scheduled",
+            Appointment.starts_at < week_end,
+            Appointment.ends_at > day_start,
+        ))
     ).scalars().all()
     appointments_today = sorted(
         (
@@ -127,17 +137,18 @@ async def get_today(
         ),
         key=lambda appointment: appointment.starts_at,
     )
+    names = await load_linked_names(db, [*overdue, *due_today, *appointments_today, *upcoming])
     return TodayResponse(
         timezone_name=zone_name,
         local_date=selected.isoformat(),
-        overdue_tasks=[await task_response_with_names(db, task) for task in overdue],
-        due_today_tasks=[await task_response_with_names(db, task) for task in due_today],
+        overdue_tasks=[await task_response_with_names(db, task, names) for task in overdue],
+        due_today_tasks=[await task_response_with_names(db, task, names) for task in due_today],
         appointments_today=[
-            await appointment_response_with_names(db, appointment)
+            await appointment_response_with_names(db, appointment, names)
             for appointment in appointments_today
         ],
         appointments_next_seven_days=[
-            await appointment_response_with_names(db, appointment) for appointment in upcoming
+            await appointment_response_with_names(db, appointment, names) for appointment in upcoming
         ],
     )
 
@@ -189,16 +200,44 @@ async def search_workspace(
     needle = q.strip().casefold()
     if len(needle) < 2:
         raise HTTPException(status_code=422, detail="Search needs at least two characters")
-    clients = (await db.execute(select(Client))).scalars().all()
-    organizations = (
-        await db.execute(select(Organization).where(Organization.archived_at.is_(None)))
-    ).scalars().all()
-    active_org_ids = {organization.id for organization in organizations}
-    contacts = (
-        await db.execute(select(Contact).where(Contact.archived_at.is_(None)))
-    ).scalars().all()
-    tasks = (await db.execute(select(Task))).scalars().all()
-    appointments = (await db.execute(select(Appointment))).scalars().all()
+    grams = query_grams(needle)
+    digests = [
+        blind_index_digest(gram, version, str(broker.id))
+        for version in blind_index_versions()
+        for gram in grams
+    ]
+    # Candidate IDs are bounded in SQL before any encrypted title is loaded.
+    matches = (await db.execute(
+        select(WorkspaceSearchToken.kind, WorkspaceSearchToken.record_id)
+        .where(WorkspaceSearchToken.digest.in_(digests))
+        .group_by(
+            WorkspaceSearchToken.kind,
+            WorkspaceSearchToken.record_id,
+            WorkspaceSearchToken.key_version,
+        )
+        .having(func.count(distinct(WorkspaceSearchToken.digest)) == len(grams))
+        .limit(min(500, limit * 25))
+    )).all()
+    ids_by_kind = {
+        kind: {record_id for match_kind, record_id in matches if match_kind == kind}
+        for kind in ("client", "organization", "contact", "task", "appointment")
+    }
+
+    async def load(model, kind):
+        ids = ids_by_kind[kind]
+        return (await db.execute(select(model).where(model.id.in_(ids)))).scalars().all() if ids else []
+
+    clients = await load(Client, "client")
+    organizations = [item for item in await load(Organization, "organization") if item.archived_at is None]
+    contacts = [item for item in await load(Contact, "contact") if item.archived_at is None]
+    contact_org_ids = {item.organization_id for item in contacts}
+    active_org_ids = {
+        item.id for item in (
+            await db.execute(select(Organization).where(Organization.id.in_(contact_org_ids)))
+        ).scalars().all() if item.archived_at is None
+    } if contact_org_ids else set()
+    tasks = await load(Task, "task")
+    appointments = await load(Appointment, "appointment")
 
     candidates: list[SearchResult] = []
     for client in clients:

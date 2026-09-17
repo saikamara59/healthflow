@@ -16,7 +16,21 @@ export const workspaceApi = {
   updateContact: (organizationId, contactId, body) => api.put(`/organizations/${organizationId}/contacts/${contactId}`, body),
   archiveContact: (organizationId, contactId) => api.post(`/organizations/${organizationId}/contacts/${contactId}/archive`),
   restoreContact: (organizationId, contactId) => api.post(`/organizations/${organizationId}/contacts/${contactId}/restore`),
-  listTasks: (query = '') => api.get(`/tasks${query ? `?${query}` : ''}`),
+  listTasks: (query = '', { limit = 50, offset = 0 } = {}) => {
+    const params = new URLSearchParams(query)
+    params.set('limit', String(limit))
+    params.set('offset', String(offset))
+    return api.get(`/tasks?${params}`)
+  },
+  listAllTasks: async (query = '') => {
+    const pageSize = 100
+    const tasks = []
+    for (;;) {
+      const page = await workspaceApi.listTasks(query, { limit: pageSize, offset: tasks.length })
+      tasks.push(...page)
+      if (page.length < pageSize) return tasks
+    }
+  },
   createTask: (body) => api.post('/tasks', body),
   updateTask: (id, body) => api.put(`/tasks/${id}`, body),
   completeTask: (id) => api.post(`/tasks/${id}/complete`),

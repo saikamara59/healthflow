@@ -14,10 +14,10 @@ export default function FollowUpsPage() {
   const [zone, setZone] = useState('UTC')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
-  const refresh = () => workspaceApi.listTasks('is_follow_up=true&status=open').then(setTasks)
+  const refresh = () => workspaceApi.listAllTasks('is_follow_up=true&status=open').then(setTasks)
   useEffect(() => {
     let alive = true
-    Promise.all([workspaceApi.listTasks('is_follow_up=true&status=open'), api.get('/clients'), workspaceApi.listOrganizations(true), workspaceApi.getPreferences()]).then(([items, clientData, orgData, preferences]) => {
+    Promise.all([workspaceApi.listAllTasks('is_follow_up=true&status=open'), api.get('/clients'), workspaceApi.listOrganizations(true), workspaceApi.getPreferences()]).then(([items, clientData, orgData, preferences]) => {
       if (!alive) return
       setTasks(items); setClients(clientData); setOrganizations(orgData); setZone(preferences.timezone_name)
     }).catch(() => { if (alive) setError('Follow-ups could not be loaded.') })
@@ -39,6 +39,6 @@ export default function FollowUpsPage() {
   return <><TopBar crumbs={['Workspace', 'Follow-ups']} onMenuClick={openMenu} onNotificationsClick={openNotifications} /><main className="page"><div className="page-head"><div><h1 className="page-title">Follow-ups</h1><p className="page-sub">Promises and next steps to keep moving.</p></div><button className="btn accent" onClick={() => setCreating(true)}>New Follow-up</button></div>
     {error && <p role="alert" className="workspace-error">{error}</p>}{!tasks && !error && <p role="status">Loading follow-ups…</p>}
     {tasks && <div className="workspace-stack"><TaskList title="Overdue" tasks={groups.overdue} onToggle={complete} timeZone={zone} /><TaskList title="Today" tasks={groups.today} onToggle={complete} timeZone={zone} /><TaskList title="Upcoming" tasks={groups.upcoming} onToggle={complete} timeZone={zone} /><TaskList title="Unscheduled" tasks={groups.unscheduled} onToggle={complete} timeZone={zone} /></div>}
-    {creating && <QuickCreateModal mode="task" initialValues={{ is_follow_up: true }} clients={clients} organizations={organizations} timeZone={zone} onClose={() => setCreating(false)} onCreated={async () => { setCreating(false); await refresh() }} />}
+    {creating && <QuickCreateModal mode="task" initialValues={{ is_follow_up: true }} clients={clients} organizations={organizations} timeZone={zone} onClose={() => setCreating(false)} onCreated={async () => { setCreating(false); try { await refresh() } catch { setError('Saved, but Follow-ups could not refresh. Reload to see the update.') } }} />}
   </main></>
 }

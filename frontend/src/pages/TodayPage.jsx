@@ -11,21 +11,29 @@ import QuickTools from '../components/workspace/QuickTools'
 import MockInbox from '../components/workspace/MockInbox'
 import QuickCreateModal from '../components/workspace/QuickCreateModal'
 
+const OTHER_TASK_PAGE_SIZE = 25
+const otherTaskQuery = (zone) => `status=open&schedule=other&timezone_name=${encodeURIComponent(zone)}`
+
 export default function TodayPage() {
   const { openMenu, openNotifications } = useLayout()
   const location = useLocation()
   const [today, setToday] = useState(null)
-  const [openTasks, setOpenTasks] = useState([])
+  const [otherTasks, setOtherTasks] = useState([])
+  const [hasMoreTasks, setHasMoreTasks] = useState(false)
+  const [loadingMoreTasks, setLoadingMoreTasks] = useState(false)
   const [clients, setClients] = useState([])
   const [organizations, setOrganizations] = useState([])
   const [error, setError] = useState('')
   const [modal, setModal] = useState(null)
   const triggerRef = useRef(null)
+  const loadingMoreRef = useRef(false)
 
   const refresh = useCallback(async () => {
-    const [data, tasks] = await Promise.all([workspaceApi.getToday(), workspaceApi.listTasks('status=open')])
+    const data = await workspaceApi.getToday()
+    const tasks = await workspaceApi.listTasks(otherTaskQuery(data.timezone_name), { limit: OTHER_TASK_PAGE_SIZE })
     setToday(data)
-    setOpenTasks(tasks)
+    setOtherTasks(tasks)
+    setHasMoreTasks(tasks.length === OTHER_TASK_PAGE_SIZE)
     return data
   }, [])
 
@@ -33,8 +41,8 @@ export default function TodayPage() {
     let alive = true
     async function load() {
       try {
-        const [preference, initialToday, clientData, organizationData, tasks] = await Promise.all([
-          workspaceApi.getPreferences(), workspaceApi.getToday(), api.get('/clients'), workspaceApi.listOrganizations(true), workspaceApi.listTasks('status=open'),
+        const [preference, initialToday, clientData, organizationData] = await Promise.all([
+          workspaceApi.getPreferences(), workspaceApi.getToday(), api.get('/clients'), workspaceApi.listOrganizations(true),
         ])
         if (!alive) return
         let result = initialToday
@@ -43,9 +51,11 @@ export default function TodayPage() {
           await workspaceApi.saveTimezone(browserZone)
           result = await workspaceApi.getToday()
         }
+        const tasks = await workspaceApi.listTasks(otherTaskQuery(result.timezone_name), { limit: OTHER_TASK_PAGE_SIZE })
         if (!alive) return
         setToday(result)
-        setOpenTasks(tasks)
+        setOtherTasks(tasks)
+        setHasMoreTasks(tasks.length === OTHER_TASK_PAGE_SIZE)
         setClients(Array.isArray(clientData) ? clientData : [])
         setOrganizations(Array.isArray(organizationData) ? organizationData : [])
       } catch {
@@ -62,7 +72,19 @@ export default function TodayPage() {
     const target = document.getElementById(`task-${taskId}`)
     target?.scrollIntoView({ block: 'center' })
     target?.focus()
-  }, [location.search, today, openTasks])
+  }, [location.search, today, otherTasks])
+
+  async function loadMoreTasks() {
+    if (!today || !hasMoreTasks || loadingMoreRef.current) return
+    loadingMoreRef.current = true
+    setLoadingMoreTasks(true)
+    try {
+      const page = await workspaceApi.listTasks(otherTaskQuery(today.timezone_name), { limit: OTHER_TASK_PAGE_SIZE, offset: otherTasks.length })
+      setOtherTasks((current) => [...current, ...page])
+      setHasMoreTasks(page.length === OTHER_TASK_PAGE_SIZE)
+    } catch { setError('More Tasks could not be loaded. Try again.') }
+    finally { loadingMoreRef.current = false; setLoadingMoreTasks(false) }
+  }
 
   function openCreate(mode, initialValues = {}, trigger = null) {
     triggerRef.current = trigger || document.activeElement
@@ -93,9 +115,6 @@ export default function TodayPage() {
   function appointmentFromMail(message) {
     openCreate('appointment', { title: message.subject, notes: `Sample email from ${message.sender} (${message.organization}): ${message.preview}` })
   }
-  const featuredTaskIds = new Set([...(today?.overdue_tasks || []), ...(today?.due_today_tasks || [])].map((task) => task.id))
-  const otherOpenTasks = openTasks.filter((task) => !featuredTaskIds.has(task.id))
-
   return <>
     <TopBar crumbs={['Daily', 'Today']} onMenuClick={openMenu} onNotificationsClick={openNotifications} />
     <main className="page">
@@ -108,7 +127,8 @@ export default function TodayPage() {
         <div className="today-main">
           <TaskList title="Overdue" tasks={today.overdue_tasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="Nothing overdue. You're caught up." />
           <TaskList title="Due today" tasks={today.due_today_tasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="No tasks due today." />
-          <TaskList title="Other open tasks" tasks={otherOpenTasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="No other open tasks." />
+          <TaskList title="Other open tasks" tasks={otherTasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="No other open tasks." />
+          {hasMoreTasks && <button className="btn" disabled={loadingMoreTasks} onClick={loadMoreTasks}>{loadingMoreTasks ? 'Loading…' : 'Show more Tasks'}</button>}
           <MockInbox onCreateTask={taskFromMail} onCreateAppointment={appointmentFromMail} />
         </div>
         <aside className="today-rail"><MyMeetings today={today.appointments_today} upcoming={today.appointments_next_seven_days} onStatusChange={changeAppointment} timeZone={today.timezone_name} /><QuickTools /></aside>

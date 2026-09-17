@@ -5,7 +5,7 @@ test('authenticated root opens Today with Broker workspace navigation', async ({
   await expect(authedPage).toHaveURL(/\/today$/)
   await expect(authedPage.getByRole('heading', { name: 'Today' })).toBeVisible()
 
-  const nav = authedPage.getByRole('complementary')
+  const nav = authedPage.locator('.side')
   await expect(nav.getByText('Daily', { exact: true })).toBeVisible()
   await expect(nav.getByRole('link', { name: 'Today' })).toBeVisible()
   await expect(nav.getByRole('link', { name: 'Overview' })).toBeVisible()

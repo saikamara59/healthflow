@@ -10,6 +10,8 @@ still decrypt with the v1 key.
 Never delete a key version while any row exists encrypted under it.
 """
 import base64
+import hashlib
+import hmac
 import os
 import re
 import secrets
@@ -75,6 +77,26 @@ def _load_phi_keys() -> dict[str, bytes]:
 
 _KEYS: dict[str, bytes] = _load_phi_keys()
 _CURRENT_VERSION: str = max(_KEYS, key=lambda v: int(v[1:]))
+
+
+def blind_index_versions() -> tuple[str, ...]:
+    """Return configured key versions so search survives additive key rotation."""
+    return tuple(_KEYS)
+
+
+def blind_index_digest(value: str, version: str, broker_id: str) -> str:
+    """Broker-separated keyed digest; never persist a plaintext search gram."""
+    key = hmac.new(
+        _KEYS[version], b"healthflow-workspace-search-key-v1:" + broker_id.encode("ascii"),
+        hashlib.sha256,
+    ).digest()
+    return hmac.new(
+        key, b"healthflow-workspace-search-v1:" + value.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
+
+
+def current_blind_index_version() -> str:
+    return _CURRENT_VERSION
 
 
 def encrypt(plaintext: str) -> str:

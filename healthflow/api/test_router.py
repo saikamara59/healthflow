@@ -21,6 +21,7 @@ from healthflow.database.models import (
     Organization,
     Task,
     WorkspaceActivity,
+    WorkspaceSearchToken,
 )
 from healthflow.seed_data import seed_for_worker, worker_email
 
@@ -53,6 +54,9 @@ async def reset_db(body: ResetRequest) -> dict:
                     )
                 ).scalar_one_or_none()
                 if broker is not None:
+                    await session.execute(
+                        delete(WorkspaceSearchToken).where(WorkspaceSearchToken.broker_id == broker.id)
+                    )
                     for model in (
                         WorkspaceActivity,
                         Appointment,

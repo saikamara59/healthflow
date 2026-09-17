@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from sqlalchemy import event
 
 
 async def _headers(client, email: str) -> dict[str, str]:
@@ -116,11 +117,21 @@ async def test_task_can_be_updated_and_filtered_by_status(client):
 
 
 @pytest.mark.asyncio
-async def test_task_due_earlier_today_is_overdue_not_due_today(client):
+async def test_task_due_earlier_today_is_overdue_not_due_today(client, monkeypatch):
+    from healthflow.workspace import tasks_router
+
+    frozen_now = datetime(2026, 9, 15, 12, tzinfo=timezone.utc)
+
+    class FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return frozen_now.astimezone(tz) if tz is not None else frozen_now.replace(tzinfo=None)
+
+    monkeypatch.setattr(tasks_router, "datetime", FrozenDatetime)
     headers = await _headers(client, "task-dates@example.com")
-    local_date = datetime.now(timezone.utc).date().isoformat()
-    overdue_due_at = datetime.now(timezone.utc) - timedelta(minutes=10)
-    future_due_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+    local_date = frozen_now.date().isoformat()
+    overdue_due_at = frozen_now - timedelta(minutes=10)
+    future_due_at = frozen_now + timedelta(minutes=10)
     for title, due_at in (("Past due", overdue_due_at), ("Later today", future_due_at)):
         created = await client.post(
             "/tasks", json={"title": title, "due_at": due_at.isoformat()}, headers=headers
@@ -142,6 +153,69 @@ async def test_task_schedule_rejects_invalid_timezone(client):
     headers = await _headers(client, "task-zone@example.com")
     response = await client.get("/tasks?schedule=today&timezone_name=Not/AZone", headers=headers)
     assert response.status_code == 422
+    malformed = await client.get("/tasks?schedule=today&timezone_name=%2Fetc%2Fpasswd", headers=headers)
+    assert malformed.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_task_pagination_and_other_schedule_include_only_unfeatured_work(client):
+    headers = await _headers(client, "task-pages@example.com")
+    for title, due_at in (
+        ("Due today", "2026-09-15T12:00:00Z"),
+        ("Future one", "2026-09-17T12:00:00Z"),
+        ("Future two", "2026-09-18T12:00:00Z"),
+        ("Unscheduled", None),
+    ):
+        assert (await client.post("/tasks", json={"title": title, "due_at": due_at}, headers=headers)).status_code == 201
+    query = "/tasks?schedule=other&local_date=2026-09-15&timezone_name=UTC&limit=2"
+    first = await client.get(query, headers=headers)
+    second = await client.get(f"{query}&offset=2", headers=headers)
+    assert first.status_code == second.status_code == 200
+    assert {task["title"] for task in first.json() + second.json()} == {
+        "Future one", "Future two", "Unscheduled"
+    }
+    assert (await client.get("/tasks?limit=101", headers=headers)).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_task_list_batch_loads_linked_names(client, db_engine):
+    headers = await _headers(client, "task-batch@example.com")
+    org = await client.post(
+        "/organizations", json={"name": "Harbor", "kind": "carrier"}, headers=headers
+    )
+    org_id = org.json()["id"]
+    contact = await client.post(
+        f"/organizations/{org_id}/contacts", json={"full_name": "Dana"}, headers=headers
+    )
+    for title in ("First", "Second"):
+        await client.post("/tasks", json={
+            "title": title, "organization_id": org_id, "contact_id": contact.json()["id"],
+        }, headers=headers)
+
+    statements = []
+    def capture(connection, cursor, statement, parameters, context, executemany):
+        statements.append(statement.lower())
+    event.listen(db_engine.sync_engine, "before_cursor_execute", capture)
+    try:
+        response = await client.get("/tasks", headers=headers)
+    finally:
+        event.remove(db_engine.sync_engine, "before_cursor_execute", capture)
+    assert {task["organization_name"] for task in response.json()} == {"Harbor"}
+    assert {task["contact_name"] for task in response.json()} == {"Dana"}
+    assert sum("from organizations" in sql for sql in statements) == 1
+    assert sum("from contacts" in sql for sql in statements) == 1
+
+
+@pytest.mark.asyncio
+async def test_selected_past_date_returns_tasks_due_that_day(client):
+    headers = await _headers(client, "task-past-date@example.com")
+    assert (await client.post(
+        "/tasks", json={"title": "Past day", "due_at": "2026-09-01T12:00:00Z"}, headers=headers
+    )).status_code == 201
+    response = await client.get(
+        "/tasks?schedule=today&local_date=2026-09-01&timezone_name=UTC", headers=headers
+    )
+    assert [task["title"] for task in response.json()] == ["Past day"]
 
 
 @pytest.mark.asyncio

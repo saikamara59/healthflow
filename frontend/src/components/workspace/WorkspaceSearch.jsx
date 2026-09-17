@@ -24,7 +24,9 @@ export default function WorkspaceSearch({ onClose }) {
   useEffect(() => {
     const trimmed = query.trim()
     const request = ++requestRef.current
-    if (trimmed.length < 2) { setResults([]); setState('idle'); return }
+    setResults([])
+    setActive(0)
+    if (trimmed.length < 2) { setState('idle'); return }
     setState('loading')
     const timer = setTimeout(() => {
       workspaceApi.search(trimmed).then((items) => {
@@ -47,7 +49,7 @@ export default function WorkspaceSearch({ onClose }) {
   }
 
   return <dialog className="workspace-dialog workspace-search-dialog" ref={dialogRef} aria-label="Search workspace"><div className="between"><h2>Search workspace</h2><button className="btn icon ghost" aria-label="Close search" onClick={onClose}>×</button></div>
-    <input ref={inputRef} type="search" aria-label="Search workspace" role="searchbox" placeholder="Find clients, organizations, tasks…" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={keyDown} aria-controls="workspace-search-results" aria-activedescendant={results[active] ? `workspace-result-${active}` : undefined} />
+    <input ref={inputRef} type="search" aria-label="Search workspace" role="searchbox" placeholder="Find clients, organizations, tasks…" value={query} onChange={(event) => { setResults([]); setActive(0); setQuery(event.target.value) }} onKeyDown={keyDown} aria-controls="workspace-search-results" aria-activedescendant={results[active] ? `workspace-result-${active}` : undefined} />
     <div className="workspace-search-hint">Type at least two characters. Use ↑ ↓ to choose and Enter to open.</div>
     {state === 'error' && <p role="alert" className="workspace-error">Search could not load. Try again.</p>}
     {state === 'loading' && <p role="status">Searching…</p>}
