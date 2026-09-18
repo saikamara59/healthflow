@@ -155,12 +155,14 @@ test('keyboard search finds a Broker task', async ({ authedPage }) => {
 })
 
 test('search reveals a completed task outside the Today sections', async ({ authedPage }) => {
-  await authedPage.goto('/today')
+  await authedPage.goto('/organizations')
   const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
   const headers = { Authorization: `Bearer ${token}` }
   const created = await authedPage.request.post('/tasks', { headers, data: { title: 'Review archived renewal' } })
   expect(created.ok()).toBe(true)
   const taskId = (await created.json()).id
+  await authedPage.goto('/today')
+  await expect(authedPage.getByRole('heading', { name: 'Other open tasks' }).locator('..').locator('..').getByRole('listitem', { name: 'Review archived renewal' })).toBeVisible()
   expect((await authedPage.request.post(`/tasks/${taskId}/complete`, { headers })).ok()).toBe(true)
   await authedPage.getByRole('button', { name: 'Search workspace' }).click()
   await authedPage.getByRole('searchbox', { name: 'Search workspace' }).fill('archived renewal')
