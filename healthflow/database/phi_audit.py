@@ -30,14 +30,33 @@ from sqlalchemy import event, func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from healthflow.auth.tenant_context import current_broker_id, current_endpoint
-from healthflow.database.models import ActionHistory, Client, Feedback, PhiAccessLog
+from healthflow.database.models import (
+    ActionHistory,
+    Appointment,
+    Client,
+    Contact,
+    Feedback,
+    Organization,
+    PhiAccessLog,
+    Task,
+    WorkspaceActivity,
+)
 
 logger = logging.getLogger(__name__)
 
 # The PHI tables whose access is audited. Mirrors TENANT_SCOPED_MODELS, but
 # kept as its own list so the two concerns stay decoupled — a future table
 # could be tenant-scoped without being PHI, or vice versa.
-_AUDITED_MODELS: frozenset[type] = frozenset({Client, ActionHistory, Feedback})
+_AUDITED_MODELS: frozenset[type] = frozenset({
+    Client,
+    ActionHistory,
+    Feedback,
+    Organization,
+    Contact,
+    Task,
+    Appointment,
+    WorkspaceActivity,
+})
 _AUDITED_TABLE_NAMES: dict[type, str] = {m: m.__tablename__ for m in _AUDITED_MODELS}
 
 

@@ -4,6 +4,7 @@ import api from '../api/client';
 import TopBar from '../components/TopBar';
 import Icon from '../components/ui/Icon';
 import useLayout from '../components/ui/useLayout';
+import { workspaceApi } from '../api/workspace';
 
 const TABS = ['profile', 'appearance', 'sign-out'];
 
@@ -16,6 +17,10 @@ export default function SettingsPage() {
   const [form, setForm] = useState({ full_name: '', email: '' });
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
+  const [timezoneName, setTimezoneName] = useState('UTC');
+  const [timezoneMsg, setTimezoneMsg] = useState('');
+  const [timezoneSaving, setTimezoneSaving] = useState(false);
+  const [timezoneLoaded, setTimezoneLoaded] = useState(false);
 
   useEffect(() => {
     api.get('/auth/profile').then((p) => {
@@ -23,6 +28,32 @@ export default function SettingsPage() {
       setForm({ full_name: p.full_name || '', email: p.email || '' });
     }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    workspaceApi.getPreferences().then((preference) => {
+      if (alive) { setTimezoneName(preference.timezone_name); setTimezoneLoaded(true); }
+    }).catch(() => {
+      if (alive) setTimezoneMsg('Time zone could not be loaded.');
+    });
+    return () => { alive = false; };
+  }, []);
+
+  async function saveTimezone(event) {
+    event.preventDefault();
+    setTimezoneSaving(true); setTimezoneMsg('');
+    try {
+      await workspaceApi.saveTimezone(timezoneName);
+      setTimezoneMsg('Time zone saved');
+    } catch (err) {
+      setTimezoneMsg(err.message || 'Time zone could not be saved.');
+    } finally {
+      setTimezoneSaving(false);
+    }
+  }
+
+  const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const zones = [...new Set([browserZone, timezoneName, 'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'America/Anchorage', 'Pacific/Honolulu'])];
 
   async function saveProfile(e) {
     e.preventDefault();
@@ -42,14 +73,14 @@ export default function SettingsPage() {
 
   return (
     <>
-      <TopBar crumbs={['Review', 'Settings']} onMenuClick={openMenu} onNotificationsClick={openNotifications} />
+      <TopBar crumbs={['Account', 'Settings']} onMenuClick={openMenu} onNotificationsClick={openNotifications} />
       <div className="page">
         <div className="page-head">
           <div>
             <div className="eyebrow" style={{ marginBottom: 14 }}>Your account</div>
             <h1 className="page-title"><em>Settings</em></h1>
             <p className="page-sub">
-              Name, email, and appearance. More settings will land here as team access and commission tracking ship.
+              Your profile, time zone, and appearance.
             </p>
           </div>
         </div>
@@ -62,7 +93,7 @@ export default function SettingsPage() {
           ))}
         </div>
 
-        {tab === 'profile' && (
+        {tab === 'profile' && (<>
           <form onSubmit={saveProfile} className="card card-pad" style={{ marginTop: 28, maxWidth: 620 }}>
             <div className="eyebrow" style={{ marginBottom: 16 }}>Profile</div>
             <div className="col" style={{ gap: 16 }}>
@@ -90,7 +121,13 @@ export default function SettingsPage() {
               </div>
             </div>
           </form>
-        )}
+          <form onSubmit={saveTimezone} className="card card-pad" style={{ marginTop: 18, maxWidth: 620 }}>
+            <div className="eyebrow" style={{ marginBottom: 16 }}>Workspace time zone</div>
+            <div className="field"><label className="field-label" htmlFor="timezone-name">IANA time zone</label><select id="timezone-name" className="input" value={timezoneName} onChange={(event) => setTimezoneName(event.target.value)} disabled={!timezoneLoaded}>{zones.map((zone) => <option value={zone} key={zone}>{zone}</option>)}</select></div>
+            <p className="workspace-small">Today and Scheduling use this time zone. Appointment and Task times are stored in UTC.</p>
+            <div className="between" style={{ marginTop: 18 }}><span role="status" className="muted">{timezoneMsg}</span><button type="submit" className="btn accent" disabled={timezoneSaving || !timezoneLoaded}>{timezoneSaving ? 'Saving…' : 'Save time zone'}</button></div>
+          </form>
+        </>)}
 
         {tab === 'appearance' && (
           <div className="card card-pad" style={{ marginTop: 28, maxWidth: 620 }}>

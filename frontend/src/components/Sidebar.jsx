@@ -9,31 +9,36 @@ import BrandWordmark from './ui/BrandWordmark';
 
 const NAV = [
   {
+    group: 'Daily',
+    items: [
+      { path: '/today', label: 'Today', icon: 'today', end: true },
+      { path: '/overview', label: 'Overview', icon: 'dashboard' },
+    ],
+  },
+  {
     group: 'Workspace',
     items: [
-      { path: '/dashboard', label: 'Overview', icon: 'dashboard', end: true },
       { path: '/clients', label: 'Clients', icon: 'users', countKey: 'clients' },
-      { path: '/leads', label: 'Leads', icon: 'leads', countKey: 'leads' },
+      { path: '/organizations', label: 'Organizations', icon: 'organization' },
+      { path: '/follow-ups', label: 'Follow-ups', icon: 'task' },
+      { path: '/scheduling', label: 'Scheduling', icon: 'calendar' },
+    ],
+  },
+  {
+    group: 'AI Tools',
+    items: [
+      { path: '/compare', label: 'Compare Plans', icon: 'compare' },
+      { path: '/calculator', label: 'Estimate Costs', icon: 'calculator' },
+      { path: '/network', label: 'Check Network', icon: 'network' },
+      { path: '/translator', label: 'Explain Coverage', icon: 'translate' },
+      { path: '/appeals', label: 'Draft Appeal', icon: 'appeal' },
+    ],
+  },
+  {
+    group: 'Account',
+    items: [
       { path: '/activity', label: 'Activity', icon: 'history' },
-    ],
-  },
-  {
-    group: 'Tools',
-    items: [
-      { path: '/compare', label: 'Plan comparison', icon: 'compare' },
-      { path: '/translator', label: 'Coverage translator', icon: 'translate' },
-      { path: '/plan', label: 'Deadline planner', icon: 'calendar' },
-      { path: '/network', label: 'Network check', icon: 'network' },
-      { path: '/calculator', label: 'Cost calculator', icon: 'calculator' },
-      { path: '/appeals', label: 'Claim appeals', icon: 'appeal' },
-    ],
-  },
-  {
-    group: 'Review',
-    items: [
-      { path: '/history', label: 'History', icon: 'history' },
-      { path: '/analytics', label: 'Analytics', icon: 'analytics' },
-      { path: '/feedback', label: 'Feedback', icon: 'feedback' },
+      { path: '/history', label: 'Tool history', icon: 'history' },
       { path: '/settings', label: 'Settings', icon: 'settings' },
       { path: '/support', label: 'Support', icon: 'support' },
     ],
@@ -58,12 +63,10 @@ export default function Sidebar({ open, onClose }) {
     let alive = true;
     Promise.all([
       api.get('/clients').catch(() => []),
-      api.get('/leads').catch(() => []),
-    ]).then(([clients, leads]) => {
+    ]).then(([clients]) => {
       if (!alive) return;
       setCounts({
         clients: Array.isArray(clients) ? clients.length : 0,
-        leads: Array.isArray(leads) ? leads.length : 0,
       });
     });
     return () => { alive = false; };

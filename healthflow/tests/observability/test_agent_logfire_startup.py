@@ -41,6 +41,13 @@ def local_logfire(monkeypatch):
     real_configure(send_to_logfire=False, console=False)
 
 
+@pytest.fixture
+def startup_database(monkeypatch, db_engine, db_session_factory):
+    """Use one isolated database for both startup table creation and backfill."""
+    monkeypatch.setattr(config, "engine", db_engine)
+    monkeypatch.setattr(config, "async_session_factory", db_session_factory)
+
+
 def _invocation_logger(monkeypatch, tmp_path):
     database_path = tmp_path / "invocations.db"
     engine = create_engine(f"sqlite:///{database_path}")
@@ -76,9 +83,8 @@ def _invocation_spans(exporter):
 
 @pytest.mark.asyncio
 async def test_startup_exports_only_allowlisted_agent_metadata(
-    monkeypatch, db_engine, tmp_path, local_logfire
+    monkeypatch, startup_database, tmp_path, local_logfire
 ):
-    monkeypatch.setattr(config, "engine", db_engine)
     monkeypatch.setenv("LOGFIRE_TOKEN", "test-token")
 
     async with main.lifespan(main.app):
@@ -128,9 +134,8 @@ async def test_startup_exports_only_allowlisted_agent_metadata(
 
 @pytest.mark.asyncio
 async def test_failed_agent_exports_status_without_exception_message(
-    monkeypatch, db_engine, tmp_path, local_logfire
+    monkeypatch, startup_database, tmp_path, local_logfire
 ):
-    monkeypatch.setattr(config, "engine", db_engine)
     monkeypatch.setenv("LOGFIRE_TOKEN", "test-token")
 
     async with main.lifespan(main.app):
@@ -146,9 +151,8 @@ async def test_failed_agent_exports_status_without_exception_message(
 
 @pytest.mark.asyncio
 async def test_temporal_plan_invocation_is_visible_without_content(
-    monkeypatch, db_engine, tmp_path, local_logfire
+    monkeypatch, startup_database, tmp_path, local_logfire
 ):
-    monkeypatch.setattr(config, "engine", db_engine)
     monkeypatch.setenv("LOGFIRE_TOKEN", "test-token")
 
     async with main.lifespan(main.app):
@@ -167,9 +171,8 @@ async def test_temporal_plan_invocation_is_visible_without_content(
 
 @pytest.mark.asyncio
 async def test_startup_without_token_exports_no_agent_events(
-    monkeypatch, db_engine, tmp_path, local_logfire
+    monkeypatch, startup_database, tmp_path, local_logfire
 ):
-    monkeypatch.setattr(config, "engine", db_engine)
     monkeypatch.setenv("LOGFIRE_TOKEN", "")
 
     async with main.lifespan(main.app):
@@ -181,9 +184,8 @@ async def test_startup_without_token_exports_no_agent_events(
 
 @pytest.mark.asyncio
 async def test_logfire_configuration_failure_does_not_block_startup(
-    monkeypatch, db_engine, caplog
+    monkeypatch, startup_database, caplog
 ):
-    monkeypatch.setattr(config, "engine", db_engine)
     monkeypatch.setattr(invocation_module, "_logfire_enabled", False, raising=False)
     monkeypatch.setenv("LOGFIRE_TOKEN", "test-token")
 
@@ -197,3 +199,23 @@ async def test_logfire_configuration_failure_does_not_block_startup(
 
     assert "Logfire agent tracing unavailable" in caplog.text
     assert "test-token" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_search_backfill_does_not_block_application_readiness(
+    monkeypatch, startup_database
+):
+    from healthflow.workspace import search_index
+
+    started = asyncio.Event()
+    blocked = asyncio.Event()
+
+    async def slow_backfill(session):
+        started.set()
+        await blocked.wait()
+
+    monkeypatch.setattr(search_index, "backfill_search_index", slow_backfill)
+    async with asyncio.timeout(2):
+        async with main.lifespan(main.app):
+            await started.wait()
+            assert not blocked.is_set()

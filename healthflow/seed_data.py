@@ -10,7 +10,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from healthflow.auth.security import hash_password
-from healthflow.database.models import Broker, Client
+from healthflow.database.models import Broker, Client, WorkspaceSearchToken
 
 
 WORKER_PASSWORD = "TestWorker123!"
@@ -74,6 +74,10 @@ async def seed_for_worker(session: AsyncSession, worker_id: str) -> Broker:
         session.add(broker)
         await session.flush()
 
+    await session.execute(delete(WorkspaceSearchToken).where(
+        WorkspaceSearchToken.broker_id == broker.id,
+        WorkspaceSearchToken.kind == "client",
+    ))
     await session.execute(delete(Client).where(Client.broker_id == broker.id))
 
     for client_data in TEST_CLIENTS:

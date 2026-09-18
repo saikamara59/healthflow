@@ -1,6 +1,7 @@
+import asyncio
 import logging
 import os
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -33,19 +34,46 @@ from healthflow.feedback.router import feedback_router
 from healthflow.agents.temporal_awareness.routes import temporal_router
 from healthflow.forensics.routes import forensics_router
 from healthflow.decisions.router import decisions_router
+from healthflow.workspace.organizations_router import organizations_router
+from healthflow.workspace.activity_router import activity_router
+from healthflow.workspace.tasks_router import tasks_router
+from healthflow.workspace.appointments_router import appointments_router
+from healthflow.workspace.dashboard_router import dashboard_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize database tables and optional agent telemetry on startup."""
-    from healthflow.database.config import engine
+    from healthflow.database.config import async_session_factory, engine
     from healthflow.database.models import Base
     from healthflow.logs.invocation import configure_agent_logfire
+    from healthflow.workspace.search_index import backfill_search_index
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     configure_agent_logfire()
-    yield
+
+    async def backfill_in_background():
+        # Each batch commits independently, so a restart resumes missing tokens.
+        # A failed attempt retries without making application readiness depend on it.
+        while True:
+            try:
+                async with async_session_factory() as session:
+                    await backfill_search_index(session)
+                return
+            except Exception as exc:
+                logging.getLogger(__name__).warning(
+                    "Workspace search backfill failed (%s); retrying", type(exc).__name__
+                )
+                await asyncio.sleep(60)
+
+    backfill_task = asyncio.create_task(backfill_in_background())
+    try:
+        yield
+    finally:
+        backfill_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await backfill_task
 
 
 app = FastAPI(
@@ -96,6 +124,11 @@ app.include_router(feedback_router)
 app.include_router(temporal_router)
 app.include_router(forensics_router)
 app.include_router(decisions_router)
+app.include_router(organizations_router)
+app.include_router(activity_router)
+app.include_router(tasks_router)
+app.include_router(appointments_router)
+app.include_router(dashboard_router)
 
 
 if (

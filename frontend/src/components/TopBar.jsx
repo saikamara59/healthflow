@@ -1,7 +1,9 @@
 import Icon from './ui/Icon';
 import { ThemeToggle } from './ui/Tweaks';
+import useLayout from './ui/useLayout';
 
 export default function TopBar({ crumbs = ['Overview'], action, onMenuClick, onNotificationsClick }) {
+  const { openSearch } = useLayout();
   return (
     <header className="topbar">
       <div className="row" style={{ gap: 12, minWidth: 0 }}>
@@ -19,11 +21,11 @@ export default function TopBar({ crumbs = ['Overview'], action, onMenuClick, onN
       </div>
 
       <div className="topbar-actions">
-        <div className="search">
+        <button className="search workspace-search-trigger" type="button" data-workspace-search-trigger aria-label="Search workspace" onClick={openSearch}>
           <Icon name="search" size={14} />
-          <input placeholder="Search clients, plans, or claims" />
+          <span>Search workspace</span>
           <span className="kbd">⌘K</span>
-        </div>
+        </button>
         <button className="btn icon ghost" onClick={onNotificationsClick} title="Notifications" aria-label="Notifications">
           <Icon name="bell" size={16} />
         </button>

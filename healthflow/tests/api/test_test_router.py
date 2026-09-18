@@ -16,9 +16,23 @@ same engine inside docker), while pytest fixtures use a separate
 in-memory engine — the two diverge in tests.
 """
 from importlib import reload
+from datetime import datetime, timezone
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
+
+from healthflow.auth.tenant_context import system_context
+from healthflow.database.models import (
+    Appointment,
+    Broker,
+    BrokerPreference,
+    Contact,
+    Organization,
+    Task,
+    WorkspaceActivity,
+)
+from healthflow.seed_data import worker_email
 
 
 async def _build_client(db_session_factory):
@@ -89,6 +103,68 @@ async def test_reset_endpoint_rejects_malformed_worker_id(monkeypatch, db_sessio
     try:
         response = await client_.post("/__test/reset", json={"worker_id": "not-a-worker"})
         assert response.status_code == 422
+    finally:
+        await client_.aclose()
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.anyio
+async def test_reset_removes_workspace_records_before_reseeding_clients(monkeypatch, db_session_factory):
+    monkeypatch.setenv("HEALTHFLOW_TEST_MODE", "1")
+    client_, app = await _build_client(db_session_factory)
+    import healthflow.api.test_router as test_router_module
+
+    monkeypatch.setattr(test_router_module, "async_session_factory", db_session_factory)
+    worker_id = "e2e-worker-999"
+    try:
+        first_reset = await client_.post("/__test/reset", json={"worker_id": worker_id})
+        assert first_reset.status_code == 200
+
+        async with db_session_factory() as session:
+            with system_context("seed workspace records before e2e reset"):
+                broker = (
+                    await session.execute(select(Broker).where(Broker.email == worker_email(worker_id)))
+                ).scalar_one()
+                organization = Organization(broker_id=broker.id, name="Reset Co", kind="carrier")
+                session.add(organization)
+                await session.flush()
+                contact = Contact(
+                    broker_id=broker.id, organization_id=organization.id, full_name="Reset Contact"
+                )
+                task = Task(broker_id=broker.id, title="Reset Task")
+                appointment = Appointment(
+                    broker_id=broker.id,
+                    title="Reset Meeting",
+                    starts_at=datetime(2026, 9, 17, 14, tzinfo=timezone.utc),
+                    ends_at=datetime(2026, 9, 17, 15, tzinfo=timezone.utc),
+                )
+                preference = BrokerPreference(broker_id=broker.id, timezone_name="America/New_York")
+                session.add_all([contact, task, appointment, preference])
+                await session.flush()
+                session.add(
+                    WorkspaceActivity(
+                        broker_id=broker.id,
+                        entity_type="task",
+                        entity_id=task.id,
+                        action="completed",
+                        summary="Reset Task completed",
+                    )
+                )
+                await session.commit()
+
+        second_reset = await client_.post("/__test/reset", json={"worker_id": worker_id})
+        assert second_reset.status_code == 200
+        async with db_session_factory() as session:
+            with system_context("verify workspace e2e reset"):
+                for model in (
+                    WorkspaceActivity,
+                    Appointment,
+                    Task,
+                    Contact,
+                    Organization,
+                    BrokerPreference,
+                ):
+                    assert (await session.execute(select(model))).scalars().all() == []
     finally:
         await client_.aclose()
         app.dependency_overrides.clear()
