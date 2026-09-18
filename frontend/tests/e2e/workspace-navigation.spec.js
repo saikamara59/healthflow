@@ -170,6 +170,7 @@ test('search reveals a completed task outside the Today sections', async ({ auth
   await expect(authedPage).toHaveURL(new RegExp(`task=${taskId}`))
   await expect(authedPage.getByRole('heading', { name: 'Search result' })).toBeVisible()
   await expect(authedPage.getByRole('listitem', { name: 'Review archived renewal' })).toBeVisible()
+  await expect(authedPage.getByRole('heading', { name: 'Other open tasks' }).locator('..').locator('..').getByRole('listitem', { name: 'Review archived renewal' })).toHaveCount(0)
 })
 
 test('search reveals an appointment outside the selected week', async ({ authedPage }) => {

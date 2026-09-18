@@ -143,6 +143,11 @@ export default function TodayPage() {
   function appointmentFromMail(message) {
     openCreate('appointment', { title: message.subject, notes: `Sample email from ${message.sender} (${message.organization}): ${message.preview}` })
   }
+  const withoutStaleTarget = (tasks) => tasks.filter((task) => task.id !== targetTask?.id || task.status === targetTask.status)
+  const overdueTasks = withoutStaleTarget(today?.overdue_tasks || [])
+  const dueTodayTasks = withoutStaleTarget(today?.due_today_tasks || [])
+  const visibleOtherTasks = withoutStaleTarget(otherTasks)
+  const targetInToday = targetTask && [...overdueTasks, ...dueTodayTasks, ...visibleOtherTasks].some((task) => task.id === targetTask.id)
   return <>
     <TopBar crumbs={['Daily', 'Today']} onMenuClick={openMenu} onNotificationsClick={openNotifications} />
     <main className="page">
@@ -154,10 +159,10 @@ export default function TodayPage() {
       {!today && !error && <p role="status">Loading Today…</p>}
       {today && <div className="today-grid">
         <div className="today-main">
-          {targetTask && ![...today.overdue_tasks, ...today.due_today_tasks, ...otherTasks].some((task) => task.id === targetTask.id) && <TaskList title="Search result" tasks={[targetTask]} onToggle={toggleTargetTask} timeZone={today.timezone_name} />}
-          <TaskList title="Overdue" tasks={today.overdue_tasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="Nothing overdue. You're caught up." />
-          <TaskList title="Due today" tasks={today.due_today_tasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="No tasks due today." />
-          <TaskList title="Other open tasks" tasks={otherTasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="No other open tasks." />
+          {targetTask && !targetInToday && <TaskList title="Search result" tasks={[targetTask]} onToggle={toggleTargetTask} timeZone={today.timezone_name} />}
+          <TaskList title="Overdue" tasks={overdueTasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="Nothing overdue. You're caught up." />
+          <TaskList title="Due today" tasks={dueTodayTasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="No tasks due today." />
+          <TaskList title="Other open tasks" tasks={visibleOtherTasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="No other open tasks." />
           {hasMoreTasks && <button className="btn" disabled={loadingMoreTasks} onClick={loadMoreTasks}>{loadingMoreTasks ? 'Loading…' : 'Show more Tasks'}</button>}
           <MockInbox onCreateTask={taskFromMail} onCreateAppointment={appointmentFromMail} />
         </div>
