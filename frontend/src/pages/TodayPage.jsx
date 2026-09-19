@@ -138,10 +138,10 @@ export default function TodayPage() {
     } catch { setError('The meeting could not be updated. Try again.') }
   }
   function taskFromMail(message) {
-    openCreate('task', { title: message.subject, notes: `Sample email from ${message.sender} (${message.organization}): ${message.preview}`, is_follow_up: true })
+    openCreate('task', { title: message.subject, notes: `Sample email from ${message.sender} (${message.organization}): ${message.preview}`, is_follow_up: true, suggested_client_id: message.clientMatch?.id })
   }
   function appointmentFromMail(message) {
-    openCreate('appointment', { title: message.subject, notes: `Sample email from ${message.sender} (${message.organization}): ${message.preview}` })
+    openCreate('appointment', { title: message.subject, notes: `Sample email from ${message.sender} (${message.organization}): ${message.preview}`, suggested_client_id: message.clientMatch?.id })
   }
   const withoutStaleTarget = (tasks) => tasks.filter((task) => task.id !== targetTask?.id || task.status === targetTask.status)
   const overdueTasks = withoutStaleTarget(today?.overdue_tasks || [])
@@ -164,7 +164,7 @@ export default function TodayPage() {
           <TaskList title="Due today" tasks={dueTodayTasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="No tasks due today." />
           <TaskList title="Other open tasks" tasks={visibleOtherTasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="No other open tasks." />
           {hasMoreTasks && <button className="btn" disabled={loadingMoreTasks} onClick={loadMoreTasks}>{loadingMoreTasks ? 'Loading…' : 'Show more Tasks'}</button>}
-          <MockInbox onCreateTask={taskFromMail} onCreateAppointment={appointmentFromMail} />
+          <MockInbox clients={clients} onCreateTask={taskFromMail} onCreateAppointment={appointmentFromMail} />
         </div>
         <aside className="today-rail"><MyMeetings today={today.appointments_today} upcoming={today.appointments_next_seven_days} onStatusChange={changeAppointment} timeZone={today.timezone_name} /><QuickTools /></aside>
       </div>}

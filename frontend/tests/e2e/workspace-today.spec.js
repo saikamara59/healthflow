@@ -24,6 +24,22 @@ test('mock inbox prefills a follow-up task and is labeled as mock data', async (
   await expect(authedPage.getByLabel('Follow-up')).toBeChecked()
 })
 
+test('mock inbox requires Broker confirmation before linking its suggested Client', async ({ authedPage }) => {
+  await authedPage.goto('/today')
+  await expect(authedPage.getByText(/Suggested client: Eleanor Rigby/)).toBeVisible()
+  await authedPage.getByRole('button', { name: /create task from renewal documents/i }).click()
+
+  const clientSelect = authedPage.getByRole('combobox', { name: 'Client' })
+  await expect(clientSelect).toHaveValue('')
+  await authedPage.getByRole('button', { name: 'Confirm Client link for Eleanor Rigby' }).click()
+  await expect(clientSelect).not.toHaveValue('')
+  await expect(authedPage.getByText('Client link confirmed: Eleanor Rigby')).toBeVisible()
+
+  await authedPage.getByRole('button', { name: 'Create Task', exact: true }).click()
+  const row = authedPage.getByRole('listitem', { name: /Renewal documents are ready/i })
+  await expect(row).toContainText('Eleanor Rigby')
+})
+
 test('unscheduled Task stays visible under Other open tasks', async ({ authedPage }) => {
   await authedPage.goto('/today')
   await authedPage.getByRole('button', { name: 'New Task' }).click()
