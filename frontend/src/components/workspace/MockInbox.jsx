@@ -2,7 +2,8 @@ import { MOCK_INBOX } from '../../data/mockInbox'
 
 function withSuggestedClient(message, clients) {
   if (!message.clientMatch || clients.length === 0) return { ...message, clientMatch: null }
-  const client = clients[Math.min(message.clientMatch.clientIndex, clients.length - 1)]
+  const client = clients[message.clientMatch.clientIndex]
+  if (!client) return { ...message, clientMatch: null }
   return { ...message, clientMatch: { id: client.id, label: client.full_name, state: message.clientMatch.state } }
 }
 

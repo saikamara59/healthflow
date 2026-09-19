@@ -40,6 +40,24 @@ test('mock inbox requires Broker confirmation before linking its suggested Clien
   await expect(row).toContainText('Eleanor Rigby')
 })
 
+test('mock inbox does not substitute another Client when its suggestion is unavailable', async ({ authedPage }) => {
+  await authedPage.goto('/today')
+  const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
+  const clientResponse = await authedPage.request.get('/clients', { headers: { Authorization: `Bearer ${token}` } })
+  expect(clientResponse.ok()).toBe(true)
+  const clients = await clientResponse.json()
+  for (const client of clients.slice(1)) {
+    const response = await authedPage.request.delete(`/clients/${client.id}`, { headers: { Authorization: `Bearer ${token}` } })
+    expect(response.ok()).toBe(true)
+  }
+
+  await authedPage.reload()
+  const denialMessage = authedPage.getByRole('listitem').filter({ hasText: 'Denial notice received' })
+  await expect(denialMessage).not.toContainText('Suggested client')
+  await denialMessage.getByRole('button', { name: /create task/i }).click()
+  await expect(authedPage.getByRole('button', { name: /Confirm Client link/ })).toHaveCount(0)
+})
+
 test('unscheduled Task stays visible under Other open tasks', async ({ authedPage }) => {
   await authedPage.goto('/today')
   await authedPage.getByRole('button', { name: 'New Task' }).click()
