@@ -30,6 +30,11 @@
 .workspace-dialog label { display: grid; gap: 6px; font-size: 12px; color: var(--ink-2); font-weight: 600; }
 .workspace-dialog input:not([type="checkbox"]), .workspace-dialog select, .workspace-dialog textarea { display: block; width: 100%; border: 1px solid var(--line-2); border-radius: var(--radius); background: var(--card); color: var(--ink); padding: 10px; font: 14px var(--sans); }
 .workspace-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.workspace-link-suggestion { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid var(--accent-line); border-radius: var(--radius); background: var(--accent-soft); }
+.workspace-link-suggestion > div { display: grid; gap: 3px; }
+.workspace-link-suggestion strong, .workspace-link-suggestion span { color: var(--ink); font-size: 13px; }
+.workspace-link-suggestion small { color: var(--ink-3); font-size: 11px; font-weight: 400; }
+.workspace-link-confirmed { color: var(--accent) !important; font-weight: 700; }
 .workspace-dialog .workspace-check { display: flex; align-items: center; gap: 8px; }
 .workspace-dialog .quick-create-actions { justify-content: flex-end; }
 .workspace-stack { display: grid; gap: 18px; }
@@ -61,4 +66,4 @@
 @media (max-width: 900px) { .topbar-actions .workspace-search-trigger { display: inline-flex; min-width: 44px; width: 44px; height: 44px; align-items: center; justify-content: center; } .workspace-search-trigger span { display: none; } }
 @media (max-width: 900px) { .workspace-agenda { grid-template-columns: 1fr; overflow-x: visible; } .workspace-agenda .workspace-list-row { display: flex; } }
 @media (max-width: 1000px) { .today-grid { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 700px) { .quick-create-actions > * { width: 100%; min-height: 44px; } .workspace-section { padding: 18px; } .workspace-form-grid { grid-template-columns: 1fr; } .workspace-row-actions { flex-direction: column; } }
+@media (max-width: 700px) { .quick-create-actions > * { width: 100%; min-height: 44px; } .workspace-section { padding: 18px; } .workspace-form-grid { grid-template-columns: 1fr; } .workspace-row-actions { flex-direction: column; } .workspace-link-suggestion { align-items: stretch; flex-direction: column; } }

@@ -24,6 +24,40 @@ test('mock inbox prefills a follow-up task and is labeled as mock data', async (
   await expect(authedPage.getByLabel('Follow-up')).toBeChecked()
 })
 
+test('mock inbox requires Broker confirmation before linking its suggested Client', async ({ authedPage }) => {
+  await authedPage.goto('/today')
+  await expect(authedPage.getByText(/Suggested client: Eleanor Rigby/)).toBeVisible()
+  await authedPage.getByRole('button', { name: /create task from renewal documents/i }).click()
+
+  const clientSelect = authedPage.getByRole('combobox', { name: 'Client' })
+  await expect(clientSelect).toHaveValue('')
+  await authedPage.getByRole('button', { name: 'Confirm Client link for Eleanor Rigby' }).click()
+  await expect(clientSelect).not.toHaveValue('')
+  await expect(authedPage.getByText('Client link confirmed: Eleanor Rigby')).toBeVisible()
+
+  await authedPage.getByRole('button', { name: 'Create Task', exact: true }).click()
+  const row = authedPage.getByRole('listitem', { name: /Renewal documents are ready/i })
+  await expect(row).toContainText('Eleanor Rigby')
+})
+
+test('mock inbox does not substitute another Client when its suggestion is unavailable', async ({ authedPage }) => {
+  await authedPage.goto('/today')
+  const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
+  const clientResponse = await authedPage.request.get('/clients', { headers: { Authorization: `Bearer ${token}` } })
+  expect(clientResponse.ok()).toBe(true)
+  const clients = await clientResponse.json()
+  for (const client of clients.slice(1)) {
+    const response = await authedPage.request.delete(`/clients/${client.id}`, { headers: { Authorization: `Bearer ${token}` } })
+    expect(response.ok()).toBe(true)
+  }
+
+  await authedPage.reload()
+  const denialMessage = authedPage.getByRole('listitem').filter({ hasText: 'Denial notice received' })
+  await expect(denialMessage).not.toContainText('Suggested client')
+  await denialMessage.getByRole('button', { name: /create task/i }).click()
+  await expect(authedPage.getByRole('button', { name: /Confirm Client link/ })).toHaveCount(0)
+})
+
 test('unscheduled Task stays visible under Other open tasks', async ({ authedPage }) => {
   await authedPage.goto('/today')
   await authedPage.getByRole('button', { name: 'New Task' }).click()
