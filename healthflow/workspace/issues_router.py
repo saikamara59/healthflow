@@ -103,6 +103,7 @@ async def list_issues(
     status: IssueStatus | None = None,
     client_id: UUID | None = None,
     limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     broker: Broker = Depends(get_current_broker),
     db: AsyncSession = Depends(get_db),
 ) -> list[IssueResponse]:
@@ -111,7 +112,7 @@ async def list_issues(
         statement = statement.where(Issue.status == status)
     if client_id is not None:
         statement = statement.where(Issue.client_id == client_id)
-    records = list((await db.execute(statement.limit(limit))).scalars().all())
+    records = list((await db.execute(statement.offset(offset).limit(limit))).scalars().all())
     return [await _issue_response(db, item, expanded=False) for item in records]
 
 
@@ -133,8 +134,21 @@ async def update_issue(
 ) -> IssueResponse:
     issue = await _issue(db, issue_id)
     changes = data.model_dump(exclude_unset=True)
-    if "client_id" in changes:
+    if "client_id" in changes and changes["client_id"] != issue.client_id:
         await require_owned_links(db, client_id=changes["client_id"])
+        linked_task = (
+            await db.execute(select(Task.id).where(Task.issue_id == issue.id).limit(1))
+        ).scalar_one_or_none()
+        linked_appointment = (
+            await db.execute(
+                select(Appointment.id).where(Appointment.issue_id == issue.id).limit(1)
+            )
+        ).scalar_one_or_none()
+        if linked_task is not None or linked_appointment is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="Move or remove linked Follow-ups and Appointments before changing the Issue Client",
+            )
     next_status = changes.get("status")
     if next_status == "resolved" and issue.status != "resolved":
         issue.resolved_at = datetime.now(timezone.utc)

@@ -16,6 +16,10 @@ Policy section: Section 4.2(b), Diagnostic Imaging.
 Denial date: 03/28/2026.
 You have 60 days to appeal this decision.`;
 
+const MAX_ADDITIONAL_CONTEXT = 1000;
+const MAX_APPEAL_TITLE = 300;
+const APPEAL_TITLE_PREFIX = 'Appeal draft: ';
+
 /** Analyzes a denial notice and prepares supporting material for an appeal. */
 export default function ClaimsAppealPage() {
   const { openMenu, openNotifications } = useLayout();
@@ -32,7 +36,7 @@ export default function ClaimsAppealPage() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([workspaceApi.listIssues(), api.get('/clients')]).then(([issueData, clientData]) => {
+    Promise.all([workspaceApi.listAllIssues(), api.get('/clients')]).then(([issueData, clientData]) => {
       if (alive) { setIssues(issueData); setClients(clientData); }
     }).catch(() => { if (alive) setError('Issue context could not be loaded.'); });
     return () => { alive = false; };
@@ -62,13 +66,19 @@ export default function ClaimsAppealPage() {
     setError('');
     setRunning(true);
     try {
+      const issueContext = `Issue context: ${issue.title}`;
+      const additionalContext = [context, issueContext].filter(Boolean).join('\n\n');
+      if (additionalContext.length > MAX_ADDITIONAL_CONTEXT) {
+        setError('Additional context is too long for the selected Issue. Shorten it and try again.');
+        return;
+      }
       const res = await api.post('/appeal', {
         denial_text: denialText,
-        additional_context: [context, issue ? `Issue context: ${issue.title}` : ''].filter(Boolean).join('\n\n'),
+        additional_context: additionalContext,
       });
       await workspaceApi.createAppeal({
         issue_id: issueId,
-        title: issue ? `Appeal draft: ${issue.title}` : 'Appeal draft',
+        title: `${APPEAL_TITLE_PREFIX}${issue.title.slice(0, MAX_APPEAL_TITLE - APPEAL_TITLE_PREFIX.length)}`,
         draft_text: res.appeal_letter,
       });
       setResult(res);
@@ -78,6 +88,10 @@ export default function ClaimsAppealPage() {
       setRunning(false);
     }
   }
+
+  const selectedIssue = issues.find((item) => item.id === issueId);
+  const issueContextLength = selectedIssue ? `Issue context: ${selectedIssue.title}`.length : 0;
+  const contextLimit = Math.max(0, MAX_ADDITIONAL_CONTEXT - issueContextLength - (selectedIssue ? 2 : 0));
 
   function copyLetter() {
     if (!result?.appeal_letter) return;
@@ -130,7 +144,8 @@ export default function ClaimsAppealPage() {
                 className="textarea"
                 style={{ height: 140, border: 0, background: 'transparent', fontSize: 13 }}
                 value={context}
-                onChange={(e) => setContext(e.target.value)}
+                maxLength={contextLimit}
+                onChange={(e) => setContext(e.target.value.slice(0, contextLimit))}
                 placeholder="Add referring physician notes, symptom history, or prior failed treatments."
               />
             </div>

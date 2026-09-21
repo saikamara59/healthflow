@@ -117,11 +117,11 @@ def _extract_ids_from_orm_rows(rows: list) -> list[str]:
 
 
 def _extract_ids_from_where(orm_execute_state, model: type) -> list[str]:
-    """Pull id-equality values out of an UPDATE/DELETE statement's WHERE clause.
+    """Pull id equality or IN values out of an UPDATE/DELETE WHERE clause.
 
     HealthFlow's PHI UPDATE/DELETE are id-based (WHERE id = :x). We walk the
     statement's WHERE clause looking for `<model>.id == <bound value>`
-    comparisons and read the bound value.
+    comparisons and read the bound value or expanding collection.
 
     The tenant filter appends `AND broker_id = :tenant`, so the WHERE clause is
     typically a flat AND of two comparisons — `getattr(whereclause, "clauses",
@@ -142,8 +142,10 @@ def _extract_ids_from_where(orm_execute_state, model: type) -> list[str]:
         right = getattr(clause, "right", None)
         # left should be the `id` column; right a bound parameter carrying .value.
         if left is not None and getattr(left, "key", None) == "id" and hasattr(right, "value"):
-            if right.value is not None:
-                ids.append(str(right.value))
+            if right.value is None:
+                continue
+            values = right.value if isinstance(right.value, (list, tuple, set)) else [right.value]
+            ids.extend(str(value) for value in values)
     return ids
 
 

@@ -143,3 +143,61 @@ async def test_issue_rejects_cross_broker_read_write_and_links(client):
             headers=other,
         )
     ).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_issue_with_linked_work_cannot_move_to_another_client(client):
+    headers = await _headers(client, "issue-reassignment@example.com")
+    first_client = await _client_record(client, headers, "First Client")
+    second_client = await _client_record(client, headers, "Second Client")
+    issue = await client.post(
+        "/issues",
+        json={"client_id": first_client["id"], "title": "Linked case"},
+        headers=headers,
+    )
+    issue_id = issue.json()["id"]
+    follow_up = await client.post(
+        "/tasks",
+        json={
+            "client_id": first_client["id"],
+            "issue_id": issue_id,
+            "title": "Call the carrier",
+            "is_follow_up": True,
+        },
+        headers=headers,
+    )
+    assert follow_up.status_code == 201, follow_up.text
+
+    reassigned = await client.put(
+        f"/issues/{issue_id}",
+        json={"client_id": second_client["id"]},
+        headers=headers,
+    )
+
+    assert reassigned.status_code == 409
+    detail = await client.get(f"/issues/{issue_id}", headers=headers)
+    assert detail.json()["client_id"] == first_client["id"]
+    assert detail.json()["follow_ups"][0]["client_id"] == first_client["id"]
+
+
+@pytest.mark.asyncio
+async def test_issue_list_supports_pagination(client):
+    headers = await _headers(client, "issue-pagination@example.com")
+    owned_client = await _client_record(client, headers)
+    created_ids = set()
+    for title in ("First issue", "Second issue", "Third issue"):
+        response = await client.post(
+            "/issues",
+            json={"client_id": owned_client["id"], "title": title},
+            headers=headers,
+        )
+        created_ids.add(response.json()["id"])
+
+    first_page = await client.get("/issues?limit=2&offset=0", headers=headers)
+    second_page = await client.get("/issues?limit=2&offset=2", headers=headers)
+
+    assert first_page.status_code == 200
+    assert second_page.status_code == 200
+    assert len(first_page.json()) == 2
+    assert len(second_page.json()) == 1
+    assert {item["id"] for item in first_page.json() + second_page.json()} == created_ids

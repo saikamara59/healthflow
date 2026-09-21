@@ -21,7 +21,7 @@ async function createClient(page, name) {
 test('Broker reviews an Enrollment before confirming an external submission', async ({ authedPage }) => {
   await authedPage.goto('/today')
   const client = await createClient(authedPage, 'Enrollment Review Client')
-  await authedPage.goto('/enrollments')
+  await authedPage.getByRole('link', { name: 'Enrollments' }).click()
   await authedPage.getByLabel('Client').selectOption(client.id)
   await authedPage.getByLabel('Plan name').fill('Harbor Gold PPO')
   await authedPage.getByRole('button', { name: 'Create Enrollment' }).click()
@@ -43,7 +43,7 @@ test('Broker reviews an Enrollment before confirming an external submission', as
 test('Issue can resolve without an Appeal and Draft Appeal requires Issue context', async ({ authedPage }) => {
   await authedPage.goto('/today')
   const client = await createClient(authedPage, 'Issue Context Client')
-  await authedPage.goto('/issues')
+  await authedPage.getByRole('link', { name: 'Issues & Appeals' }).click()
   await authedPage.getByLabel('Client').selectOption(client.id)
   await authedPage.getByLabel('Issue title').fill('Incorrect specialist copay')
   await authedPage.getByRole('button', { name: 'Create Issue' }).click()
@@ -59,11 +59,104 @@ test('Issue can resolve without an Appeal and Draft Appeal requires Issue contex
   await authedPage.getByLabel('Status').selectOption('resolved')
   await expect(authedPage.getByText('No Appeal is required unless the case needs a formal challenge.')).toBeVisible()
 
-  await authedPage.goto('/appeals')
+  await authedPage.getByRole('link', { name: 'Draft Appeal' }).first().click()
   await authedPage.getByRole('button', { name: 'Use sample' }).click()
   await authedPage.getByRole('button', { name: 'Analyze & draft' }).click()
   await expect(authedPage.getByRole('alert')).toContainText('Choose an existing Issue')
   const issueOption = authedPage.getByLabel('Existing Issue').getByRole('option', { name: /Issue Context Client · Incorrect specialist copay/ })
   await authedPage.getByLabel('Existing Issue').selectOption(await issueOption.getAttribute('value'))
   await expect(authedPage.getByLabel('Existing Issue')).not.toHaveValue('')
+})
+
+test('Issue details recover from an error, use workspace time, and reopen a saved Appeal draft', async ({ authedPage }) => {
+  await authedPage.goto('/today')
+  const client = await createClient(authedPage, 'Review Finding Client')
+  const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
+  await authedPage.request.put('/workspace/preferences', {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { timezone_name: 'America/New_York' },
+  })
+  const issueResponse = await authedPage.request.post('/issues', {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { client_id: client.id, title: 'Reopen this appeal' },
+  })
+  const issue = await issueResponse.json()
+  await authedPage.request.post('/appointments', {
+    headers: { Authorization: `Bearer ${token}` },
+    data: {
+      client_id: client.id,
+      issue_id: issue.id,
+      title: 'Workspace-time meeting',
+      starts_at: '2030-01-15T15:00:00Z',
+      ends_at: '2030-01-15T15:30:00Z',
+    },
+  })
+  await authedPage.request.post('/appeals', {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { issue_id: issue.id, title: 'Saved draft', draft_text: 'Persisted broker appeal text.' },
+  })
+
+  await authedPage.getByRole('link', { name: 'Issues & Appeals' }).click()
+  await authedPage.route(`**/issues/${issue.id}`, async (route) => {
+    await route.abort()
+    await authedPage.unroute(`**/issues/${issue.id}`)
+  })
+  await authedPage.getByRole('button', { name: /Reopen this appeal/ }).click()
+  await expect(authedPage.getByRole('alert')).toContainText('Issue could not be opened')
+  await authedPage.getByRole('button', { name: /Reopen this appeal/ }).click()
+
+  await expect(authedPage.getByRole('alert')).toHaveCount(0)
+  await expect(authedPage.getByText('Jan 15, 2030, 10:00 AM')).toBeVisible()
+  await authedPage.getByText('Saved draft').click()
+  await expect(authedPage.getByText('Persisted broker appeal text.')).toBeVisible()
+})
+
+test('Appeal drafting keeps generated requests within schema limits', async ({ authedPage }) => {
+  await authedPage.goto('/today')
+  const client = await createClient(authedPage, 'Appeal Boundary Client')
+  const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
+  const longTitle = 'I'.repeat(300)
+  const issueResponse = await authedPage.request.post('/issues', {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { client_id: client.id, title: longTitle },
+  })
+  const issue = await issueResponse.json()
+  let generatedRequest
+  await authedPage.route('**/appeal', async (route) => {
+    generatedRequest = route.request().postDataJSON()
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        session_id: 'review-boundary-test',
+        denial_analysis: {
+          denial_reason_code: 'CO-50', denial_reason: 'Not medically necessary',
+          treatment_denied: 'MRI', policy_section_cited: null,
+          appeal_deadline: '60 days', denial_date: '03/28/2026',
+        },
+        coverage_argument: {
+          cms_rule: 'Coverage applies when medically necessary.',
+          common_appeal_grounds: ['Provide documentation'], success_precedents: [],
+        },
+        appeal_letter: 'Persisted generated appeal letter.',
+        refined_recommendation: 'Broker review required.',
+        disclaimer: 'For educational purposes only.',
+      }),
+    })
+  })
+
+  await authedPage.getByRole('link', { name: 'Draft Appeal' }).first().click()
+  await authedPage.getByLabel('Existing Issue').selectOption(issue.id)
+  await authedPage.getByRole('button', { name: 'Use sample' }).click()
+  await authedPage.getByPlaceholder(/Add referring physician notes/).fill('C'.repeat(1000))
+  await authedPage.getByRole('button', { name: 'Analyze & draft' }).click()
+
+  await expect(authedPage.getByRole('heading', { name: 'Drafted appeal letter' })).toBeVisible()
+  expect(generatedRequest.additional_context.length).toBeLessThanOrEqual(1000)
+  const appeals = await authedPage.request.get(`/appeals?issue_id=${issue.id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  const saved = await appeals.json()
+  expect(saved).toHaveLength(1)
+  expect(saved[0].title.length).toBeLessThanOrEqual(300)
 })

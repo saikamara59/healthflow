@@ -219,6 +219,32 @@ async def test_delete_listener_logs_affected_id(audited_session):
 
 
 @pytest.mark.anyio
+async def test_delete_listener_expands_id_in_predicate(audited_session):
+    session, broker, c1, c2 = audited_session
+    token = current_broker_id.set(broker.id)
+    endpoint_token = current_endpoint.set("DELETE /clients/bulk")
+    try:
+        await session.execute(sa_delete(Client).where(Client.id.in_([c1.id, c2.id])))
+        await session.commit()
+    finally:
+        current_endpoint.reset(endpoint_token)
+        current_broker_id.reset(token)
+
+    with system_context("verify bulk delete audit"):
+        log = (
+            await session.execute(
+                select(PhiAccessLog).where(
+                    PhiAccessLog.operation == "delete",
+                    PhiAccessLog.endpoint == "DELETE /clients/bulk",
+                )
+            )
+        ).scalars().all()
+    assert len(log) == 1
+    assert set(log[0].row_ids) == {str(c1.id), str(c2.id)}
+    assert log[0].row_count == 2
+
+
+@pytest.mark.anyio
 async def test_update_listener_logs_affected_id(audited_session):
     session, broker, c1, _c2 = audited_session
     token = current_broker_id.set(broker.id)

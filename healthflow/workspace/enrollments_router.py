@@ -95,10 +95,19 @@ async def update_enrollment(
 ) -> EnrollmentResponse:
     enrollment = await _enrollment(db, enrollment_id)
     changes = data.model_dump(exclude_unset=True)
+    details_changed = any(getattr(enrollment, field) != value for field, value in changes.items())
+    if details_changed and enrollment.status in {"submitted", "confirmed", "canceled"}:
+        raise HTTPException(
+            status_code=409,
+            detail="Submitted, confirmed, or canceled Enrollments cannot be edited",
+        )
     if "client_id" in changes:
         await require_owned_links(db, client_id=changes["client_id"])
     for field, value in changes.items():
         setattr(enrollment, field, value)
+    if details_changed and enrollment.status == "ready_to_submit":
+        enrollment.status = "preparing"
+        enrollment.ready_at = None
     await db.flush()
     return await _response(db, enrollment)
 
@@ -201,7 +210,17 @@ async def cancel_enrollment(
         return await _response(db, enrollment)
     if enrollment.status == "confirmed":
         raise HTTPException(status_code=409, detail="A confirmed Enrollment cannot be canceled")
-    enrollment.status = "canceled"
-    enrollment.canceled_at = datetime.now(timezone.utc)
-    await db.flush()
+    previous_status = enrollment.status
+    changed = (
+        await db.execute(
+            update(Enrollment)
+            .where(Enrollment.id == enrollment.id, Enrollment.status == previous_status)
+            .values(status="canceled", canceled_at=datetime.now(timezone.utc))
+            .returning(Enrollment.id)
+            .execution_options(synchronize_session=False)
+        )
+    ).scalar_one_or_none()
+    if changed is None:
+        raise HTTPException(status_code=409, detail="Enrollment changed; reload and review it again")
+    await db.refresh(enrollment)
     return await _response(db, enrollment)

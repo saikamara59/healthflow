@@ -51,7 +51,21 @@ export const workspaceApi = {
   submitEnrollment: (id, confirmed) => api.post(`/enrollments/${id}/submit`, { external_submission_confirmed: confirmed }),
   confirmEnrollment: (id) => api.post(`/enrollments/${id}/confirm`),
   cancelEnrollment: (id) => api.post(`/enrollments/${id}/cancel`),
-  listIssues: (query = '') => api.get(`/issues${query ? `?${query}` : ''}`),
+  listIssues: (query = '', { limit = 100, offset = 0 } = {}) => {
+    const params = new URLSearchParams(query)
+    params.set('limit', String(limit))
+    params.set('offset', String(offset))
+    return api.get(`/issues?${params}`)
+  },
+  listAllIssues: async (query = '') => {
+    const pageSize = 100
+    const issues = []
+    for (;;) {
+      const page = await workspaceApi.listIssues(query, { limit: pageSize, offset: issues.length })
+      issues.push(...page)
+      if (page.length < pageSize) return issues
+    }
+  },
   getIssue: (id) => api.get(`/issues/${encodeURIComponent(id)}`),
   createIssue: (body) => api.post('/issues', body),
   updateIssue: (id, body) => api.put(`/issues/${id}`, body),

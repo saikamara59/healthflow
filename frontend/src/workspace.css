@@ -45,6 +45,10 @@
 .phase2-row-button small { display: block; color: var(--ink-3); font-size: 12px; margin-top: 4px; }
 .phase2-selected { background: var(--accent-soft); margin-inline: -10px; padding-inline: 10px; border-radius: var(--radius); }
 .phase2-appeal-form { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 18px; }
+.workspace-appeal-draft { width: 100%; }
+.workspace-appeal-draft summary { cursor: pointer; display: grid; gap: 4px; }
+.workspace-appeal-draft summary small { color: var(--ink-3); font-size: 12px; }
+.workspace-appeal-text { margin-top: 12px; padding: 12px; border-radius: var(--radius); background: var(--surface-2); color: var(--ink-2); font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
 .workspace-inline-form { display: grid; gap: 15px; margin-bottom: 18px; }
 .workspace-inline-form label, .workspace-filter { display: grid; gap: 6px; color: var(--ink-2); font-size: 12px; font-weight: 600; }
 .workspace-inline-form input, .workspace-inline-form select, .workspace-inline-form textarea, .workspace-filter input { width: 100%; border: 1px solid var(--line-2); background: var(--card); color: var(--ink); border-radius: var(--radius); padding: 10px; font: 14px var(--sans); }
