@@ -259,6 +259,63 @@ async def test_cancel_cannot_overwrite_a_concurrent_confirmation(client, monkeyp
 
 
 @pytest.mark.asyncio
+async def test_edit_cannot_overwrite_a_concurrent_submission(client, monkeypatch):
+    headers = await _headers(client, "enrollment-edit-race@example.com")
+    owned_client = await _client_record(client, headers)
+    created = await client.post(
+        "/enrollments",
+        json={"client_id": owned_client["id"], "plan_name": "Reviewed Plan"},
+        headers=headers,
+    )
+    enrollment_id = created.json()["id"]
+    await client.post(f"/enrollments/{enrollment_id}/ready-to-submit", headers=headers)
+
+    edit_loaded = asyncio.Event()
+    submission_saved = asyncio.Event()
+    original_enrollment = enrollments_module._enrollment
+    original_transition = enrollments_module._transition
+
+    async def coordinated_enrollment(db, requested_id):
+        record = await original_enrollment(db, requested_id)
+        if current_endpoint.get().startswith("PUT /enrollments/"):
+            edit_loaded.set()
+            await submission_saved.wait()
+        return record
+
+    async def coordinated_transition(db, enrollment, **kwargs):
+        if kwargs["to_status"] == "submitted":
+            await edit_loaded.wait()
+        record = await original_transition(db, enrollment, **kwargs)
+        if kwargs["to_status"] == "submitted":
+            await db.commit()
+            submission_saved.set()
+        return record
+
+    monkeypatch.setattr(enrollments_module, "_enrollment", coordinated_enrollment)
+    monkeypatch.setattr(enrollments_module, "_transition", coordinated_transition)
+
+    edited, submitted = await asyncio.gather(
+        client.put(
+            f"/enrollments/{enrollment_id}",
+            json={"plan_name": "Unreviewed Plan"},
+            headers=headers,
+        ),
+        client.post(
+            f"/enrollments/{enrollment_id}/submit",
+            json={"external_submission_confirmed": True},
+            headers=headers,
+        ),
+    )
+
+    assert submitted.status_code == 200, submitted.text
+    assert edited.status_code == 409, edited.text
+    detail = await client.get(f"/enrollments/{enrollment_id}", headers=headers)
+    assert detail.json()["status"] == "submitted"
+    assert detail.json()["plan_name"] == "Reviewed Plan"
+    assert detail.json()["submitted_at"] is not None
+
+
+@pytest.mark.asyncio
 async def test_enrollment_rejects_cross_broker_read_write_and_client_link(client):
     owner = await _headers(client, "enrollment-private-owner@example.com")
     other = await _headers(client, "enrollment-private-other@example.com")

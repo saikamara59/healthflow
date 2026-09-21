@@ -76,12 +76,16 @@ export default function ClaimsAppealPage() {
         denial_text: denialText,
         additional_context: additionalContext,
       });
-      await workspaceApi.createAppeal({
-        issue_id: issueId,
-        title: `${APPEAL_TITLE_PREFIX}${issue.title.slice(0, MAX_APPEAL_TITLE - APPEAL_TITLE_PREFIX.length)}`,
-        draft_text: res.appeal_letter,
-      });
       setResult(res);
+      try {
+        await workspaceApi.createAppeal({
+          issue_id: issueId,
+          title: `${APPEAL_TITLE_PREFIX}${issue.title.slice(0, MAX_APPEAL_TITLE - APPEAL_TITLE_PREFIX.length)}`,
+          draft_text: res.appeal_letter,
+        });
+      } catch {
+        setError('The Appeal was generated, but the draft could not be saved. Copy the letter before leaving this page and try again.');
+      }
     } catch (err) {
       setError(err.message || 'Appeal generation failed');
     } finally {

@@ -40,6 +40,21 @@ test('Broker reviews an Enrollment before confirming an external submission', as
   await expect(enrollmentRow.locator('small')).toContainText('Submitted')
 })
 
+test('Enrollment filters clear a stale load error after a successful retry', async ({ authedPage }) => {
+  await authedPage.goto('/today')
+  await authedPage.getByRole('link', { name: 'Enrollments' }).click()
+  await authedPage.route('**/enrollments?status=preparing', async (route) => {
+    await route.abort()
+    await authedPage.unroute('**/enrollments?status=preparing')
+  })
+
+  await authedPage.getByLabel('Status').selectOption('preparing')
+  await expect(authedPage.getByRole('alert')).toContainText('Enrollments could not be filtered')
+  await authedPage.getByLabel('Status').selectOption('')
+
+  await expect(authedPage.getByRole('alert')).toHaveCount(0)
+})
+
 test('Issue can resolve without an Appeal and Draft Appeal requires Issue context', async ({ authedPage }) => {
   await authedPage.goto('/today')
   const client = await createClient(authedPage, 'Issue Context Client')
@@ -159,4 +174,46 @@ test('Appeal drafting keeps generated requests within schema limits', async ({ a
   const saved = await appeals.json()
   expect(saved).toHaveLength(1)
   expect(saved[0].title.length).toBeLessThanOrEqual(300)
+})
+
+test('A generated Appeal remains visible when saving the draft fails', async ({ authedPage }) => {
+  await authedPage.goto('/today')
+  const client = await createClient(authedPage, 'Appeal Save Failure Client')
+  const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
+  const issueResponse = await authedPage.request.post('/issues', {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { client_id: client.id, title: 'Save failure case' },
+  })
+  const issue = await issueResponse.json()
+  await authedPage.route('**/appeal', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      session_id: 'save-failure-test',
+      denial_analysis: {
+        denial_reason_code: 'CO-50', denial_reason: 'Not medically necessary',
+        treatment_denied: 'MRI', policy_section_cited: null,
+        appeal_deadline: '60 days', denial_date: '03/28/2026',
+      },
+      coverage_argument: {
+        cms_rule: 'Coverage applies when medically necessary.',
+        common_appeal_grounds: [], success_precedents: [],
+      },
+      appeal_letter: 'Generated letter remains available for Broker review.',
+      refined_recommendation: 'Broker review required.',
+      disclaimer: 'For educational purposes only.',
+    }),
+  }))
+  await authedPage.route('**/appeals', (route) => route.fulfill({
+    status: 503, contentType: 'application/json', body: '{"detail":"Unavailable"}',
+  }))
+
+  await authedPage.getByRole('link', { name: 'Draft Appeal' }).first().click()
+  await authedPage.getByLabel('Existing Issue').selectOption(issue.id)
+  await authedPage.getByRole('button', { name: 'Use sample' }).click()
+  await authedPage.getByRole('button', { name: 'Analyze & draft' }).click()
+
+  await expect(authedPage.getByRole('heading', { name: 'Drafted appeal letter' })).toBeVisible()
+  await expect(authedPage.getByText('Generated letter remains available for Broker review.')).toBeVisible()
+  await expect(authedPage.getByRole('alert')).toContainText('generated, but the draft could not be saved')
 })

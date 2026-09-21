@@ -23,3 +23,27 @@ async def test_phase2_migration_adds_issue_links_idempotently():
         assert "issue_id" in await connection.run_sync(columns, "tasks")
         assert "issue_id" in await connection.run_sync(columns, "appointments")
     await engine.dispose()
+
+
+def test_postgres_phase2_migration_uses_atomic_column_creation():
+    class PostgreSQLDialect:
+        name = "postgresql"
+
+    class RecordingConnection:
+        dialect = PostgreSQLDialect()
+
+        def __init__(self):
+            self.statements = []
+
+        def execute(self, statement):
+            self.statements.append(str(statement))
+
+    connection = RecordingConnection()
+
+    ensure_phase2_issue_links(connection)
+
+    column_statements = [
+        statement for statement in connection.statements if "ADD COLUMN" in statement
+    ]
+    assert len(column_statements) == 2
+    assert all("ADD COLUMN IF NOT EXISTS issue_id" in statement for statement in column_statements)

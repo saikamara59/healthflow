@@ -103,12 +103,25 @@ async def update_enrollment(
         )
     if "client_id" in changes:
         await require_owned_links(db, client_id=changes["client_id"])
-    for field, value in changes.items():
-        setattr(enrollment, field, value)
-    if details_changed and enrollment.status == "ready_to_submit":
-        enrollment.status = "preparing"
-        enrollment.ready_at = None
-    await db.flush()
+    if not details_changed:
+        return await _response(db, enrollment)
+
+    expected_status = enrollment.status
+    values = dict(changes)
+    if expected_status == "ready_to_submit":
+        values.update(status="preparing", ready_at=None)
+    changed = (
+        await db.execute(
+            update(Enrollment)
+            .where(Enrollment.id == enrollment.id, Enrollment.status == expected_status)
+            .values(**values)
+            .returning(Enrollment.id)
+            .execution_options(synchronize_session=False)
+        )
+    ).scalar_one_or_none()
+    if changed is None:
+        raise HTTPException(status_code=409, detail="Enrollment changed; reload and review it again")
+    await db.refresh(enrollment)
     return await _response(db, enrollment)
 
 

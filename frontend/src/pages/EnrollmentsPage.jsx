@@ -26,12 +26,13 @@ export default function EnrollmentsPage() {
   async function refresh(nextFilter = filter) {
     const query = nextFilter ? `status=${encodeURIComponent(nextFilter)}` : ''
     setEnrollments(await workspaceApi.listEnrollments(query))
+    setError('')
   }
 
   useEffect(() => {
     let alive = true
     Promise.all([workspaceApi.listEnrollments(), api.get('/clients')]).then(([records, clientData]) => {
-      if (alive) { setEnrollments(records); setClients(clientData) }
+      if (alive) { setEnrollments(records); setClients(clientData); setError('') }
     }).catch(() => { if (alive) setError('Enrollments could not be loaded.') })
     return () => { alive = false }
   }, [])

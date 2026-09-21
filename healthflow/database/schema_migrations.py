@@ -12,6 +12,22 @@ def ensure_phase2_issue_links(connection) -> None:
     idempotently for both SQLite and PostgreSQL deployments.
     """
 
+    if connection.dialect.name == "postgresql":
+        for table_name in ("tasks", "appointments"):
+            connection.execute(
+                text(
+                    f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS issue_id VARCHAR(36) "
+                    "REFERENCES issues(id)"
+                )
+            )
+            connection.execute(
+                text(
+                    f"CREATE INDEX IF NOT EXISTS ix_{table_name}_issue_id "
+                    f"ON {table_name} (issue_id)"
+                )
+            )
+        return
+
     inspector = inspect(connection)
     for table_name in ("tasks", "appointments"):
         columns = {column["name"] for column in inspector.get_columns(table_name)}
