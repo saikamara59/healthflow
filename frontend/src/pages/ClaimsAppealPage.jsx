@@ -1,7 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useState } from 'react';
 import api from '../api/client';
-import { workspaceApi } from '../api/workspace';
 import TopBar from '../components/TopBar';
 import Icon from '../components/ui/Icon';
 import Chip from '../components/ui/Chip';
@@ -19,57 +17,20 @@ You have 60 days to appeal this decision.`;
 /** Analyzes a denial notice and prepares supporting material for an appeal. */
 export default function ClaimsAppealPage() {
   const { openMenu, openNotifications } = useLayout();
-  const location = useLocation();
   const [denialText, setDenialText] = useState('');
   const [context, setContext] = useState('');
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
-  const [issues, setIssues] = useState([]);
-  const [clients, setClients] = useState([]);
-  const [issueId, setIssueId] = useState(new URLSearchParams(location.search).get('issue') || '');
-  const [newIssue, setNewIssue] = useState({ client_id: '', title: '' });
-
-  useEffect(() => {
-    let alive = true;
-    Promise.all([workspaceApi.listIssues(), api.get('/clients')]).then(([issueData, clientData]) => {
-      if (alive) { setIssues(issueData); setClients(clientData); }
-    }).catch(() => { if (alive) setError('Issue context could not be loaded.'); });
-    return () => { alive = false; };
-  }, []);
-
-  async function createIssue(event) {
-    event.preventDefault();
-    if (!window.confirm('Create this Issue and use it for the Appeal draft?')) return;
-    try {
-      const created = await workspaceApi.createIssue(newIssue);
-      setIssues((current) => [created, ...current]);
-      setIssueId(created.id);
-      setNewIssue({ client_id: '', title: '' });
-      setError('');
-    } catch (err) {
-      setError(err.message || 'Issue could not be created.');
-    }
-  }
 
   async function run() {
     if (!denialText.trim()) return;
-    const issue = issues.find((item) => item.id === issueId);
-    if (!issueId || !issue) {
-      setError('Choose an existing Issue or confirm creation of a new one before drafting an Appeal.');
-      return;
-    }
     setError('');
     setRunning(true);
     try {
       const res = await api.post('/appeal', {
         denial_text: denialText,
-        additional_context: [context, issue ? `Issue context: ${issue.title}` : ''].filter(Boolean).join('\n\n'),
-      });
-      await workspaceApi.createAppeal({
-        issue_id: issueId,
-        title: issue ? `Appeal draft: ${issue.title}` : 'Appeal draft',
-        draft_text: res.appeal_letter,
+        additional_context: context,
       });
       setResult(res);
     } catch (err) {
@@ -99,15 +60,6 @@ export default function ClaimsAppealPage() {
           </div>
         </div>
 
-        <section className="card workspace-section" style={{ marginBottom: 24 }}>
-          <h2>Issue context</h2>
-          <p>Every Appeal stays inside an Issue so its deadline, Follow-ups, and Appointments remain together.</p>
-          <div className="workspace-form-grid">
-            <label className="field"><span className="field-label">Existing Issue</span><select className="select" value={issueId} onChange={(event) => { setIssueId(event.target.value); setError('') }}><option value="">Choose an Issue</option>{issues.map((issue) => <option key={issue.id} value={issue.id}>{issue.client_name} · {issue.title}</option>)}</select></label>
-            <form className="workspace-inline-form" onSubmit={createIssue} style={{ marginBottom: 0 }}><div className="workspace-form-grid"><label>Client<select required value={newIssue.client_id} onChange={(event) => setNewIssue({ ...newIssue, client_id: event.target.value })}><option value="">Choose a Client</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.full_name}</option>)}</select></label><label>New Issue title<input required value={newIssue.title} onChange={(event) => setNewIssue({ ...newIssue, title: event.target.value })} /></label></div><button className="btn sm" type="submit">Create and use Issue</button></form>
-          </div>
-        </section>
-
         <div className="grid-12" style={{ gap: 24 }}>
           <div style={{ gridColumn: 'span 5' }}>
             <div className="section-head" style={{ marginTop: 0 }}>
@@ -135,7 +87,7 @@ export default function ClaimsAppealPage() {
               />
             </div>
 
-            {error && <div role="alert" className="notice" style={{ marginTop: 16, color: 'var(--neg)', borderColor: 'var(--neg)' }}>{error}</div>}
+            {error && <div className="notice" style={{ marginTop: 16, color: 'var(--neg)', borderColor: 'var(--neg)' }}>{error}</div>}
 
             <div className="row" style={{ justifyContent: 'flex-end', marginTop: 20 }}>
               <button className="btn accent" onClick={run} disabled={running || !denialText.trim()}>

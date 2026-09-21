@@ -39,8 +39,6 @@ from healthflow.workspace.activity_router import activity_router
 from healthflow.workspace.tasks_router import tasks_router
 from healthflow.workspace.appointments_router import appointments_router
 from healthflow.workspace.dashboard_router import dashboard_router
-from healthflow.workspace.enrollments_router import enrollments_router
-from healthflow.workspace.issues_router import appeals_router, issues_router
 
 
 @asynccontextmanager
@@ -48,13 +46,11 @@ async def lifespan(app: FastAPI):
     """Initialize database tables and optional agent telemetry on startup."""
     from healthflow.database.config import async_session_factory, engine
     from healthflow.database.models import Base
-    from healthflow.database.schema_migrations import ensure_phase2_issue_links
     from healthflow.logs.invocation import configure_agent_logfire
     from healthflow.workspace.search_index import backfill_search_index
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        await conn.run_sync(ensure_phase2_issue_links)
     configure_agent_logfire()
 
     async def backfill_in_background():
@@ -133,9 +129,6 @@ app.include_router(activity_router)
 app.include_router(tasks_router)
 app.include_router(appointments_router)
 app.include_router(dashboard_router)
-app.include_router(enrollments_router)
-app.include_router(issues_router)
-app.include_router(appeals_router)
 
 
 if (

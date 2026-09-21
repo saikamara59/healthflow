@@ -10,8 +10,6 @@ import OrganizationsPage from './pages/OrganizationsPage'
 import OrganizationDetailPage from './pages/OrganizationDetailPage'
 import FollowUpsPage from './pages/FollowUpsPage'
 import SchedulingPage from './pages/SchedulingPage'
-import EnrollmentsPage from './pages/EnrollmentsPage'
-import IssuesPage from './pages/IssuesPage'
 import ClientListPage from './pages/ClientListPage'
 import ClientProfilePage from './pages/ClientProfilePage'
 import AddClientPage from './pages/AddClientPage'
@@ -61,8 +59,6 @@ export default function App() {
             <Route path="organizations/:id" element={<OrganizationDetailPage />} />
             <Route path="follow-ups" element={<FollowUpsPage />} />
             <Route path="scheduling" element={<SchedulingPage />} />
-            <Route path="enrollments" element={<EnrollmentsPage />} />
-            <Route path="issues" element={<IssuesPage />} />
             <Route path="clients" element={<ClientListPage />} />
             <Route path="clients/new" element={<AddClientPage />} />
             <Route path="clients/success" element={<OnboardingSuccessPage />} />

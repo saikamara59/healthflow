@@ -65,7 +65,6 @@ async def create_task(
         client_id=data.client_id,
         organization_id=data.organization_id,
         contact_id=data.contact_id,
-        issue_id=data.issue_id,
     )
     task = Task(broker_id=broker.id, **data.model_dump())
     db.add(task)
@@ -139,13 +138,12 @@ async def update_task(
 ) -> TaskResponse:
     task = await _task(db, task_id)
     changes = data.model_dump(exclude_unset=True)
-    if {"client_id", "organization_id", "contact_id", "issue_id"} & changes.keys():
+    if {"client_id", "organization_id", "contact_id"} & changes.keys():
         await require_owned_links(
             db,
             client_id=changes.get("client_id", task.client_id),
             organization_id=changes.get("organization_id", task.organization_id),
             contact_id=changes.get("contact_id", task.contact_id),
-            issue_id=changes.get("issue_id", task.issue_id),
         )
     for field, value in changes.items():
         setattr(task, field, value)

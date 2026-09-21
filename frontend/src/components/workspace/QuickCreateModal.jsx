@@ -35,7 +35,7 @@ export default function QuickCreateModal({ mode, initialValues = {}, clients = [
   async function submit(event) {
     event.preventDefault()
     if (!title.trim()) { setError('Enter a title.'); titleRef.current?.focus(); return }
-    const links = { client_id: clientId || null, organization_id: organizationId || null, contact_id: contactId || null, issue_id: initialValues.issue_id || null }
+    const links = { client_id: clientId || null, organization_id: organizationId || null, contact_id: contactId || null }
     setSaving(true); setError('')
     try {
       if (mode === 'task') {

@@ -34,16 +34,13 @@ from healthflow.auth.tenant_context import (
 )
 from healthflow.database.models import (
     ActionHistory,
-    Appeal,
     Appointment,
     BrokerPreference,
     Client,
     Contact,
     DecisionRecord,
-    Enrollment,
     Feedback,
     Organization,
-    Issue,
     Task,
     WorkspaceActivity,
     WorkspaceSearchToken,
@@ -63,9 +60,6 @@ TENANT_SCOPED_MODELS: frozenset[type] = frozenset({
     Contact,
     Task,
     Appointment,
-    Enrollment,
-    Issue,
-    Appeal,
     WorkspaceActivity,
     WorkspaceSearchToken,
 })

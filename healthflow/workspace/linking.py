@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from healthflow.database.models import Client, Contact, Issue, Organization
+from healthflow.database.models import Client, Contact, Organization
 
 
 async def require_owned_links(
@@ -15,24 +15,13 @@ async def require_owned_links(
     client_id: UUID | None = None,
     organization_id: UUID | None = None,
     contact_id: UUID | None = None,
-    issue_id: UUID | None = None,
 ) -> None:
-    client = None
     if client_id is not None:
         client = (
             await db.execute(select(Client).where(Client.id == client_id))
         ).scalar_one_or_none()
         if client is None:
             raise HTTPException(status_code=404, detail="Client not found")
-
-    if issue_id is not None:
-        issue = (
-            await db.execute(select(Issue).where(Issue.id == issue_id))
-        ).scalar_one_or_none()
-        if issue is None:
-            raise HTTPException(status_code=404, detail="Issue not found")
-        if client is not None and issue.client_id != client.id:
-            raise HTTPException(status_code=422, detail="Issue does not belong to Client")
 
     organization = None
     if organization_id is not None:

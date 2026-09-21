@@ -32,14 +32,11 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from healthflow.auth.tenant_context import current_broker_id, current_endpoint
 from healthflow.database.models import (
     ActionHistory,
-    Appeal,
     Appointment,
     Client,
     Contact,
-    Enrollment,
     Feedback,
     Organization,
-    Issue,
     PhiAccessLog,
     Task,
     WorkspaceActivity,
@@ -58,9 +55,6 @@ _AUDITED_MODELS: frozenset[type] = frozenset({
     Contact,
     Task,
     Appointment,
-    Enrollment,
-    Issue,
-    Appeal,
     WorkspaceActivity,
 })
 _AUDITED_TABLE_NAMES: dict[type, str] = {m: m.__tablename__ for m in _AUDITED_MODELS}

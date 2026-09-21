@@ -20,8 +20,6 @@ const NAV = [
     items: [
       { path: '/clients', label: 'Clients', icon: 'users', countKey: 'clients' },
       { path: '/organizations', label: 'Organizations', icon: 'organization' },
-      { path: '/enrollments', label: 'Enrollments', icon: 'note' },
-      { path: '/issues', label: 'Issues & Appeals', icon: 'appeal' },
       { path: '/follow-ups', label: 'Follow-ups', icon: 'task' },
       { path: '/scheduling', label: 'Scheduling', icon: 'calendar' },
     ],

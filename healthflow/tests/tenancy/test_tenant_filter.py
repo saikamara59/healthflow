@@ -62,9 +62,6 @@ def test_registry_lists_tenant_scoped_tables():
         "contacts",
         "tasks",
         "appointments",
-        "enrollments",
-        "issues",
-        "appeals",
         "workspace_activity",
         "workspace_search_tokens",
     }

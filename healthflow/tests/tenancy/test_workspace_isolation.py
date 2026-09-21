@@ -3,13 +3,10 @@ from sqlalchemy import select
 
 from healthflow.auth.tenant_context import current_broker_id, system_context
 from healthflow.database.models import (
-    Appeal,
     Appointment,
     Broker,
     BrokerPreference,
     Contact,
-    Enrollment,
-    Issue,
     Organization,
     Task,
     WorkspaceActivity,
@@ -26,9 +23,6 @@ def test_workspace_records_require_broker_scoping():
         Contact,
         Task,
         Appointment,
-        Enrollment,
-        Issue,
-        Appeal,
         WorkspaceActivity,
     } <= TENANT_SCOPED_MODELS
 
@@ -40,9 +34,6 @@ def test_phi_bearing_workspace_records_are_audited():
         Contact,
         Task,
         Appointment,
-        Enrollment,
-        Issue,
-        Appeal,
         WorkspaceActivity,
     } <= _AUDITED_MODELS
 
@@ -151,5 +142,3 @@ async def test_workspace_api_never_exposes_or_mutates_another_brokers_records(cl
         'title': 'Intruder meeting', 'starts_at': '2030-01-02T10:00:00Z',
         'ends_at': '2030-01-02T11:00:00Z', 'contact_id': contact_id,
     }, headers=outsider)).status_code == 404
-    Enrollment,
-    Issue,
