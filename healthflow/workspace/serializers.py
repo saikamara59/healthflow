@@ -2,10 +2,22 @@
 
 from datetime import datetime, timezone
 
-from healthflow.database.models import Appointment, Contact, Organization, Task, WorkspaceActivity
+from healthflow.database.models import (
+    Appeal,
+    Appointment,
+    Contact,
+    Enrollment,
+    Issue,
+    Organization,
+    Task,
+    WorkspaceActivity,
+)
 from healthflow.workspace.schemas import (
+    AppealResponse,
     AppointmentResponse,
     ContactResponse,
+    EnrollmentResponse,
+    IssueResponse,
     OrganizationResponse,
     TaskResponse,
     WorkspaceActivityResponse,
@@ -70,6 +82,7 @@ def task_response(
         client_id=task.client_id,
         organization_id=task.organization_id,
         contact_id=task.contact_id,
+        issue_id=task.issue_id,
         title=task.title,
         notes=task.notes,
         priority=task.priority,
@@ -103,6 +116,7 @@ def appointment_response(
         client_id=appointment.client_id,
         organization_id=appointment.organization_id,
         contact_id=appointment.contact_id,
+        issue_id=appointment.issue_id,
         title=appointment.title,
         notes=appointment.notes,
         starts_at=_as_utc(appointment.starts_at),
@@ -116,6 +130,61 @@ def appointment_response(
         contact_name=contact_name,
         created_at=_as_utc(appointment.created_at),
         updated_at=_as_utc(appointment.updated_at),
+    )
+
+
+def enrollment_response(enrollment: Enrollment, *, client_name: str) -> EnrollmentResponse:
+    return EnrollmentResponse(
+        id=enrollment.id,
+        client_id=enrollment.client_id,
+        client_name=client_name,
+        plan_name=enrollment.plan_name,
+        effective_date=enrollment.effective_date,
+        notes=enrollment.notes,
+        status=enrollment.status,
+        ready_at=_optional_utc(enrollment.ready_at),
+        submitted_at=_optional_utc(enrollment.submitted_at),
+        confirmed_at=_optional_utc(enrollment.confirmed_at),
+        canceled_at=_optional_utc(enrollment.canceled_at),
+        created_at=_as_utc(enrollment.created_at),
+        updated_at=_as_utc(enrollment.updated_at),
+    )
+
+
+def appeal_response(appeal: Appeal) -> AppealResponse:
+    return AppealResponse(
+        id=appeal.id,
+        issue_id=appeal.issue_id,
+        title=appeal.title,
+        draft_text=appeal.draft_text,
+        status=appeal.status,
+        created_at=_as_utc(appeal.created_at),
+        updated_at=_as_utc(appeal.updated_at),
+    )
+
+
+def issue_response(
+    issue: Issue,
+    *,
+    client_name: str,
+    appeals: list[AppealResponse] | None = None,
+    follow_ups: list[TaskResponse] | None = None,
+    appointments: list[AppointmentResponse] | None = None,
+) -> IssueResponse:
+    return IssueResponse(
+        id=issue.id,
+        client_id=issue.client_id,
+        client_name=client_name,
+        title=issue.title,
+        description=issue.description,
+        deadline=issue.deadline,
+        status=issue.status,
+        resolved_at=_optional_utc(issue.resolved_at),
+        appeals=appeals or [],
+        follow_ups=follow_ups or [],
+        appointments=appointments or [],
+        created_at=_as_utc(issue.created_at),
+        updated_at=_as_utc(issue.updated_at),
     )
 
 

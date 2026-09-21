@@ -38,6 +38,13 @@
 .workspace-dialog .workspace-check { display: flex; align-items: center; gap: 8px; }
 .workspace-dialog .quick-create-actions { justify-content: flex-end; }
 .workspace-stack { display: grid; gap: 18px; }
+.phase2-grid { display: grid; grid-template-columns: minmax(280px, .8fr) minmax(0, 1.4fr); gap: 20px; align-items: start; }
+.phase2-detail { position: sticky; top: 84px; }
+.phase2-row-button { width: 100%; border: 0; background: transparent; color: inherit; text-align: left; padding: 0; cursor: pointer; font: inherit; }
+.phase2-row-button > span { display: grid; gap: 4px; }
+.phase2-row-button small { display: block; color: var(--ink-3); font-size: 12px; margin-top: 4px; }
+.phase2-selected { background: var(--accent-soft); margin-inline: -10px; padding-inline: 10px; border-radius: var(--radius); }
+.phase2-appeal-form { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 18px; }
 .workspace-inline-form { display: grid; gap: 15px; margin-bottom: 18px; }
 .workspace-inline-form label, .workspace-filter { display: grid; gap: 6px; color: var(--ink-2); font-size: 12px; font-weight: 600; }
 .workspace-inline-form input, .workspace-inline-form select, .workspace-inline-form textarea, .workspace-filter input { width: 100%; border: 1px solid var(--line-2); background: var(--card); color: var(--ink); border-radius: var(--radius); padding: 10px; font: 14px var(--sans); }
@@ -66,4 +73,5 @@
 @media (max-width: 900px) { .topbar-actions .workspace-search-trigger { display: inline-flex; min-width: 44px; width: 44px; height: 44px; align-items: center; justify-content: center; } .workspace-search-trigger span { display: none; } }
 @media (max-width: 900px) { .workspace-agenda { grid-template-columns: 1fr; overflow-x: visible; } .workspace-agenda .workspace-list-row { display: flex; } }
 @media (max-width: 1000px) { .today-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 900px) { .phase2-grid { grid-template-columns: minmax(0, 1fr); } .phase2-detail { position: static; } }
 @media (max-width: 700px) { .quick-create-actions > * { width: 100%; min-height: 44px; } .workspace-section { padding: 18px; } .workspace-form-grid { grid-template-columns: 1fr; } .workspace-row-actions { flex-direction: column; } .workspace-link-suggestion { align-items: stretch; flex-direction: column; } }

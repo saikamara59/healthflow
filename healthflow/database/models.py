@@ -1,8 +1,9 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import (
     Boolean,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -164,6 +165,7 @@ class Task(Base):
         GUID(), ForeignKey("organizations.id"), index=True
     )
     contact_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("contacts.id"), index=True)
+    issue_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("issues.id"), index=True)
     title: Mapped[str] = mapped_column(EncryptedString(4000), nullable=False)
     notes: Mapped[str | None] = mapped_column(EncryptedString(12000), nullable=True)
     priority: Mapped[str | None] = mapped_column(String(10), nullable=True)
@@ -189,6 +191,7 @@ class Appointment(Base):
         GUID(), ForeignKey("organizations.id"), index=True
     )
     contact_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("contacts.id"), index=True)
+    issue_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("issues.id"), index=True)
     title: Mapped[str] = mapped_column(EncryptedString(4000), nullable=False)
     notes: Mapped[str | None] = mapped_column(EncryptedString(12000), nullable=True)
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
@@ -198,6 +201,82 @@ class Appointment(Base):
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     canceled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+
+class Enrollment(Base):
+    """A Broker-reviewed Client enrollment; HealthFlow never transmits it."""
+
+    __tablename__ = "enrollments"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    broker_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("brokers.id"), index=True, nullable=False
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("clients.id"), index=True, nullable=False
+    )
+    plan_name: Mapped[str] = mapped_column(EncryptedString(4000), nullable=False)
+    effective_date: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    notes: Mapped[str | None] = mapped_column(EncryptedString(12000), nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(30), default="preparing", server_default="preparing", nullable=False
+    )
+    ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    canceled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+
+class Issue(Base):
+    """A Client-related case that may, but need not, contain an Appeal."""
+
+    __tablename__ = "issues"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    broker_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("brokers.id"), index=True, nullable=False
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("clients.id"), index=True, nullable=False
+    )
+    title: Mapped[str] = mapped_column(EncryptedString(4000), nullable=False)
+    description: Mapped[str | None] = mapped_column(EncryptedString(12000), nullable=True)
+    deadline: Mapped[date | None] = mapped_column(Date(), index=True, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(30), default="open", server_default="open", nullable=False
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+
+class Appeal(Base):
+    """A formal challenge that always belongs to an Issue."""
+
+    __tablename__ = "appeals"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    broker_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("brokers.id"), index=True, nullable=False
+    )
+    issue_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("issues.id"), index=True, nullable=False
+    )
+    title: Mapped[str] = mapped_column(EncryptedString(4000), nullable=False)
+    draft_text: Mapped[str | None] = mapped_column(EncryptedString(30000), nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(20), default="draft", server_default="draft", nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False

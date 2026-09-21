@@ -53,6 +53,7 @@ async def create_appointment(
         client_id=data.client_id,
         organization_id=data.organization_id,
         contact_id=data.contact_id,
+        issue_id=data.issue_id,
     )
     appointment = Appointment(broker_id=broker.id, **data.model_dump())
     db.add(appointment)
@@ -98,12 +99,13 @@ async def update_appointment(
 ) -> AppointmentResponse:
     appointment = await _appointment(db, appointment_id)
     changes = data.model_dump(exclude_unset=True)
-    if {"client_id", "organization_id", "contact_id"} & changes.keys():
+    if {"client_id", "organization_id", "contact_id", "issue_id"} & changes.keys():
         await require_owned_links(
             db,
             client_id=changes.get("client_id", appointment.client_id),
             organization_id=changes.get("organization_id", appointment.organization_id),
             contact_id=changes.get("contact_id", appointment.contact_id),
+            issue_id=changes.get("issue_id", appointment.issue_id),
         )
     starts_at = changes.get("starts_at", appointment.starts_at)
     ends_at = changes.get("ends_at", appointment.ends_at)
