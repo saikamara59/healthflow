@@ -1,4 +1,6 @@
 """Verify that get_current_broker sets the tenant ContextVar for the request."""
+import asyncio
+
 import pytest
 
 
@@ -31,10 +33,6 @@ async def test_authenticated_request_sees_broker_in_context_var(client, db_sessi
     )
     assert res.status_code == 200
     assert res.json() == []  # no clients yet
-
-
-import asyncio
-
 
 @pytest.mark.anyio
 async def test_concurrent_authenticated_requests_do_not_leak_data(client, db_session):

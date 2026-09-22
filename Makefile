@@ -8,12 +8,12 @@ help: ## Show this help
 
 install: ## Install all dependencies (backend + frontend)
 	python -m venv .venv
-	.venv/bin/pip install -r requirements.txt
+	.venv/bin/pip install -r requirements-dev.txt
 	cd frontend && npm install
 
 install-backend: ## Install backend dependencies only
 	python -m venv .venv
-	.venv/bin/pip install -r requirements.txt
+	.venv/bin/pip install -r requirements-dev.txt
 
 install-frontend: ## Install frontend dependencies only
 	cd frontend && npm install
@@ -55,11 +55,9 @@ smoke-external: ## Run opt-in live smoke tests against RxNav + NPPES (needs inte
 # ─── Linting ──────────────────────────────────────────────────────────────────
 
 lint: ## Run ruff linter
-	.venv/bin/pip install ruff -q
-	.venv/bin/ruff check healthflow/ --select F,E,W --ignore E501
+	.venv/bin/ruff check healthflow/
 
 lint-fix: ## Auto-fix lint issues
-	.venv/bin/pip install ruff -q
 	.venv/bin/ruff check healthflow/ --select F401 --fix
 
 dead-code: ## Find dead code with vulture
