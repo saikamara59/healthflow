@@ -157,6 +157,7 @@ if os.path.isdir(_DIST_DIR):
     from fastapi import Request
     from fastapi.responses import FileResponse
     from fastapi.staticfiles import StaticFiles
+    from healthflow.api.spa_document_middleware import SPADocumentMiddleware
 
     app.mount(
         "/assets",
@@ -168,6 +169,11 @@ if os.path.isdir(_DIST_DIR):
     # returns index.html so React Router can handle client-side routing.
     # Registered last so all explicit routes/mounts take priority.
     _INDEX_HTML = os.path.join(_DIST_DIR, "index.html")
+
+    # Browser page loads for paths such as /enrollments otherwise match the
+    # protected API route before the catch-all below can serve React.
+    # JSON/XHR calls still reach the API and retain its authentication checks.
+    app.add_middleware(SPADocumentMiddleware, index_html=_INDEX_HTML)
 
     @app.get("/{full_path:path}")
     async def spa_fallback(full_path: str, request: Request):
