@@ -8,6 +8,7 @@ import textwrap
 
 
 def test_combined_app_routes_documents_to_react_and_json_to_api(tmp_path):
+    """Keep browser deep links on React without intercepting API requests."""
     dist = tmp_path / "dist"
     (dist / "assets").mkdir(parents=True)
     (dist / "index.html").write_text("<!doctype html><title>HealthFlow app</title>")

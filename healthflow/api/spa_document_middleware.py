@@ -23,6 +23,7 @@ SPA_DOCUMENT_DETAIL_PREFIXES = ("/clients/", "/organizations/")
 
 
 def is_spa_document_request(request: Request) -> bool:
+    """Identify browser document GETs for routes that overlap API endpoints."""
     accept = request.headers.get("accept", "").lower()
     if request.method != "GET" or "text/html" not in accept or "application/json" in accept:
         return False
@@ -37,10 +38,12 @@ def is_spa_document_request(request: Request) -> bool:
 
 class SPADocumentMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, index_html: str | Path):
+        """Configure the React entry document to serve for browser requests."""
         super().__init__(app)
         self.index_html = str(index_html)
 
     async def dispatch(self, request: Request, call_next):
+        """Serve the React document or pass non-document requests to the API."""
         if is_spa_document_request(request):
             return FileResponse(self.index_html)
         return await call_next(request)

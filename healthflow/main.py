@@ -177,6 +177,7 @@ if os.path.isdir(_DIST_DIR):
 
     @app.get("/{full_path:path}")
     async def spa_fallback(full_path: str, request: Request):
+        """Serve the React entry document when no explicit route matches."""
         # Don't shadow API responses if a route handler raised 404; FastAPI
         # has already returned in that path. This handler only fires for
         # paths with no matching route at all.
