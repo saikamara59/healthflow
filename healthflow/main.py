@@ -113,6 +113,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# In the combined image, route browser documents before same-path API routes.
+# Install this inside HTTPLoggingMiddleware so document visits remain logged.
+_DIST_DIR = os.getenv("HEALTHFLOW_DIST_DIR", "/app/frontend/dist")
+_INDEX_HTML = os.path.join(_DIST_DIR, "index.html")
+if os.path.isdir(_DIST_DIR):
+    from healthflow.api.spa_document_middleware import SPADocumentMiddleware
+
+    app.add_middleware(SPADocumentMiddleware, index_html=_INDEX_HTML)
+
 app.add_middleware(HTTPLoggingMiddleware)
 app.add_middleware(EndpointContextMiddleware)
 app.add_middleware(CaseContextMiddleware)
@@ -152,12 +161,10 @@ if (
 # Dockerfile stage copies it there), serve it alongside the API. This keeps
 # local dev untouched — docker-compose uses separate backend + nginx + vite
 # containers, none of which have /app/frontend/dist inside the backend image.
-_DIST_DIR = os.getenv("HEALTHFLOW_DIST_DIR", "/app/frontend/dist")
 if os.path.isdir(_DIST_DIR):
     from fastapi import Request
     from fastapi.responses import FileResponse
     from fastapi.staticfiles import StaticFiles
-    from healthflow.api.spa_document_middleware import SPADocumentMiddleware
 
     app.mount(
         "/assets",
@@ -168,15 +175,9 @@ if os.path.isdir(_DIST_DIR):
     # SPA fallback — any GET that didn't match an API route and isn't an asset
     # returns index.html so React Router can handle client-side routing.
     # Registered last so all explicit routes/mounts take priority.
-    _INDEX_HTML = os.path.join(_DIST_DIR, "index.html")
-
-    # Browser page loads for paths such as /enrollments otherwise match the
-    # protected API route before the catch-all below can serve React.
-    # JSON/XHR calls still reach the API and retain its authentication checks.
-    app.add_middleware(SPADocumentMiddleware, index_html=_INDEX_HTML)
-
     @app.get("/{full_path:path}")
     async def spa_fallback(full_path: str, request: Request):
+        """Serve the React shell when no API or asset route matches."""
         # Don't shadow API responses if a route handler raised 404; FastAPI
         # has already returned in that path. This handler only fires for
         # paths with no matching route at all.
