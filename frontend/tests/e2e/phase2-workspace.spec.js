@@ -18,6 +18,50 @@ async function createClient(page, name) {
   return response.json()
 }
 
+async function exposeOnlyLinkableClient(page, ownClient) {
+  const foreignClient = {
+    ...ownClient,
+    id: '00000000-0000-0000-0000-000000000073',
+    full_name: 'Other broker client',
+  }
+  await page.route('**/clients*', (route) => {
+    const linkable = new URL(route.request().url()).searchParams.get('linkable') === 'true'
+    return route.fulfill({ json: linkable ? [ownClient] : [foreignClient, ownClient] })
+  })
+}
+
+test('Enrollment selector offers only Clients the Broker can link', async ({ authedPage }) => {
+  await authedPage.goto('/today')
+  const ownClient = await createClient(authedPage, 'Enrollment owner client')
+  await exposeOnlyLinkableClient(authedPage, ownClient)
+  await authedPage.getByRole('link', { name: 'Enrollments' }).click()
+
+  const selector = authedPage.getByLabel('Client')
+  await expect(selector.getByRole('option', { name: 'Other broker client' })).toHaveCount(0)
+  await selector.selectOption(ownClient.id)
+  await authedPage.getByLabel('Plan name').fill('Harbor Gold PPO')
+  await authedPage.getByRole('button', { name: 'Create Enrollment' }).click()
+  await expect(authedPage.getByText('Enrollment owner client · Harbor Gold PPO')).toBeVisible()
+  await expect(authedPage.getByRole('alert')).toHaveCount(0)
+})
+
+test('Issue selector offers only Clients the Broker can link', async ({ authedPage }) => {
+  await authedPage.goto('/today')
+  const ownClient = await createClient(authedPage, 'Issue owner client')
+  await exposeOnlyLinkableClient(authedPage, ownClient)
+  await authedPage.getByRole('link', { name: 'Issues & Appeals' }).click()
+
+  const selector = authedPage.getByLabel('Client')
+  await expect(selector.getByRole('option', { name: 'Other broker client' })).toHaveCount(0)
+  await selector.selectOption(ownClient.id)
+  await authedPage.getByLabel('Issue title').fill('Incorrect copay')
+  await authedPage.getByRole('button', { name: 'Create Issue' }).click()
+  await expect(authedPage.getByRole('heading', { name: 'Incorrect copay' })).toBeVisible()
+  await expect(authedPage.getByRole('alert')).toHaveCount(0)
+  await authedPage.getByRole('link', { name: 'Draft Appeal' }).first().click()
+  await expect(authedPage.getByLabel('Client').getByRole('option', { name: 'Other broker client' })).toHaveCount(0)
+})
+
 test('Broker reviews an Enrollment before confirming an external submission', async ({ authedPage }) => {
   await authedPage.goto('/today')
   const client = await createClient(authedPage, 'Enrollment Review Client')

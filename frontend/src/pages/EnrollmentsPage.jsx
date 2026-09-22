@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import api from '../api/client'
 import { workspaceApi } from '../api/workspace'
 import TopBar from '../components/TopBar'
 import useLayout from '../components/ui/useLayout'
@@ -31,7 +30,7 @@ export default function EnrollmentsPage() {
 
   useEffect(() => {
     let alive = true
-    Promise.all([workspaceApi.listEnrollments(), api.get('/clients')]).then(([records, clientData]) => {
+    Promise.all([workspaceApi.listEnrollments(), workspaceApi.listLinkableClients()]).then(([records, clientData]) => {
       if (alive) { setEnrollments(records); setClients(clientData); setError('') }
     }).catch(() => { if (alive) setError('Enrollments could not be loaded.') })
     return () => { alive = false }
