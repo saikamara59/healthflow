@@ -74,14 +74,18 @@ async def create_client(
 
 @client_router.get("", response_model=list[ClientResponse])
 async def list_clients(
+    linkable: bool = False,
     broker: Broker = Depends(get_current_broker),
     db: AsyncSession = Depends(get_db),
 ) -> list[ClientResponse]:
-    """List clients. Brokers see their own book; admins see every broker's."""
-    # Brokers: tenant filter auto-injects WHERE Client.broker_id = broker.id.
-    # Admins: _admin_bypass suspends the filter so the workspace view is whole.
-    with _admin_bypass(broker):
-        result = await db.execute(select(Client))
+    """List Clients; linkable choices always belong to the current Broker."""
+    # The directory keeps its admin cross-tenant view. Client choices used by
+    # write flows must stay within the current Broker's book.
+    with _admin_bypass(broker) if not linkable else nullcontext():
+        statement = select(Client)
+        if linkable:
+            statement = statement.where(Client.broker_id == broker.id)
+        result = await db.execute(statement)
         clients = result.scalars().all()
     return [_client_to_response(c) for c in clients]
 

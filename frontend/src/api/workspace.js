@@ -1,6 +1,7 @@
 import api from './client'
 
 export const workspaceApi = {
+  listLinkableClients: () => api.get('/clients?linkable=true'),
   getToday: (localDate) => api.get(`/workspace/today${localDate ? `?local_date=${localDate}` : ''}`),
   getOverview: () => api.get('/workspace/overview'),
   listActivity: () => api.get('/workspace/activity?limit=200'),

@@ -36,7 +36,7 @@ export default function ClaimsAppealPage() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([workspaceApi.listAllIssues(), api.get('/clients')]).then(([issueData, clientData]) => {
+    Promise.all([workspaceApi.listAllIssues(), workspaceApi.listLinkableClients()]).then(([issueData, clientData]) => {
       if (alive) { setIssues(issueData); setClients(clientData); }
     }).catch(() => { if (alive) setError('Issue context could not be loaded.'); });
     return () => { alive = false; };

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import api from '../api/client'
 import { workspaceApi } from '../api/workspace'
 import TopBar from '../components/TopBar'
 import useLayout from '../components/ui/useLayout'
@@ -38,7 +37,7 @@ export default function IssuesPage() {
 
   useEffect(() => {
     let alive = true
-    Promise.all([workspaceApi.listAllIssues(), api.get('/clients'), workspaceApi.listOrganizations(true), workspaceApi.getPreferences()]).then(([records, clientData, organizationData, preferences]) => {
+    Promise.all([workspaceApi.listAllIssues(), workspaceApi.listLinkableClients(), workspaceApi.listOrganizations(true), workspaceApi.getPreferences()]).then(([records, clientData, organizationData, preferences]) => {
       if (alive) { setIssues(records); setClients(clientData); setOrganizations(organizationData); setTimeZone(preferences.timezone_name); setError('') }
     }).catch(() => { if (alive) setError('Issues could not be loaded.') })
     return () => { alive = false }
