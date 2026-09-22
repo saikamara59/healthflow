@@ -1,0 +1,10 @@
+target-version = "py312"
+
+[lint]
+select = ["E", "F", "W"]
+ignore = ["E501"]
+
+# The application must load .env and set HEALTHFLOW_DATA_DB before importing
+# modules that read those values at import time.
+[lint.per-file-ignores]
+"healthflow/main.py" = ["E402"]

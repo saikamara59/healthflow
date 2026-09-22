@@ -71,7 +71,7 @@ make all                       # Install deps, load data, run 658 tests
 
 ```bash
 # Backend
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 export ANTHROPIC_API_KEY=your-key-here
 python scripts/refresh_data.py --seed-only   # Load real health data
 python -m healthflow.main                     # API at http://localhost:8000

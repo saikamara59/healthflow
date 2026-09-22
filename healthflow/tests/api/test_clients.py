@@ -409,7 +409,7 @@ async def _make_admin(client, db_session, email="admin@example.com"):
     from sqlalchemy import update as sa_update
     from healthflow.database.models import Broker
 
-    token = await _register_and_login(client, email=email)
+    await _register_and_login(client, email=email)
     await db_session.execute(
         sa_update(Broker).where(Broker.email == email).values(role="admin")
     )

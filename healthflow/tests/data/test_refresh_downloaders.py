@@ -1,6 +1,7 @@
 """Unit tests for scripts.refresh_data downloaders and cache wrapper."""
 
 import json
+import sqlite3 as _sqlite3
 import time
 
 import pytest
@@ -313,8 +314,6 @@ def test_cms_returns_none_when_httpx_missing(monkeypatch):
 
 
 # -- build_database (atomic write + plan_counties) ----------------------------
-
-import sqlite3 as _sqlite3
 
 
 def test_build_database_writes_plan_counties_and_is_atomic(tmp_path):
