@@ -13,12 +13,15 @@ from healthflow.auth.tenant_context import system_context
 from healthflow.database.config import async_session_factory, get_db
 from healthflow.database.models import (
     ActionHistory,
+    Appeal,
     Appointment,
     Broker,
     BrokerPreference,
     Contact,
+    Enrollment,
     Feedback,
     Organization,
+    Issue,
     Task,
     WorkspaceActivity,
     WorkspaceSearchToken,
@@ -59,8 +62,11 @@ async def reset_db(body: ResetRequest) -> dict:
                     )
                     for model in (
                         WorkspaceActivity,
+                        Appeal,
                         Appointment,
                         Task,
+                        Issue,
+                        Enrollment,
                         Contact,
                         Organization,
                         BrokerPreference,

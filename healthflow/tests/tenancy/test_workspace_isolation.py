@@ -3,10 +3,13 @@ from sqlalchemy import select
 
 from healthflow.auth.tenant_context import current_broker_id, system_context
 from healthflow.database.models import (
+    Appeal,
     Appointment,
     Broker,
     BrokerPreference,
     Contact,
+    Enrollment,
+    Issue,
     Organization,
     Task,
     WorkspaceActivity,
@@ -23,6 +26,9 @@ def test_workspace_records_require_broker_scoping():
         Contact,
         Task,
         Appointment,
+        Enrollment,
+        Issue,
+        Appeal,
         WorkspaceActivity,
     } <= TENANT_SCOPED_MODELS
 
@@ -34,6 +40,9 @@ def test_phi_bearing_workspace_records_are_audited():
         Contact,
         Task,
         Appointment,
+        Enrollment,
+        Issue,
+        Appeal,
         WorkspaceActivity,
     } <= _AUDITED_MODELS
 
@@ -94,6 +103,19 @@ async def test_workspace_api_never_exposes_or_mutates_another_brokers_records(cl
         'ends_at': '2030-01-01T11:00:00Z',
     }, headers=owner)
     appointment_id = appointment.json()['id']
+    owned_client = await client.post('/clients', json={
+        'full_name': 'Private Client', 'zip_code': '10001', 'age': 68,
+        'income_level': 'medium', 'doctors': [], 'prescriptions': [], 'procedures': [],
+    }, headers=owner)
+    client_id = owned_client.json()['id']
+    enrollment = await client.post('/enrollments', json={
+        'client_id': client_id, 'plan_name': 'Private Plan',
+    }, headers=owner)
+    enrollment_id = enrollment.json()['id']
+    issue = await client.post('/issues', json={
+        'client_id': client_id, 'title': 'Private issue',
+    }, headers=owner)
+    issue_id = issue.json()['id']
     await client.post(f'/tasks/{task_id}/complete', headers=owner)
     await client.put('/workspace/preferences', json={
         'timezone_name': 'America/Chicago',
@@ -117,6 +139,11 @@ async def test_workspace_api_never_exposes_or_mutates_another_brokers_records(cl
         ('post', f'/appointments/{appointment_id}/complete', None),
         ('post', f'/appointments/{appointment_id}/cancel', None),
         ('post', f'/appointments/{appointment_id}/restore-scheduled', None),
+        ('get', f'/enrollments/{enrollment_id}', None),
+        ('put', f'/enrollments/{enrollment_id}', {'plan_name': 'Stolen'}),
+        ('post', f'/enrollments/{enrollment_id}/ready-to-submit', None),
+        ('get', f'/issues/{issue_id}', None),
+        ('put', f'/issues/{issue_id}', {'title': 'Stolen'}),
     ]
     for method, path, payload in hidden_requests:
         response = await client.request(method.upper(), path, json=payload, headers=outsider)
@@ -124,6 +151,7 @@ async def test_workspace_api_never_exposes_or_mutates_another_brokers_records(cl
 
     for path in (
         '/organizations?include_contacts=true', '/tasks', '/appointments',
+        '/enrollments', '/issues',
         '/workspace/activity', '/workspace/today?local_date=2030-01-01',
         '/workspace/overview', '/workspace/search?q=Private',
     ):

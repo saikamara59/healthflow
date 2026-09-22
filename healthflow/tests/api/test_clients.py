@@ -3,7 +3,8 @@ import uuid
 import pytest
 from sqlalchemy import select
 
-from healthflow.database.models import DecisionRecord
+from healthflow.auth.tenant_context import system_context
+from healthflow.database.models import DecisionRecord, PhiAccessLog
 
 
 async def _register_and_login(client, email="crud@example.com"):
@@ -232,6 +233,62 @@ async def test_delete_client_detaches_workspace_records(client, db_session):
         select(DecisionRecord).where(DecisionRecord.id == decision_id)
     )).scalar_one()
     assert record.client_id is None
+
+
+@pytest.mark.asyncio
+async def test_delete_client_audits_phase2_record_ids(client, db_session):
+    token = await _register_and_login(client, "delete-phase2-client@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    created = await client.post(
+        "/clients",
+        json={
+            "full_name": "Phase 2 Client",
+            "zip_code": "10001",
+            "age": 35,
+            "income_level": "medium",
+            "doctors": [],
+            "prescriptions": [],
+            "procedures": [],
+        },
+        headers=headers,
+    )
+    client_id = created.json()["id"]
+    enrollment = await client.post(
+        "/enrollments",
+        json={"client_id": client_id, "plan_name": "Audited Plan"},
+        headers=headers,
+    )
+    issue = await client.post(
+        "/issues",
+        json={"client_id": client_id, "title": "Audited Issue"},
+        headers=headers,
+    )
+    appeal = await client.post(
+        "/appeals",
+        json={"issue_id": issue.json()["id"], "title": "Audited Appeal"},
+        headers=headers,
+    )
+
+    deleted = await client.delete(f"/clients/{client_id}", headers=headers)
+
+    assert deleted.status_code == 204
+    await db_session.rollback()
+    with system_context("verify phase 2 delete audit"):
+        logs = (
+            await db_session.execute(
+                select(PhiAccessLog).where(
+                    PhiAccessLog.endpoint == f"DELETE /clients/{client_id}",
+                    PhiAccessLog.operation == "delete",
+                    PhiAccessLog.table_name.in_(["enrollments", "issues", "appeals"]),
+                )
+            )
+        ).scalars().all()
+    ids_by_table = {entry.table_name: entry.row_ids for entry in logs}
+    assert ids_by_table == {
+        "appeals": [appeal.json()["id"]],
+        "enrollments": [enrollment.json()["id"]],
+        "issues": [issue.json()["id"]],
+    }
 
 
 @pytest.mark.asyncio

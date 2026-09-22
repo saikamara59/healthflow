@@ -10,7 +10,7 @@ from healthflow.auth.dependencies import get_current_broker
 from healthflow.auth.tenant_context import system_context
 from healthflow.database.config import get_db
 from healthflow.database.models import (
-    ActionHistory, Appointment, Broker, Client, DecisionRecord, Task,
+    ActionHistory, Appeal, Appointment, Broker, Client, DecisionRecord, Enrollment, Issue, Task,
     WorkspaceActivity, WorkspaceSearchToken,
 )
 from healthflow.models.schemas import ClientCreate, ClientResponse, ClientUpdate
@@ -158,6 +158,25 @@ async def delete_client(
     # tenant filter auto-injects AND Client.broker_id = current_broker_id
     # Preserve broker work/history, but detach it from the removed Client.
     # These updates must precede the DELETE for databases enforcing foreign keys.
+    issue_ids = list((await db.execute(
+        select(Issue.id).where(Issue.client_id == parsed_id)
+    )).scalars().all())
+    if issue_ids:
+        appeal_ids = list((await db.execute(
+            select(Appeal.id).where(Appeal.issue_id.in_(issue_ids))
+        )).scalars().all())
+        await db.execute(update(Task).where(Task.issue_id.in_(issue_ids)).values(issue_id=None))
+        await db.execute(
+            update(Appointment).where(Appointment.issue_id.in_(issue_ids)).values(issue_id=None)
+        )
+        if appeal_ids:
+            await db.execute(delete(Appeal).where(Appeal.id.in_(appeal_ids)))
+        await db.execute(delete(Issue).where(Issue.id.in_(issue_ids)))
+    enrollment_ids = list((await db.execute(
+        select(Enrollment.id).where(Enrollment.client_id == parsed_id)
+    )).scalars().all())
+    if enrollment_ids:
+        await db.execute(delete(Enrollment).where(Enrollment.id.in_(enrollment_ids)))
     for model in (Task, Appointment, WorkspaceActivity, DecisionRecord):
         await db.execute(update(model).where(model.client_id == parsed_id).values(client_id=None))
     # Client.actions is delete-orphan, but bulk DELETE bypasses ORM cascades.

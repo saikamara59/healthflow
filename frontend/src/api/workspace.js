@@ -44,4 +44,31 @@ export const workspaceApi = {
   completeAppointment: (id) => api.post(`/appointments/${id}/complete`),
   cancelAppointment: (id) => api.post(`/appointments/${id}/cancel`),
   restoreAppointment: (id) => api.post(`/appointments/${id}/restore-scheduled`),
+  listEnrollments: (query = '') => api.get(`/enrollments${query ? `?${query}` : ''}`),
+  createEnrollment: (body) => api.post('/enrollments', body),
+  updateEnrollment: (id, body) => api.put(`/enrollments/${id}`, body),
+  readyEnrollment: (id) => api.post(`/enrollments/${id}/ready-to-submit`),
+  submitEnrollment: (id, confirmed) => api.post(`/enrollments/${id}/submit`, { external_submission_confirmed: confirmed }),
+  confirmEnrollment: (id) => api.post(`/enrollments/${id}/confirm`),
+  cancelEnrollment: (id) => api.post(`/enrollments/${id}/cancel`),
+  listIssues: (query = '', { limit = 100, offset = 0 } = {}) => {
+    const params = new URLSearchParams(query)
+    params.set('limit', String(limit))
+    params.set('offset', String(offset))
+    return api.get(`/issues?${params}`)
+  },
+  listAllIssues: async (query = '') => {
+    const pageSize = 100
+    const issues = []
+    for (;;) {
+      const page = await workspaceApi.listIssues(query, { limit: pageSize, offset: issues.length })
+      issues.push(...page)
+      if (page.length < pageSize) return issues
+    }
+  },
+  getIssue: (id) => api.get(`/issues/${encodeURIComponent(id)}`),
+  createIssue: (body) => api.post('/issues', body),
+  updateIssue: (id, body) => api.put(`/issues/${id}`, body),
+  createAppeal: (body) => api.post('/appeals', body),
+  updateAppeal: (id, body) => api.put(`/appeals/${id}`, body),
 }

@@ -24,10 +24,14 @@ from sqlalchemy import select
 
 from healthflow.auth.tenant_context import system_context
 from healthflow.database.models import (
+    Appeal,
     Appointment,
     Broker,
     BrokerPreference,
+    Client,
     Contact,
+    Enrollment,
+    Issue,
     Organization,
     Task,
     WorkspaceActivity,
@@ -125,6 +129,9 @@ async def test_reset_removes_workspace_records_before_reseeding_clients(monkeypa
                 broker = (
                     await session.execute(select(Broker).where(Broker.email == worker_email(worker_id)))
                 ).scalar_one()
+                seeded_client = (
+                    await session.execute(select(Client).where(Client.broker_id == broker.id))
+                ).scalars().first()
                 organization = Organization(broker_id=broker.id, name="Reset Co", kind="carrier")
                 session.add(organization)
                 await session.flush()
@@ -139,8 +146,19 @@ async def test_reset_removes_workspace_records_before_reseeding_clients(monkeypa
                     ends_at=datetime(2026, 9, 17, 15, tzinfo=timezone.utc),
                 )
                 preference = BrokerPreference(broker_id=broker.id, timezone_name="America/New_York")
-                session.add_all([contact, task, appointment, preference])
+                enrollment = Enrollment(
+                    broker_id=broker.id,
+                    client_id=seeded_client.id,
+                    plan_name="Reset Plan",
+                )
+                issue = Issue(
+                    broker_id=broker.id,
+                    client_id=seeded_client.id,
+                    title="Reset Issue",
+                )
+                session.add_all([contact, task, appointment, preference, enrollment, issue])
                 await session.flush()
+                session.add(Appeal(broker_id=broker.id, issue_id=issue.id, title="Reset Appeal"))
                 session.add(
                     WorkspaceActivity(
                         broker_id=broker.id,
@@ -158,8 +176,11 @@ async def test_reset_removes_workspace_records_before_reseeding_clients(monkeypa
             with system_context("verify workspace e2e reset"):
                 for model in (
                     WorkspaceActivity,
+                    Appeal,
                     Appointment,
                     Task,
+                    Issue,
+                    Enrollment,
                     Contact,
                     Organization,
                     BrokerPreference,
