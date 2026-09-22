@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 
+/** Advances a UTC calendar day without depending on the runner's local time zone. */
 function dateAfter(day, count) {
   const date = new Date(`${day}T12:00:00Z`)
   date.setUTCDate(date.getUTCDate() + count)
