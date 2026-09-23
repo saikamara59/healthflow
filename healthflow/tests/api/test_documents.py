@@ -252,11 +252,15 @@ async def test_real_multipart_parser_caps_and_closes_spools(client, records, ser
             yielded += 4096
             yield b"x" * 4096
         yield b"\r\n--boundary--\r\n"
-    headers = {**records[0], "content-type": "multipart/form-data; boundary=boundary"}
+    headers = {**records[0], "content-type": "multipart/form-data; boundary=boundary",
+               "origin": "http://localhost:5173"}
     if fake_length:
         headers["content-length"] = fake_length
     response = await client.post(f"/clients/{records[2]}/documents", headers=headers, content=multipart())
     assert response.status_code == 413, response.text
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert response.headers["access-control-allow-credentials"] == "true"
+    assert "origin" in response.headers["vary"].lower()
     assert yielded < 100000
     assert spools and all(s.closed for s in spools)
     assert max(sizes) <= 1024 + 65536

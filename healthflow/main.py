@@ -112,6 +112,9 @@ _cors_origins += [
 ]
 ALLOWED_ORIGINS = list(dict.fromkeys(_cors_origins))  # de-dup, preserve order
 
+# Middleware added later wraps earlier entries. Keep CORS outside the limiter
+# so its direct 413 responses receive the same allowed-origin headers.
+app.add_middleware(DocumentUploadLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -133,7 +136,6 @@ app.add_middleware(HTTPLoggingMiddleware)
 app.add_middleware(EndpointContextMiddleware)
 app.add_middleware(CaseContextMiddleware)
 app.add_middleware(OptionalBrokerContextMiddleware)
-app.add_middleware(DocumentUploadLimitMiddleware)
 
 app.include_router(router)
 app.include_router(auth_router)
