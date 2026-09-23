@@ -149,6 +149,30 @@ async def test_overview_counts_only_current_broker_records(client):
 
 
 @pytest.mark.asyncio
+async def test_overview_shows_only_active_clients_and_restores_them(client):
+    headers = await _headers(client, "overview-archive@example.com")
+    client_ids = []
+    for name in ("Active Client", "Archived Client"):
+        response = await client.post("/clients", json={
+            "full_name": name, "zip_code": "10001", "age": 68,
+            "income_level": "medium", "doctors": [], "prescriptions": [], "procedures": [],
+        }, headers=headers)
+        assert response.status_code == 201
+        client_ids.append(response.json()["id"])
+
+    archived_id = client_ids[1]
+    assert (await client.post(f"/clients/{archived_id}/archive", headers=headers)).status_code == 200
+    archived_view = (await client.get("/workspace/overview", headers=headers)).json()
+    assert archived_view["clients"] == 1
+    assert [item["id"] for item in archived_view["recent_clients"]] == [client_ids[0]]
+
+    assert (await client.post(f"/clients/{archived_id}/restore", headers=headers)).status_code == 200
+    restored_view = (await client.get("/workspace/overview", headers=headers)).json()
+    assert restored_view["clients"] == 2
+    assert {item["id"] for item in restored_view["recent_clients"]} == set(client_ids)
+
+
+@pytest.mark.asyncio
 async def test_overview_returns_only_five_recent_clients_without_listing_the_book(client):
     owner = await _headers(client, "overview-recent-owner@example.com")
     outsider = await _headers(client, "overview-recent-outsider@example.com")

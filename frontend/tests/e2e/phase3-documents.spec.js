@@ -30,6 +30,7 @@ test('archived client remains in history and keeps Today and Scheduling deadline
   await expect(page.getByText('Archived client')).toBeVisible()
   await page.reload()
   await expect(page.getByText('Archived client')).toBeVisible()
+  await page.getByRole('link', { name: 'Archived clients' }).click()
   await page.getByRole('link', { name: 'Active clients' }).click()
   await expect(page.getByText('Eleanor Rigby')).toHaveCount(0)
   await page.getByRole('link', { name: 'Archived clients' }).click()
