@@ -8,9 +8,11 @@ tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
 check_path() {
-  local path="$1" status content_type attempt
+  local path="$1" status content_type attempt accept
+  accept="text/html"
+  if [[ "$path" == /health ]]; then accept="application/json"; fi
   for attempt in {1..12}; do
-    if status="$(curl --silent --show-error --max-time 10 --dump-header "$tmp_dir/headers" --output "$tmp_dir/body" --write-out '%{http_code}' "$base_url$path")"; then
+    if status="$(curl --silent --show-error --max-time 10 --header "Accept: $accept" --dump-header "$tmp_dir/headers" --output "$tmp_dir/body" --write-out '%{http_code}' "$base_url$path")"; then
       content_type="$(tr -d '\r' < "$tmp_dir/headers" | awk 'BEGIN { IGNORECASE = 1 } tolower($1) == "content-type:" { print tolower($2) }' | tail -1)"
       if [[ "$path" == /health ]]; then
         if [[ "$status" == 200 && "$content_type" == application/json* ]] && grep -q '"status":"healthy"' "$tmp_dir/body"; then
