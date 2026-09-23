@@ -7,6 +7,7 @@ base_url="${base_url%/}"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
+# Verify a deployed path returns the expected health response or SPA document.
 check_path() {
   local path="$1" status content_type attempt accept
   accept="text/html"
