@@ -73,6 +73,7 @@ def task_response(
     task: Task,
     *,
     client_name: str | None = None,
+    client_archived: bool = False,
     organization_name: str | None = None,
     contact_name: str | None = None,
 ) -> TaskResponse:
@@ -94,6 +95,7 @@ def task_response(
             task.status == "open" and task.due_at is not None and _as_utc(task.due_at) < now
         ),
         client_name=client_name,
+        client_archived=client_archived,
         organization_name=organization_name,
         contact_name=contact_name,
         created_at=_as_utc(task.created_at),
@@ -105,6 +107,7 @@ def appointment_response(
     appointment: Appointment,
     *,
     client_name: str | None = None,
+    client_archived: bool = False,
     organization_name: str | None = None,
     contact_name: str | None = None,
 ) -> AppointmentResponse:
@@ -126,6 +129,7 @@ def appointment_response(
         completed_at=_optional_utc(appointment.completed_at),
         canceled_at=_optional_utc(appointment.canceled_at),
         client_name=client_name,
+        client_archived=client_archived,
         organization_name=organization_name,
         contact_name=contact_name,
         created_at=_as_utc(appointment.created_at),

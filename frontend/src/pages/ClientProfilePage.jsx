@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import TopBar from '../components/TopBar';
 import Icon from '../components/ui/Icon';
@@ -76,11 +76,21 @@ export default function ClientProfilePage() {
     }
   }
 
-  async function handleDelete() {
-    if (!window.confirm(`Delete ${client.full_name}? This cannot be undone.`)) return;
+  async function handleArchive() {
+    if (!window.confirm(`Archive ${client.full_name}? Related work and deadlines remain available in Today and Scheduling. You can restore this Client later.`)) return;
+    setSaveMsg('');
     try {
-      await api.del(`/clients/${id}`);
-      navigate('/clients');
+      setClient(await api.post(`/clients/${id}/archive`));
+      setTab('overview');
+    } catch (err) {
+      setSaveMsg(`Error: ${err.message}`);
+    }
+  }
+
+  async function handleRestore() {
+    setSaveMsg('');
+    try {
+      setClient(await api.post(`/clients/${id}/restore`));
     } catch (err) {
       setSaveMsg(`Error: ${err.message}`);
     }
@@ -124,7 +134,7 @@ export default function ClientProfilePage() {
         crumbs={['Clients', client.full_name]}
         onMenuClick={openMenu}
         onNotificationsClick={openNotifications}
-        action={
+        action={!client.archived_at &&
           <>
             <button className="btn" onClick={() => navigate('/compare')}>
               <Icon name="compare" size={14} /> Run comparison
@@ -136,10 +146,11 @@ export default function ClientProfilePage() {
         }
       />
       <div className="page">
+        {saveMsg.startsWith('Error:') && <p role="alert" className="workspace-error">{saveMsg}</p>}
         <div style={{ marginBottom: 20 }}>
-          <a onClick={() => navigate('/clients')} className="muted" style={{ fontSize: 13, cursor: 'pointer' }}>
-            Back to clients
-          </a>
+          <Link to={client.archived_at ? '/clients?archived=true' : '/clients'} className="muted" style={{ fontSize: 13 }}>
+            {client.archived_at ? 'Archived clients' : 'Active clients'}
+          </Link>
         </div>
 
         <div className="profile-hero">
@@ -149,6 +160,7 @@ export default function ClientProfilePage() {
             <h1 style={{ fontFamily: 'var(--serif)', fontSize: 44, lineHeight: 1.05, letterSpacing: '-0.02em' }}>
               {client.full_name}
             </h1>
+            {client.archived_at && <span className="status-label">Archived client</span>}
             <div className="row" style={{ gap: 12, marginTop: 14, flexWrap: 'wrap' }}>
               <Chip tone={incomeTone} dot>{client.income_level} income</Chip>
               <Chip>Age {client.age}</Chip>
@@ -158,6 +170,11 @@ export default function ClientProfilePage() {
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
+            {client.archived_at ? (
+              <button className="btn" onClick={handleRestore}>Restore client</button>
+            ) : (
+              <button className="btn danger" onClick={handleArchive}>Archive client</button>
+            )}
             <div className="eyebrow">Added</div>
             <div className="serif" style={{ fontSize: 22, marginTop: 4 }}>
               {new Date(client.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -169,7 +186,7 @@ export default function ClientProfilePage() {
         </div>
 
         <div className="tabs-row" style={{ marginTop: 20 }}>
-          {TABS.map((t) => (
+          {TABS.filter((t) => !client.archived_at || t !== 'edit').map((t) => (
             <button key={t} onClick={() => setTab(t)} className={`tab-btn ${tab === t ? 'active' : ''}`}>
               {t}
             </button>
@@ -293,7 +310,7 @@ export default function ClientProfilePage() {
                 )}
               </div>
 
-              <div className="section-head"><h2>Quick tools</h2></div>
+              {!client.archived_at && <><div className="section-head"><h2>Quick tools</h2></div>
               <div className="card card-pad">
                 {[
                   { icon: 'compare', label: 'Compare plans', path: '/compare' },
@@ -320,7 +337,7 @@ export default function ClientProfilePage() {
                     <Icon name="chev_r" size={13} className="ink-4" />
                   </div>
                 ))}
-              </div>
+              </div></>}
             </div>
           </div>
         )}
@@ -331,11 +348,11 @@ export default function ClientProfilePage() {
             <div className="muted" style={{ maxWidth: 480, margin: '0 auto' }}>
               Once you run a plan comparison for {client.full_name}, enrolled plan details and formulary coverage will appear here.
             </div>
-            <div style={{ marginTop: 20 }}>
+            {!client.archived_at && <div style={{ marginTop: 20 }}>
               <button className="btn accent" onClick={() => navigate('/compare')}>
                 <Icon name="compare" size={14} /> Run comparison
               </button>
-            </div>
+            </div>}
           </div>
         )}
 
@@ -400,7 +417,7 @@ export default function ClientProfilePage() {
           </div>
         )}
 
-        {tab === 'edit' && (
+        {tab === 'edit' && !client.archived_at && (
           <form onSubmit={handleSave} className="card card-pad" style={{ marginTop: 28, maxWidth: 720 }}>
             <div className="eyebrow" style={{ marginBottom: 16 }}>Edit profile</div>
             <div className="grid-2">
@@ -443,9 +460,6 @@ export default function ClientProfilePage() {
               </div>
             </div>
             <div className="between" style={{ marginTop: 24 }}>
-              <button type="button" className="btn danger" onClick={handleDelete}>
-                <Icon name="trash" size={14} /> Delete client
-              </button>
               <div className="row" style={{ gap: 10 }}>
                 {saveMsg && <span className="muted" style={{ fontSize: 12 }}>{saveMsg}</span>}
                 <button type="submit" className="btn accent" disabled={saving}>

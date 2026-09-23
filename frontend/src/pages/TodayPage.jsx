@@ -48,7 +48,7 @@ export default function TodayPage() {
     async function load() {
       try {
         const [preference, initialToday, clientData, organizationData] = await Promise.all([
-          workspaceApi.getPreferences(), workspaceApi.getToday(), api.get('/clients'), workspaceApi.listOrganizations(true),
+          workspaceApi.getPreferences(), workspaceApi.getToday(), api.get('/clients?linkable=true'), workspaceApi.listOrganizations(true),
         ])
         if (!alive || generation !== taskGenerationRef.current) return
         let result = initialToday

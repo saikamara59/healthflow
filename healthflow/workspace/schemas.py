@@ -223,6 +223,7 @@ class TaskResponse(LinkedRecordFields):
     completed_at: datetime | None
     is_overdue: bool
     client_name: str | None
+    client_archived: bool
     organization_name: str | None
     contact_name: str | None
     created_at: datetime
@@ -242,6 +243,7 @@ class AppointmentResponse(LinkedRecordFields):
     completed_at: datetime | None
     canceled_at: datetime | None
     client_name: str | None
+    client_archived: bool
     organization_name: str | None
     contact_name: str | None
     created_at: datetime
