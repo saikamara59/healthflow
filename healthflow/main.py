@@ -29,6 +29,9 @@ from healthflow.auth.router import auth_router
 from healthflow.auth.admin_router import admin_router
 from healthflow.api.drug_router import drug_router
 from healthflow.api.client_router import client_router
+from healthflow.api.documents_router import (
+    DocumentUploadLimitMiddleware, configure_documents, documents_router,
+)
 from healthflow.api.history_router import history_router
 from healthflow.feedback.router import feedback_router
 from healthflow.agents.temporal_awareness.routes import temporal_router
@@ -46,6 +49,7 @@ from healthflow.workspace.issues_router import appeals_router, issues_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize database tables and optional agent telemetry on startup."""
+    configure_documents(app)
     from healthflow.database.config import async_session_factory, engine
     from healthflow.database.models import Base
     from healthflow.database.schema_migrations import (
@@ -129,12 +133,14 @@ app.add_middleware(HTTPLoggingMiddleware)
 app.add_middleware(EndpointContextMiddleware)
 app.add_middleware(CaseContextMiddleware)
 app.add_middleware(OptionalBrokerContextMiddleware)
+app.add_middleware(DocumentUploadLimitMiddleware)
 
 app.include_router(router)
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(drug_router)
 app.include_router(client_router)
+app.include_router(documents_router)
 app.include_router(history_router)
 app.include_router(feedback_router)
 app.include_router(temporal_router)
