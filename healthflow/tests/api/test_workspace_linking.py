@@ -4,7 +4,7 @@ import pytest
 from fastapi import HTTPException
 
 from healthflow.auth.tenant_context import current_broker_id, system_context
-from healthflow.database.models import Broker, Client, Contact, Organization, _utcnow
+from healthflow.database.models import Broker, Client, Contact, Issue, Organization, _utcnow
 
 
 @pytest.mark.asyncio
@@ -129,5 +129,39 @@ async def test_link_validation_rejects_archived_client(db_session_factory):
             client.archived_at = None
             await session.flush()
             await require_owned_links(session, client_id=client.id)
+        finally:
+            current_broker_id.reset(token)
+
+
+@pytest.mark.asyncio
+async def test_link_validation_hides_issue_from_different_owned_client(db_session_factory):
+    from healthflow.workspace.linking import require_owned_links
+
+    async with db_session_factory() as session:
+        with system_context("seed Client Issue mismatch test"):
+            broker = Broker(email="issue-client-mismatch@example.com", hashed_password="hash", full_name="Owner")
+            session.add(broker)
+            await session.flush()
+            first = Client(
+                broker_id=broker.id, full_name="First", zip_code="10001", age=40,
+                income_level="medium", doctors=[], prescriptions=[], procedures=[],
+            )
+            second = Client(
+                broker_id=broker.id, full_name="Second", zip_code="10002", age=41,
+                income_level="medium", doctors=[], prescriptions=[], procedures=[],
+            )
+            session.add_all([first, second])
+            await session.flush()
+            issue = Issue(broker_id=broker.id, client_id=first.id, title="Owned Issue")
+            session.add(issue)
+            await session.commit()
+
+        token = current_broker_id.set(broker.id)
+        try:
+            await require_owned_links(session, client_id=first.id, issue_id=issue.id)
+            with pytest.raises(HTTPException) as mismatch:
+                await require_owned_links(session, client_id=second.id, issue_id=issue.id)
+            assert mismatch.value.status_code == 404
+            assert mismatch.value.detail == "Issue not found"
         finally:
             current_broker_id.reset(token)

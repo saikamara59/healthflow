@@ -32,7 +32,7 @@ async def require_owned_links(
         if issue is None:
             raise HTTPException(status_code=404, detail="Issue not found")
         if client is not None and issue.client_id != client.id:
-            raise HTTPException(status_code=422, detail="Issue does not belong to Client")
+            raise HTTPException(status_code=404, detail="Issue not found")
 
     organization = None
     if organization_id is not None:
