@@ -59,7 +59,12 @@ class LocalDocumentStorage:
         root = Path(root).absolute()
         if any(part.is_symlink() for part in (root, *root.parents)):
             raise ValueError("Document storage root must not contain symlinks")
-        if any(
+        root = root.resolve()
+        # Match main.py's effective frontend configuration, including an
+        # assets mount that resolves outside the frontend through a symlink.
+        frontend = Path(os.getenv("HEALTHFLOW_DIST_DIR", "/app/frontend/dist"))
+        served_roots = (frontend.resolve(), (frontend / "assets").resolve())
+        if any(root.is_relative_to(served) for served in served_roots) or any(
             part.lower() in {"frontend", "static", "public", "dist"}
             for part in root.parts
         ):

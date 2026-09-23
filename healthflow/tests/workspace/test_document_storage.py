@@ -100,6 +100,44 @@ def test_local_rejects_webroot_and_symlink(tmp_path):
     assert target.read_bytes() == b""
 
 
+@pytest.mark.parametrize(
+    "subdirectory", ["", "assets", "assets/documents", "documents"]
+)
+def test_local_rejects_configured_webroot(tmp_path, monkeypatch, subdirectory):
+    webroot = tmp_path / "custom-site"
+    monkeypatch.setenv("HEALTHFLOW_DIST_DIR", str(webroot))
+    root = webroot / subdirectory
+    with pytest.raises(ValueError, match="outside web assets"):
+        store = LocalDocumentStorage(root)
+        store.put("opaque-key", io.BytesIO(b"synthetic"), "application/pdf")
+    assert not root.exists()
+
+
+def test_local_resolves_configured_webroot_alias(tmp_path, monkeypatch):
+    webroot = tmp_path / "custom-site"
+    webroot.mkdir()
+    alias = tmp_path / "site-alias"
+    alias.symlink_to(webroot, target_is_directory=True)
+    monkeypatch.setenv("HEALTHFLOW_DIST_DIR", str(alias))
+    root = webroot / "assets" / "documents"
+    with pytest.raises(ValueError, match="outside web assets"):
+        LocalDocumentStorage(root)
+    assert not root.exists()
+
+
+def test_local_rejects_resolved_assets_mount(tmp_path, monkeypatch):
+    webroot = tmp_path / "custom-site"
+    webroot.mkdir()
+    assets = tmp_path / "published-files"
+    assets.mkdir()
+    (webroot / "assets").symlink_to(assets, target_is_directory=True)
+    monkeypatch.setenv("HEALTHFLOW_DIST_DIR", str(webroot))
+    root = assets / "documents"
+    with pytest.raises(ValueError, match="outside web assets"):
+        LocalDocumentStorage(root)
+    assert not root.exists()
+
+
 def test_s3_missing_key():
     client = boto3.client(
         "s3", region_name="auto", aws_access_key_id="test", aws_secret_access_key="test"
