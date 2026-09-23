@@ -100,3 +100,34 @@ async def test_link_validation_rejects_archived_organization_and_contact(db_sess
             assert archived_contact.value.status_code == 404
         finally:
             current_broker_id.reset(token)
+
+
+@pytest.mark.asyncio
+async def test_link_validation_rejects_archived_client(db_session_factory):
+    from healthflow.workspace.linking import require_owned_links
+
+    async with db_session_factory() as session:
+        with system_context("seed archived Client link test"):
+            broker = Broker(email="client-link-archive@example.com", hashed_password="hash", full_name="Owner")
+            session.add(broker)
+            await session.flush()
+            client = Client(
+                broker_id=broker.id, full_name="Archived", zip_code="10001", age=40,
+                income_level="medium", doctors=[], prescriptions=[], procedures=[],
+            )
+            session.add(client)
+            await session.commit()
+
+        token = current_broker_id.set(broker.id)
+        try:
+            await require_owned_links(session, client_id=client.id)
+            client.archived_at = _utcnow()
+            await session.flush()
+            with pytest.raises(HTTPException) as archived:
+                await require_owned_links(session, client_id=client.id)
+            assert archived.value.status_code == 404
+            client.archived_at = None
+            await session.flush()
+            await require_owned_links(session, client_id=client.id)
+        finally:
+            current_broker_id.reset(token)

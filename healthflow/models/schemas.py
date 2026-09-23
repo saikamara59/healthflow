@@ -352,6 +352,7 @@ class ClientResponse(BaseModel):
     procedures: list[str]
     created_at: str
     updated_at: str
+    archived_at: str | None = None
 
     model_config = {"from_attributes": True}
 

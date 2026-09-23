@@ -3,6 +3,17 @@
 from sqlalchemy import inspect, text
 
 
+def ensure_client_archive_column(connection) -> None:
+    """Add Client archive state to databases created before Phase 3."""
+    if connection.dialect.name == "postgresql":
+        connection.execute(text("ALTER TABLE clients ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP WITH TIME ZONE"))
+        return
+
+    columns = {column["name"] for column in inspect(connection).get_columns("clients")}
+    if "archived_at" not in columns:
+        connection.execute(text("ALTER TABLE clients ADD COLUMN archived_at DATETIME"))
+
+
 def ensure_phase2_issue_links(connection) -> None:
     """Add nullable Issue links to existing Task and Appointment tables.
 

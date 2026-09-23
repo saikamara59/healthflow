@@ -22,7 +22,7 @@ async def require_owned_links(
         client = (
             await db.execute(select(Client).where(Client.id == client_id))
         ).scalar_one_or_none()
-        if client is None:
+        if client is None or client.archived_at is not None:
             raise HTTPException(status_code=404, detail="Client not found")
 
     if issue_id is not None:

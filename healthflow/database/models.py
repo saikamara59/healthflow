@@ -92,6 +92,7 @@ class Client(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
     )
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     broker: Mapped["Broker"] = relationship(back_populates="clients")
     actions: Mapped[list["ActionHistory"]] = relationship(back_populates="client", cascade="all, delete-orphan")

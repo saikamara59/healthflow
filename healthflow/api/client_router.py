@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from sqlalchemy import delete, select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from contextlib import nullcontext
@@ -10,10 +10,10 @@ from healthflow.auth.dependencies import get_current_broker
 from healthflow.auth.tenant_context import system_context
 from healthflow.database.config import get_db
 from healthflow.database.models import (
-    ActionHistory, Appeal, Appointment, Broker, Client, DecisionRecord, Enrollment, Issue, Task,
-    WorkspaceActivity, WorkspaceSearchToken,
+    Broker, Client, _utcnow,
 )
 from healthflow.models.schemas import ClientCreate, ClientResponse, ClientUpdate
+from healthflow.workspace.activity import record_workspace_activity
 
 
 def _admin_bypass(broker: Broker):
@@ -46,6 +46,32 @@ def _client_to_response(client: Client) -> ClientResponse:
         procedures=client.procedures,
         created_at=client.created_at.isoformat(),
         updated_at=client.updated_at.isoformat(),
+        archived_at=client.archived_at.isoformat() if client.archived_at else None,
+    )
+
+
+async def _owned_client(db: AsyncSession, client_id: str) -> Client:
+    """Load a Client under the active Broker's tenant filter for write paths."""
+    try:
+        parsed_id = uuid.UUID(client_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Client not found")
+    client = (await db.execute(select(Client).where(Client.id == parsed_id))).scalar_one_or_none()
+    if client is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    return client
+
+
+async def _set_archive_state(
+    db: AsyncSession, *, client: Client, broker: Broker, archived: bool,
+) -> None:
+    client.archived_at = _utcnow() if archived else None
+    await db.flush()
+    action = "archived" if archived else "restored"
+    await record_workspace_activity(
+        db, broker_id=broker.id, client_id=client.id, entity_type="client",
+        entity_id=client.id, action=action, summary=f"Client {action}",
+        details={"outcome": "success"},
     )
 
 
@@ -75,6 +101,7 @@ async def create_client(
 @client_router.get("", response_model=list[ClientResponse])
 async def list_clients(
     linkable: bool = False,
+    archived: bool = False,
     broker: Broker = Depends(get_current_broker),
     db: AsyncSession = Depends(get_db),
 ) -> list[ClientResponse]:
@@ -85,6 +112,10 @@ async def list_clients(
         statement = select(Client)
         if linkable:
             statement = statement.where(Client.broker_id == broker.id)
+        statement = statement.where(
+            Client.archived_at.is_(None) if linkable or not archived
+            else Client.archived_at.is_not(None)
+        )
         result = await db.execute(statement)
         clients = result.scalars().all()
     return [_client_to_response(c) for c in clients]
@@ -120,16 +151,7 @@ async def update_client(
     db: AsyncSession = Depends(get_db),
 ) -> ClientResponse:
     """Update a client's profile. Must belong to the current broker."""
-    try:
-        parsed_id = uuid.UUID(client_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Client not found")
-
-    result = await db.execute(select(Client).where(Client.id == parsed_id))
-    client = result.scalar_one_or_none()
-
-    if client is None:
-        raise HTTPException(status_code=404, detail="Client not found")
+    client = await _owned_client(db, client_id)
 
     # Apply only the fields that were explicitly set
     update_fields = update_data.model_dump(exclude_unset=True)
@@ -147,48 +169,29 @@ async def delete_client(
     broker: Broker = Depends(get_current_broker),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Delete a client. Must belong to the current broker."""
-    try:
-        parsed_id = uuid.UUID(client_id)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Client not found")
-
-    result = await db.execute(select(Client).where(Client.id == parsed_id))
-    client = result.scalar_one_or_none()
-
-    if client is None:
-        raise HTTPException(status_code=404, detail="Client not found")
-
-    # tenant filter auto-injects AND Client.broker_id = current_broker_id
-    # Preserve broker work/history, but detach it from the removed Client.
-    # These updates must precede the DELETE for databases enforcing foreign keys.
-    issue_ids = list((await db.execute(
-        select(Issue.id).where(Issue.client_id == parsed_id)
-    )).scalars().all())
-    if issue_ids:
-        appeal_ids = list((await db.execute(
-            select(Appeal.id).where(Appeal.issue_id.in_(issue_ids))
-        )).scalars().all())
-        await db.execute(update(Task).where(Task.issue_id.in_(issue_ids)).values(issue_id=None))
-        await db.execute(
-            update(Appointment).where(Appointment.issue_id.in_(issue_ids)).values(issue_id=None)
-        )
-        if appeal_ids:
-            await db.execute(delete(Appeal).where(Appeal.id.in_(appeal_ids)))
-        await db.execute(delete(Issue).where(Issue.id.in_(issue_ids)))
-    enrollment_ids = list((await db.execute(
-        select(Enrollment.id).where(Enrollment.client_id == parsed_id)
-    )).scalars().all())
-    if enrollment_ids:
-        await db.execute(delete(Enrollment).where(Enrollment.id.in_(enrollment_ids)))
-    for model in (Task, Appointment, WorkspaceActivity, DecisionRecord):
-        await db.execute(update(model).where(model.client_id == parsed_id).values(client_id=None))
-    # Client.actions is delete-orphan, but bulk DELETE bypasses ORM cascades.
-    await db.execute(delete(ActionHistory).where(ActionHistory.client_id == parsed_id))
-    await db.execute(delete(WorkspaceSearchToken).where(
-        WorkspaceSearchToken.kind == "client",
-        WorkspaceSearchToken.record_id == parsed_id,
-    ))
-    await db.execute(delete(Client).where(Client.id == parsed_id))
-    await db.flush()
+    """Compatibility endpoint: archive a Client and preserve linked work."""
+    owned = await _owned_client(db, client_id)
+    await _set_archive_state(db, client=owned, broker=broker, archived=True)
     return Response(status_code=204)
+
+
+@client_router.post("/{client_id}/archive", response_model=ClientResponse)
+async def archive_client(
+    client_id: str,
+    broker: Broker = Depends(get_current_broker),
+    db: AsyncSession = Depends(get_db),
+) -> ClientResponse:
+    owned = await _owned_client(db, client_id)
+    await _set_archive_state(db, client=owned, broker=broker, archived=True)
+    return _client_to_response(owned)
+
+
+@client_router.post("/{client_id}/restore", response_model=ClientResponse)
+async def restore_client(
+    client_id: str,
+    broker: Broker = Depends(get_current_broker),
+    db: AsyncSession = Depends(get_db),
+) -> ClientResponse:
+    owned = await _owned_client(db, client_id)
+    await _set_archive_state(db, client=owned, broker=broker, archived=False)
+    return _client_to_response(owned)
