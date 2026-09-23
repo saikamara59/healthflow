@@ -216,11 +216,15 @@ test('Appeal drafting keeps generated requests within schema limits', async ({ a
   await expect(authedPage.getByRole('heading', { name: 'Drafted appeal letter' })).toBeVisible()
   expect((await savedAppealResponse).ok()).toBe(true)
   expect(generatedRequest.additional_context.length).toBeLessThanOrEqual(1000)
-  const appeals = await authedPage.request.get(`/appeals?issue_id=${issue.id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  const saved = await appeals.json()
-  expect(saved).toHaveLength(1)
+  const fetchSavedAppeals = async () => {
+    const response = await authedPage.request.get(`/appeals?issue_id=${issue.id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    expect(response.ok()).toBe(true)
+    return response.json()
+  }
+  await expect.poll(fetchSavedAppeals).toHaveLength(1)
+  const saved = await fetchSavedAppeals()
   expect(saved[0].title.length).toBeLessThanOrEqual(300)
 })
 
