@@ -1,6 +1,7 @@
 """Protected synthetic Documents: API authorization and durable stream outcomes."""
 
 import io
+import asyncio
 import threading
 from unittest.mock import AsyncMock, Mock
 from uuid import UUID, uuid4
@@ -10,7 +11,7 @@ import pytest_asyncio
 from sqlalchemy import select, text
 from starlette.requests import ClientDisconnect
 
-from healthflow.database.models import Document, DocumentEvent, _utcnow
+from healthflow.database.models import Appeal, Document, DocumentEvent, DocumentLink, Enrollment, Issue, _utcnow
 from healthflow.main import app, lifespan
 from healthflow.tests.api.test_enrollments import _client_record, _headers
 from healthflow.tests.fixtures.documents import fixture_bytes
@@ -46,6 +47,198 @@ async def upload(client, records, filename="Synthetic.pdf"):
 async def events(db_session):
     return [(e.action, e.outcome) for e in
             (await db_session.execute(select(DocumentEvent).order_by(DocumentEvent.occurred_at))).scalars()]
+
+
+async def document_targets(db_session, document):
+    enrollment = Enrollment(broker_id=document.broker_id, client_id=document.client_id, plan_name="Synthetic")
+    issue = Issue(broker_id=document.broker_id, client_id=document.client_id, title="Synthetic")
+    db_session.add_all([enrollment, issue])
+    await db_session.flush()
+    appeal = Appeal(broker_id=document.broker_id, issue_id=issue.id, title="Synthetic")
+    db_session.add(appeal)
+    await db_session.commit()
+    return {"enrollment": enrollment.id, "issue": issue.id, "appeal": appeal.id}
+
+
+@pytest.mark.asyncio
+async def test_link_history_archive_restore_keep_one_object(client, records, service, db_session):
+    service.storage.put = Mock(wraps=service.storage.put)
+    service.storage.remove = Mock(wraps=service.storage.remove)
+    data = (await upload(client, records)).json()
+    document = await db_session.get(Document, UUID(data["id"]))
+    targets = await document_targets(db_session, document)
+    base, auth = f"/documents/{data['id']}", records[0]
+    links = {}
+    for kind, target in targets.items():
+        response = await client.post(base + "/links", headers=auth,
+                                     json={"target_type": kind, "target_id": str(target)})
+        assert response.status_code == 201, response.text
+        links[kind] = response.json()["id"]
+        listing = await client.get("/documents", headers=auth,
+                                   params={"target_type": kind, "target_id": str(target)})
+        assert [row["id"] for row in listing.json()] == [data["id"]]
+    assert (await client.delete(base + f"/links/{links['enrollment']}", headers=auth)).status_code == 204
+    active = (await client.get(base + "/links", headers=auth)).json()
+    assert {row["target_type"] for row in active} == {"issue", "appeal"}
+    history = (await client.get(base + "/links?include_ended=true", headers=auth)).json()
+    assert len(history) == 3 and sum(row["ended_at"] is not None for row in history) == 1
+    assert (await client.post(base + "/archive", headers=auth)).status_code == 200
+    assert (await client.get(base + "/links", headers=auth)).json() == []
+    assert len((await client.get(base + "/links?include_ended=true", headers=auth)).json()) == 3
+    assert (await client.get(f"/clients/{records[2]}/documents", headers=auth)).json() == []
+    for kind, target in targets.items():
+        assert (await client.get("/documents", headers=auth,
+                                 params={"target_type": kind, "target_id": str(target)})).json() == []
+    assert [row["id"] for row in (await client.get("/documents/archived", headers=auth)).json()] == [data["id"]]
+    assert (await client.post(base + "/restore", headers=auth)).status_code == 200
+    for kind, target in targets.items():
+        listing = (await client.get("/documents", headers=auth,
+                                    params={"target_type": kind, "target_id": str(target)})).json()
+        assert len(listing) == (0 if kind == "enrollment" else 1)
+    relink = await client.post(base + "/links", headers=auth,
+                               json={"target_type": "enrollment", "target_id": str(targets["enrollment"])})
+    assert relink.status_code == 201 and relink.json()["id"] != links["enrollment"]
+    assert len(service.storage._objects) == 1
+    service.storage.put.assert_called_once()
+    service.storage.remove.assert_not_called()
+    assert await events(db_session) == [(action, "success") for action in
+                                        ["upload", "link", "link", "link", "unlink", "archive", "restore", "link"]]
+    rows = (await db_session.execute(select(DocumentEvent))).scalars().all()
+    assert all(row.actor_id == document.broker_id and row.client_id == document.client_id
+               and row.document_id == document.id for row in rows)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action", ["link", "unlink", "archive", "restore"])
+async def test_transition_audit_failure_rolls_back(client, records, service, db_session, action):
+    from sqlalchemy import event
+    from sqlalchemy.orm import Session
+
+    data = (await upload(client, records)).json()
+    document = await db_session.get(Document, UUID(data["id"]))
+    targets = await document_targets(db_session, document)
+    base, auth = f"/documents/{data['id']}", records[0]
+    payload = {"target_type": "issue", "target_id": str(targets["issue"])}
+    if action == "unlink":
+        link = (await client.post(base + "/links", headers=auth, json=payload)).json()
+    if action == "restore":
+        await client.post(base + "/archive", headers=auth)
+    before = await events(db_session)
+    def fail_audit(session, context, instances):
+        if any(isinstance(row, DocumentEvent) and row.action == action for row in session.new):
+            raise RuntimeError("audit unavailable")
+    event.listen(Session, "before_flush", fail_audit)
+    try:
+        if action == "unlink":
+            response = await client.delete(base + f"/links/{link['id']}", headers=auth)
+        else:
+            response = await client.post(base + ("/links" if action == "link" else f"/{action}"),
+                                         headers=auth, json=payload if action == "link" else None)
+        assert response.status_code == 503
+    finally:
+        event.remove(Session, "before_flush", fail_audit)
+    await db_session.refresh(document)
+    assert (document.archived_at is not None) == (action == "restore")
+    links = (await db_session.execute(select(DocumentLink))).scalars().all()
+    assert len(links) == (1 if action == "unlink" else 0)
+    assert all(link.ended_at is None for link in links)
+    assert await events(db_session) == before
+
+
+@pytest.mark.asyncio
+async def test_document_transition_retries_and_archived_link_guard(client, records, service, db_session):
+    data = (await upload(client, records)).json()
+    document = await db_session.get(Document, UUID(data["id"]))
+    targets = await document_targets(db_session, document)
+    base, auth = f"/documents/{data['id']}", records[0]
+    payload = {"target_type": "issue", "target_id": str(targets["issue"])}
+    created = (await client.post(base + "/links", headers=auth, json=payload)).json()
+    for _ in range(2):
+        assert (await client.delete(base + f"/links/{created['id']}", headers=auth)).status_code == 204
+        assert (await client.post(base + "/archive", headers=auth)).status_code == 200
+    assert (await client.post(base + "/links", headers=auth, json=payload)).status_code == 409
+    assert len((await client.get(base + "/links?include_ended=true", headers=auth)).json()) == 1
+    for _ in range(2):
+        assert (await client.post(base + "/restore", headers=auth)).status_code == 200
+    assert await events(db_session) == [(action, "success") for action in
+                                        ["upload", "link", "unlink", "archive", "restore"]]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["enrollment", "issue", "appeal"])
+@pytest.mark.parametrize("dialect", ["sqlite", "asyncpg", "psycopg", "unrelated"])
+async def test_only_active_link_integrity_errors_become_conflicts(service, kind, dialect):
+    from types import SimpleNamespace
+    from sqlalchemy.exc import IntegrityError
+    from fastapi import HTTPException
+
+    original = Exception("unrelated foreign key or audit failure")
+    constraint = f"uq_document_links_active_{kind}"
+    if dialect == "sqlite":
+        original = Exception(f"UNIQUE constraint failed: document_links.document_id, document_links.{kind}_id")
+    elif dialect == "asyncpg":
+        cause = Exception()
+        cause.constraint_name = constraint
+        original.__cause__ = cause
+    elif dialect == "psycopg":
+        original.diag = SimpleNamespace(constraint_name=constraint)
+    session = SimpleNamespace(commit=AsyncMock(side_effect=IntegrityError("", {}, original)), rollback=AsyncMock())
+    with pytest.raises(HTTPException) as caught:
+        await service._commit_transition(session, target_type=kind)
+    assert caught.value.status_code == (503 if dialect == "unrelated" else 409)
+    session.rollback.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_duplicate_link_requests_use_database_uniqueness(client, records, service, db_session, tmp_path, monkeypatch):
+    # Independent file-backed connections exercise the real unique index race;
+    # the suite's shared in-memory connection cannot model concurrent transactions.
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from healthflow.database.config import get_db
+    from healthflow.database.models import Base, Broker, Client
+
+    data = (await upload(client, records)).json()
+    document = await db_session.get(Document, UUID(data["id"]))
+    targets = await document_targets(db_session, document)
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'race.db'}")
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with factory() as session:
+        for model in (Broker, Client, Document, Enrollment, Issue, Appeal):
+            for row in (await db_session.execute(select(model))).scalars():
+                await session.merge(row)
+        await session.commit()
+    previous = app.dependency_overrides[get_db]
+    async def race_db():
+        async with factory() as session:
+            yield session
+    app.dependency_overrides[get_db] = race_db
+    original_link = service.link
+    both_ready = asyncio.Event()
+    arrivals = 0
+    async def concurrent_link(*args):
+        nonlocal arrivals
+        arrivals += 1
+        if arrivals == 2:
+            both_ready.set()
+        await asyncio.wait_for(both_ready.wait(), timeout=5)
+        return await original_link(*args)
+    # Synchronize before reads: metadata-read audit INSERTs acquire SQLite's
+    # write lock, so a barrier after those reads would deadlock the test itself.
+    monkeypatch.setattr(service, "link", concurrent_link)
+    try:
+        responses = await asyncio.gather(*[
+            client.post(f"/documents/{data['id']}/links", headers=records[0],
+                        json={"target_type": "issue", "target_id": str(targets["issue"])}) for _ in range(2)],
+                                         return_exceptions=True)
+        assert sorted(response.status_code for response in responses) == [201, 409]
+        async with factory() as session:
+            assert len((await session.execute(select(DocumentLink))).scalars().all()) == 1
+            assert len((await session.execute(select(DocumentEvent))).scalars().all()) == 1
+    finally:
+        app.dependency_overrides[get_db] = previous
+        await engine.dispose()
 
 
 @pytest.mark.asyncio

@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +16,7 @@ from starlette.responses import JSONResponse
 from healthflow.auth.dependencies import get_current_broker
 from healthflow.database.config import get_db
 from healthflow.database.models import Broker, Document
-from healthflow.workspace.document_service import DEFAULT_MAX_BYTES, DocumentService
+from healthflow.workspace.document_service import DEFAULT_MAX_BYTES, DocumentService, TargetType
 from healthflow.workspace.document_storage import LocalDocumentStorage, S3DocumentStorage
 
 documents_router = APIRouter(tags=["documents"])
@@ -94,6 +94,69 @@ class DocumentResponse(BaseModel):
     byte_length: int
     created_at: datetime
     archived_at: datetime | None
+
+
+class LinkRequest(BaseModel):
+    target_type: TargetType
+    target_id: UUID
+
+
+class LinkResponse(BaseModel):
+    id: UUID
+    document_id: UUID
+    target_type: TargetType
+    target_id: UUID
+    created_at: datetime
+    ended_at: datetime | None
+
+
+def _link_response(link):
+    kind = next(kind for kind in ("enrollment", "issue", "appeal") if getattr(link, f"{kind}_id") is not None)
+    return LinkResponse(id=link.id, document_id=link.document_id, target_type=kind,
+                        target_id=getattr(link, f"{kind}_id"), created_at=link.created_at, ended_at=link.ended_at)
+
+
+@documents_router.get("/documents", response_model=list[DocumentResponse])
+async def target_documents(target_type: TargetType, target_id: UUID,
+                           broker: Broker = Depends(get_current_broker), db: AsyncSession = Depends(get_db),
+                           service: DocumentService = Depends(get_document_service)):
+    return await service.for_target(db, broker.id, target_type, target_id)
+
+
+@documents_router.post("/documents/{document_id}/links", response_model=LinkResponse, status_code=201)
+async def link_document(document_id: UUID, body: LinkRequest,
+                        broker: Broker = Depends(get_current_broker), db: AsyncSession = Depends(get_db),
+                        service: DocumentService = Depends(get_document_service)):
+    return _link_response(await service.link(db, broker.id, document_id, body.target_type, body.target_id))
+
+
+@documents_router.get("/documents/{document_id}/links", response_model=list[LinkResponse])
+async def document_links(document_id: UUID, include_ended: bool = False,
+                         broker: Broker = Depends(get_current_broker), db: AsyncSession = Depends(get_db),
+                         service: DocumentService = Depends(get_document_service)):
+    return [_link_response(link) for link in await service.links(db, broker.id, document_id, include_ended)]
+
+
+@documents_router.delete("/documents/{document_id}/links/{link_id}", status_code=204)
+async def unlink_document(document_id: UUID, link_id: UUID,
+                          broker: Broker = Depends(get_current_broker), db: AsyncSession = Depends(get_db),
+                          service: DocumentService = Depends(get_document_service)):
+    await service.unlink(db, broker.id, document_id, link_id)
+    return Response(status_code=204)
+
+
+@documents_router.post("/documents/{document_id}/archive", response_model=DocumentResponse)
+async def archive_document(document_id: UUID,
+                           broker: Broker = Depends(get_current_broker), db: AsyncSession = Depends(get_db),
+                           service: DocumentService = Depends(get_document_service)):
+    return await service.set_archived(db, broker.id, document_id, True)
+
+
+@documents_router.post("/documents/{document_id}/restore", response_model=DocumentResponse)
+async def restore_document(document_id: UUID,
+                           broker: Broker = Depends(get_current_broker), db: AsyncSession = Depends(get_db),
+                           service: DocumentService = Depends(get_document_service)):
+    return await service.set_archived(db, broker.id, document_id, False)
 
 
 @documents_router.get("/documents/capabilities")
