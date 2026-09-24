@@ -25,6 +25,7 @@ RUN --mount=type=secret,id=HEALTHFLOW_AGENTS_TOKEN,required=true \
 # Copy app code
 COPY healthflow/ healthflow/
 COPY seed.py .
+COPY demo_documents/ demo_documents/
 COPY scripts/ scripts/
 
 # Generate seed data

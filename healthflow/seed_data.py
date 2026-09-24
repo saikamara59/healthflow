@@ -10,7 +10,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from healthflow.auth.security import hash_password
-from healthflow.database.models import Broker, Client, WorkspaceSearchToken
+from healthflow.database.models import Broker, Client, Document, DocumentLink, WorkspaceSearchToken
 
 
 WORKER_PASSWORD = "TestWorker123!"
@@ -74,6 +74,7 @@ async def seed_for_worker(session: AsyncSession, worker_id: str) -> Broker:
         session.add(broker)
         await session.flush()
 
+    await clear_worker_documents(session, broker.id)
     await session.execute(delete(WorkspaceSearchToken).where(
         WorkspaceSearchToken.broker_id == broker.id,
         WorkspaceSearchToken.kind == "client",
@@ -95,3 +96,13 @@ async def seed_for_worker(session: AsyncSession, worker_id: str) -> Broker:
         )
     await session.flush()
     return broker
+
+
+async def clear_worker_documents(session: AsyncSession, broker_id) -> None:
+    """Metadata only: worker cleanup never opens or deletes bucket objects.
+
+    DocumentEvent snapshots deliberately survive the disposable records.
+    Call before deleting Link targets as well as before deleting Clients.
+    """
+    for model in (DocumentLink, Document):
+        await session.execute(delete(model).where(model.broker_id == broker_id))

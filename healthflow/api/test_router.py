@@ -26,7 +26,7 @@ from healthflow.database.models import (
     WorkspaceActivity,
     WorkspaceSearchToken,
 )
-from healthflow.seed_data import seed_for_worker, worker_email
+from healthflow.seed_data import clear_worker_documents, seed_for_worker, worker_email
 
 
 test_router = APIRouter(prefix="/__test", tags=["test"])
@@ -57,6 +57,7 @@ async def reset_db(body: ResetRequest) -> dict:
                     )
                 ).scalar_one_or_none()
                 if broker is not None:
+                    await clear_worker_documents(session, broker.id)
                     await session.execute(
                         delete(WorkspaceSearchToken).where(WorkspaceSearchToken.broker_id == broker.id)
                     )
