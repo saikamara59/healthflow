@@ -69,6 +69,7 @@ def test_registry_lists_tenant_scoped_tables():
         "workspace_search_tokens",
         "documents",
         "document_links",
+        "demo_document_cleanup_intents",
     }
 
 
@@ -78,6 +79,25 @@ async def test_query_with_no_context_raises(session_with_filter):
     # current_broker_id is unset here.
     with pytest.raises(TenantContextMissing):
         await session.execute(select(Client))
+
+
+@pytest.mark.anyio
+async def test_demo_cleanup_journal_is_broker_scoped(session_with_filter):
+    from healthflow.database.models import DemoDocumentCleanupIntent
+    session, broker_a, broker_b, _, _ = session_with_filter
+    with system_context("seed private demo recovery ownership"):
+        for broker in (broker_a, broker_b):
+            session.add(DemoDocumentCleanupIntent(broker_id=broker.id,
+                fixture_marker="synthetic-summary-v1", object_key=str(uuid.uuid4())))
+        await session.commit()
+    with pytest.raises(TenantContextMissing):
+        await session.execute(select(DemoDocumentCleanupIntent))
+    token = current_broker_id.set(broker_a.id)
+    try:
+        intents = (await session.scalars(select(DemoDocumentCleanupIntent))).all()
+        assert len(intents) == 1 and intents[0].broker_id == broker_a.id
+    finally:
+        current_broker_id.reset(token)
 
 
 @pytest.mark.anyio

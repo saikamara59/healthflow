@@ -5,10 +5,10 @@ from pathlib import Path
 from uuid import uuid4, uuid5
 
 from fastapi import UploadFile
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 
 from healthflow.auth.tenant_context import current_broker_id, system_context
-from healthflow.database.models import Broker, Client, Document, DocumentEvent, DocumentLink
+from healthflow.database.models import Broker, Client, DemoDocumentCleanupIntent, Document, DocumentEvent, DocumentLink
 from healthflow.workspace.document_validation import validate_upload
 
 logger = logging.getLogger(__name__)
@@ -44,10 +44,53 @@ def _event(document, action, outcome, actor_id=None):
                          actor_kind="broker" if actor_id else "system", action=action, outcome=outcome)
 
 
+async def _lock_intent(session, broker_id, intent_id):
+    # A no-op UPDATE provides a write lock on SQLite as well as PostgreSQL.
+    # A stale concurrent retry must not PUT after another worker cleared it.
+    result = await session.execute(update(DemoDocumentCleanupIntent).where(
+        DemoDocumentCleanupIntent.id == intent_id,
+        DemoDocumentCleanupIntent.broker_id == broker_id,
+    ).values(created_at=DemoDocumentCleanupIntent.created_at))
+    if result.rowcount != 1:
+        return None
+    return (await session.scalars(select(DemoDocumentCleanupIntent).where(
+        DemoDocumentCleanupIntent.id == intent_id,
+        DemoDocumentCleanupIntent.broker_id == broker_id,
+    ))).one()
+
+
+async def _recover_intents(session, storage, broker_id, markers):
+    """Recover only durable keys for exact markers, never enumerate storage."""
+    ids = (await session.scalars(select(DemoDocumentCleanupIntent.id).where(
+        DemoDocumentCleanupIntent.broker_id == broker_id,
+        DemoDocumentCleanupIntent.fixture_marker.in_(markers),
+    ))).all()
+    for intent_id in ids:
+        try:
+            intent = await _lock_intent(session, broker_id, intent_id)
+            if intent is None:
+                await session.rollback()
+                continue
+            # Defensive protection even if an operator repaired metadata after
+            # an ambiguous commit. A committed file must never be orphan cleanup.
+            with system_context("verify private demo recovery key is unreferenced"):
+                referenced = (await session.scalars(select(Document.id).where(
+                    Document.object_key == intent.object_key,
+                ).limit(1))).first()
+            if referenced is None:
+                storage.remove(intent.object_key)
+            await session.delete(intent)
+            await session.commit()
+        except BaseException:
+            await session.rollback()
+            raise
+
+
 async def seed_demo_documents(session, storage, broker_id, *, fixture_ids=DEMO_FIXTURE_MARKERS) -> int:
     """Commit absent fixtures; archived Documents and Clients remain untouched."""
     markers = exact_markers(fixture_ids)
     await _demo_broker(session, broker_id)
+    await _recover_intents(session, storage, broker_id, markers)
     existing_markers = set((await session.scalars(select(Document.demo_fixture_marker).where(
         Document.broker_id == broker_id, Document.demo_fixture_marker.in_(markers),
     ))).all())
@@ -69,17 +112,34 @@ async def seed_demo_documents(session, storage, broker_id, *, fixture_ids=DEMO_F
                             verified_type=validated.verified_type, byte_length=validated.byte_length,
                             object_key=str(uuid4()))
         key = document.object_key
+        intent = DemoDocumentCleanupIntent(id=uuid4(), broker_id=broker_id,
+                                           fixture_marker=marker, object_key=key)
+        intent_id = intent.id
         try:
-            storage.put(key, validated.stream, validated.content_type)
-            session.add_all([document, _event(document, "seed", "success")])
-            await session.commit()
-        except BaseException:
-            await session.rollback()
+            session.add(intent)
             try:
-                storage.remove(key)
-            except Exception:
-                logger.error("demo_seed_cleanup_failed")
-            raise
+                # No PUT is permitted without a durable exact cleanup target.
+                await session.commit()
+            except BaseException:
+                await session.rollback()
+                raise
+            try:
+                intent = await _lock_intent(session, broker_id, intent_id)
+                if intent is None:
+                    raise RuntimeError("Demo seed superseded by exact recovery; retry")
+                storage.put(key, validated.stream, validated.content_type)
+                session.add_all([document, _event(document, "seed", "success")])
+                await session.delete(intent)
+                await session.commit()
+            except BaseException:
+                await session.rollback()
+                try:
+                    await _recover_intents(session, storage, broker_id, [marker])
+                except Exception:
+                    # The encrypted journal retains the key; ordinary logs and
+                    # durable audit events intentionally contain no object key.
+                    logger.error("demo_seed_cleanup_pending")
+                raise
         finally:
             validated.stream.close()
         created += 1
@@ -100,6 +160,7 @@ async def reset_demo_documents(session, storage, broker_id, fixture_ids) -> int:
         raise PermissionError("An authenticated active administrator is required")
     with system_context("exact demo Document administrator reset"):
         await _demo_broker(session, broker_id)
+        await _recover_intents(session, storage, broker_id, markers)
         documents = (await session.scalars(select(Document).where(
             Document.broker_id == broker_id, Document.demo_fixture_marker.in_(markers),
         ))).all()

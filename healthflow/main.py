@@ -53,7 +53,7 @@ async def lifespan(app: FastAPI):
     from healthflow.database.config import async_session_factory, engine
     from healthflow.database.models import Base
     from healthflow.database.schema_migrations import (
-        ensure_client_archive_column, ensure_phase2_issue_links,
+        ensure_client_archive_column, ensure_demo_document_cleanup_intents, ensure_phase2_issue_links,
     )
     from healthflow.logs.invocation import configure_agent_logfire
     from healthflow.workspace.search_index import backfill_search_index
@@ -62,6 +62,7 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(ensure_phase2_issue_links)
         await conn.run_sync(ensure_client_archive_column)
+        await conn.run_sync(ensure_demo_document_cleanup_intents)
     configure_agent_logfire()
 
     async def backfill_in_background():

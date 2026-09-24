@@ -312,6 +312,25 @@ class Document(Base):
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class DemoDocumentCleanupIntent(Base):
+    """Private recovery journal, committed before any synthetic object PUT.
+
+    Keys are encrypted and never copied into DocumentEvent or API payloads.
+    Unique marker ownership coordinates seeding and exact-target recovery.
+    """
+
+    __tablename__ = "demo_document_cleanup_intents"
+    __table_args__ = (
+        Index("uq_demo_cleanup_broker_fixture", "broker_id", "fixture_marker", unique=True),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    broker_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("brokers.id"), nullable=False, index=True)
+    fixture_marker: Mapped[str] = mapped_column(String(255), nullable=False)
+    object_key: Mapped[str] = mapped_column(EncryptedString(4000), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+
+
 class DocumentLink(Base):
     """One typed association; ending a Link retains its history for re-linking."""
 

@@ -30,6 +30,18 @@ lists or deletes a bucket, and it only deletes Links attached to selected
 Documents. Historical DocumentEvent rows survive. Reset is the explicit
 exception that replaces archived fixtures; ordinary reseeding never does.
 
+Before each object PUT, a private cleanup journal durably records the exact
+Broker, allowlisted marker, and encrypted random key. If that write fails, no
+object is written. Successful Document creation clears the journal in the same
+transaction. If both metadata creation and object cleanup fail, the journal
+survives; retrying seeding or confirming a reset for the exact marker recovers
+only that key. Recovery checks for a committed Document before removing any
+object and keeps its journal if cleanup fails. Keys never appear in ordinary
+logs, reset previews, or DocumentEvent rows. Reset previews include pending
+cleanup record IDs/count. Startup's idempotent schema bridge adds this internal
+table to existing databases. This journal adds one private table and recovery
+lifecycle to maintain; no bucket scan is needed.
+
 Storage and database changes are not one transaction: a durable started event
 precedes each remove, and success follows metadata deletion. After a failure,
 retry the same exact markers; a missing object removal is idempotent. No

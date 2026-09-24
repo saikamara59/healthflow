@@ -3,6 +3,13 @@
 from sqlalchemy import inspect, text
 
 
+def ensure_demo_document_cleanup_intents(connection) -> None:
+    """Idempotently upgrade existing demo databases with the recovery journal."""
+    from healthflow.database.models import DemoDocumentCleanupIntent
+
+    DemoDocumentCleanupIntent.__table__.create(connection, checkfirst=True)
+
+
 def ensure_client_archive_column(connection) -> None:
     """Add Client archive state to databases created before Phase 3."""
     if connection.dialect.name == "postgresql":

@@ -209,3 +209,106 @@ async def test_admin_cli_preview_then_confirm_with_fake_store(db_session, db_ses
     assert "Matched Documents: 1" in output and "Removed: 1; seeded: 1" in output
     assert "synthetic-test-password" not in output
     assert not any(key in output for key in original)
+
+
+@pytest.mark.anyio
+async def test_failed_commit_and_cleanup_retains_encrypted_exact_recovery(db_session, monkeypatch, caplog):
+    from sqlalchemy import text
+    from healthflow.database.models import DemoDocumentCleanupIntent
+    broker, admin = await setup_demo(db_session, monkeypatch)
+    broker_id, admin_id = broker.id, admin.id
+    store = FakeDocumentStorage()
+    commit = db_session.commit
+    remove = store.remove
+    commits = 0
+
+    async def fail_metadata_commit():
+        nonlocal commits
+        commits += 1
+        if commits == 2:
+            raise RuntimeError("metadata commit failed")
+        await commit()
+
+    def fail_cleanup(key):
+        raise OSError("cleanup failed")
+
+    monkeypatch.setattr(db_session, "commit", fail_metadata_commit)
+    monkeypatch.setattr(store, "remove", fail_cleanup)
+    with pytest.raises(RuntimeError, match="metadata commit"):
+        await seed_demo_documents(db_session, store, broker_id, fixture_ids=[DEMO_FIXTURE_MARKERS[0]])
+    intents = (await db_session.scalars(select(DemoDocumentCleanupIntent))).all()
+    assert len(intents) == 1
+    key = intents[0].object_key
+    assert key in store._objects
+    assert (await db_session.scalars(select(Document))).all() == []
+    raw = (await db_session.execute(text("SELECT object_key FROM demo_document_cleanup_intents WHERE broker_id=:broker"), {"broker": str(broker_id)})).scalar_one()
+    assert key not in raw and key not in caplog.text
+    assert (await db_session.scalars(select(DocumentEvent))).all() == []
+    monkeypatch.setattr(db_session, "commit", commit)
+    monkeypatch.setattr(store, "remove", remove)
+    store._objects["unrelated"] = b"untouched"
+    token = current_broker_id.set(admin_id)
+    try:
+        assert await reset_demo_documents(db_session, store, broker_id, [DEMO_FIXTURE_MARKERS[1]]) == 0
+        assert key in store._objects
+        assert await reset_demo_documents(db_session, store, broker_id, [DEMO_FIXTURE_MARKERS[0]]) == 0
+    finally:
+        current_broker_id.reset(token)
+    assert store._objects == {"unrelated": b"untouched"}
+    assert (await db_session.scalars(select(DemoDocumentCleanupIntent))).all() == []
+    assert await seed_demo_documents(db_session, store, broker_id, fixture_ids=[DEMO_FIXTURE_MARKERS[0]]) == 1
+    assert (await db_session.scalars(select(DemoDocumentCleanupIntent))).all() == []
+
+
+@pytest.mark.anyio
+async def test_no_object_write_when_cleanup_intent_cannot_persist(db_session, monkeypatch):
+    broker, _ = await setup_demo(db_session, monkeypatch)
+    store = FakeDocumentStorage()
+    writes = []
+    monkeypatch.setattr(store, "put", lambda *args: writes.append(args))
+
+    async def fail():
+        raise RuntimeError("intent unavailable")
+
+    monkeypatch.setattr(db_session, "commit", fail)
+    with pytest.raises(RuntimeError, match="intent unavailable"):
+        await seed_demo_documents(db_session, store, broker.id)
+    assert writes == []
+
+
+@pytest.mark.anyio
+async def test_recovery_never_removes_committed_document(db_session, monkeypatch):
+    from healthflow.database.models import DemoDocumentCleanupIntent
+    broker, _ = await setup_demo(db_session, monkeypatch)
+    store = FakeDocumentStorage()
+    await seed_demo_documents(db_session, store, broker.id)
+    document = (await db_session.scalars(select(Document))).first()
+    db_session.add(DemoDocumentCleanupIntent(broker_id=broker.id, fixture_marker=document.demo_fixture_marker, object_key=document.object_key))
+    await db_session.commit()
+    objects = dict(store._objects)
+    assert await seed_demo_documents(db_session, store, broker.id) == 0
+    assert store._objects == objects
+    assert (await db_session.scalars(select(DemoDocumentCleanupIntent))).all() == []
+
+
+@pytest.mark.anyio
+async def test_successful_cleanup_clears_intent_after_metadata_failure(db_session, monkeypatch):
+    from healthflow.database.models import DemoDocumentCleanupIntent
+    broker, _ = await setup_demo(db_session, monkeypatch)
+    store = FakeDocumentStorage()
+    commit = db_session.commit
+    count = 0
+
+    async def fail_metadata_only():
+        nonlocal count
+        count += 1
+        if count == 2:
+            raise RuntimeError("metadata failure")
+        await commit()
+
+    monkeypatch.setattr(db_session, "commit", fail_metadata_only)
+    with pytest.raises(RuntimeError, match="metadata failure"):
+        await seed_demo_documents(db_session, store, broker.id)
+    assert store._objects == {}
+    assert (await db_session.scalars(select(Document))).all() == []
+    assert (await db_session.scalars(select(DemoDocumentCleanupIntent))).all() == []

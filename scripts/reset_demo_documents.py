@@ -11,7 +11,7 @@ async def reset(args, password):
     from healthflow.auth.security import verify_password
     from healthflow.auth.tenant_context import current_broker_id, system_context
     from healthflow.database.config import async_session_factory
-    from healthflow.database.models import Broker, Document
+    from healthflow.database.models import Broker, DemoDocumentCleanupIntent, Document
     from healthflow.workspace.demo_documents import DEMO_EMAIL, exact_markers, reset_demo_documents, seed_demo_documents
     from healthflow.workspace.document_storage import S3DocumentStorage
 
@@ -26,6 +26,13 @@ async def reset(args, password):
             print(f"Matched Documents: {len(targets)}")
             for document in targets:
                 print(f"  {document.id} {document.demo_fixture_marker}")
+            intents = (await session.scalars(select(DemoDocumentCleanupIntent).where(
+                DemoDocumentCleanupIntent.broker_id == broker.id,
+                DemoDocumentCleanupIntent.fixture_marker.in_(markers),
+            ))).all()
+            print(f"Pending exact cleanup records: {len(intents)}")
+            for intent in intents:
+                print(f"  {intent.id} {intent.fixture_marker}")
         if not args.confirm:
             print("Preview only. Repeat with --confirm to remove and reseed these fixtures.")
             return
