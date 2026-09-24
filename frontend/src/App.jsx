@@ -31,6 +31,7 @@ import OnboardingSuccessPage from './pages/OnboardingSuccessPage'
 import FeedbackDashboardPage from './pages/FeedbackDashboardPage'
 import AdminPage from './pages/AdminPage'
 import AdminRoute from './components/AdminRoute'
+import DocumentArchivePage from './pages/DocumentArchivePage'
 
 // At `/`, show the public marketing page to logged-out visitors; redirect
 // authenticated users into their workspace so they don't see a sales pitch
@@ -64,6 +65,7 @@ export default function App() {
             <Route path="enrollments" element={<EnrollmentsPage />} />
             <Route path="issues" element={<IssuesPage />} />
             <Route path="clients" element={<ClientListPage />} />
+            <Route path="documents/archive" element={<DocumentArchivePage />} />
             <Route path="clients/new" element={<AddClientPage />} />
             <Route path="clients/success" element={<OnboardingSuccessPage />} />
             <Route path="clients/:id" element={<ClientProfilePage />} />

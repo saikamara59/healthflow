@@ -1,4 +1,172 @@
 import { test, expect } from '../fixtures'
+import path from 'node:path'
+import { test as publicTest } from '@playwright/test'
+
+publicTest('Phase 3 documents public demo seeded files are visible and direct upload is denied', async ({ page, request }) => {
+  publicTest.skip(process.env.PHASE3_PUBLIC_DEMO !== '1', 'Requires separately seeded upload-disabled synthetic demo')
+  const login = await request.post('/auth/login', { data: { email: process.env.PHASE3_DEMO_EMAIL, password: process.env.PHASE3_DEMO_PASSWORD } })
+  expect(login.ok()).toBe(true)
+  const tokens = await login.json()
+  await page.addInitScript((value) => {
+    sessionStorage.setItem('hf_token', value.access_token)
+    sessionStorage.setItem('hf_refresh', value.refresh_token)
+  }, tokens)
+  const headers = { Authorization: `Bearer ${tokens.access_token}` }
+  expect((await (await request.get('/documents/capabilities', { headers })).json()).upload_enabled).toBe(false)
+  const clients = await (await request.get('/clients', { headers })).json()
+  const client = clients.find((item) => item.full_name === 'Eleanor Rigby')
+  expect(client).toBeTruthy()
+  await page.goto(`/clients/${client.id}`)
+  await expect(page.locator('.document-row').filter({ hasText: 'synthetic-summary.pdf' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Upload document' })).toHaveCount(0)
+  const denied = await request.post(`/clients/${client.id}/documents`, { headers, multipart: { file: { name: 'synthetic.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%%EOF') } } })
+  expect(denied.status()).toBe(503)
+  expect((await denied.json()).detail).toBe('Document uploads are disabled')
+  await page.goto('/documents/archive')
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Document archive', exact: true })).toBeVisible()
+})
+
+test('Phase 3 documents shares one rotating refresh across simultaneous requests', async ({ authedPage: page }) => {
+  await page.goto('/documents/archive')
+  await expect(page.getByText('No archived Documents.')).toBeVisible()
+  let refreshes = 0
+  page.on('request', (request) => { if (request.url().endsWith('/auth/refresh')) refreshes += 1 })
+  const tokens = await page.evaluate(async () => {
+    const { default: api } = await import('/src/api/client.js')
+    const before = sessionStorage.getItem('hf_refresh')
+    sessionStorage.setItem('hf_token', 'expired')
+    await Promise.all([api.get('/documents/capabilities'), api.get('/documents/archived'), api.get('/clients')])
+    const first = sessionStorage.getItem('hf_refresh')
+    sessionStorage.setItem('hf_token', 'expired-again')
+    await api.get('/documents/capabilities')
+    return [before, first, sessionStorage.getItem('hf_refresh')]
+  })
+  expect(refreshes).toBe(2)
+  expect(new Set(tokens).size).toBe(3)
+})
+
+test('Phase 3 documents downloads Word attachments and revokes the temporary URL', async ({ authedPage: page }) => {
+  await page.goto('/today')
+  await page.route('**/documents/word-fixture/content', (route) => route.fulfill({
+    headers: { 'Content-Type': 'application/msword', 'Content-Disposition': "attachment; filename*=UTF-8''synthetic-letter.doc" },
+    body: 'Synthetic Word download transport fixture',
+  }))
+  await page.evaluate(() => {
+    window.revokedDocumentUrls = []
+    const revoke = URL.revokeObjectURL.bind(URL)
+    URL.revokeObjectURL = (url) => { window.revokedDocumentUrls.push(url); revoke(url) }
+  })
+  const download = page.waitForEvent('download')
+  await page.evaluate(async () => {
+    const { default: api } = await import('/src/api/client.js')
+    await api.openDocument('word-fixture')
+  })
+  expect((await download).suggestedFilename()).toBe('synthetic-letter.doc')
+  await expect.poll(() => page.evaluate(() => window.revokedDocumentUrls.length)).toBe(1)
+})
+
+test('Phase 3 documents upload, reuse, Unlink, archive and restore retain only active associations', async ({ authedPage: page }) => {
+  await page.goto('/today')
+  const headers = { Authorization: `Bearer ${await page.evaluate(() => sessionStorage.getItem('hf_token'))}` }
+  const capability = await (await page.request.get('/documents/capabilities', { headers })).json()
+  test.skip(!capability.upload_enabled, 'Private synthetic-test environment required')
+  const client = (await (await page.request.get('/clients', { headers })).json())[0]
+  const enrollment = await (await page.request.post('/enrollments', { headers, data: { client_id: client.id, plan_name: 'Synthetic Document Plan' } })).json()
+  const issue = await (await page.request.post('/issues', { headers, data: { client_id: client.id, title: 'Synthetic Document Issue' } })).json()
+  const appeal = await (await page.request.post('/appeals', { headers, data: { issue_id: issue.id, title: 'Synthetic Document Appeal' } })).json()
+  await page.goto(`/clients/${client.id}`)
+  await page.getByLabel('Choose synthetic file').setInputFiles(path.resolve('../demo_documents/synthetic-summary.pdf'))
+  await page.getByRole('button', { name: 'Upload document', exact: true }).click()
+  const row = page.locator('.document-row').filter({ hasText: 'synthetic-summary.pdf' }).last()
+  await expect(row).toBeVisible()
+  const docs = await (await page.request.get(`/clients/${client.id}/documents`, { headers })).json()
+  const doc = docs.find((item) => item.display_filename === 'synthetic-summary.pdf')
+  const otherId = 'e2e-worker-999'
+  expect((await page.request.post('/__test/reset', { data: { worker_id: otherId } })).ok()).toBe(true)
+  const outsider = await (await page.request.post('/auth/login', { data: { email: `${otherId}@healthflow.test`, password: 'TestWorker123!' } })).json()
+  const outsiderHeaders = { Authorization: `Bearer ${outsider.access_token}` }
+  expect((await page.request.get(`/documents/${doc.id}/content`, { headers: outsiderHeaders })).status()).toBe(404)
+  expect((await page.request.get(`/clients/${client.id}/documents`, { headers: outsiderHeaders })).status()).toBe(404)
+  await page.goto('/enrollments')
+  const enrollmentPanel = page.locator('details').filter({ hasText: 'Synthetic Document Plan' })
+  await enrollmentPanel.locator('summary').click()
+  await enrollmentPanel.getByLabel('Client Document').selectOption(doc.id)
+  await enrollmentPanel.getByRole('button', { name: 'Link document', exact: true }).click()
+  await expect(enrollmentPanel.locator('.document-row')).toContainText('synthetic-summary.pdf')
+  await page.reload()
+  await page.goto('/issues')
+  await page.reload()
+  await page.getByRole('button', { name: /Synthetic Document Issue/ }).click()
+  const issuePanel = page.locator('.phase2-detail > .document-panel')
+  await issuePanel.getByLabel('Client Document').selectOption(doc.id)
+  await issuePanel.getByRole('button', { name: 'Link document', exact: true }).click()
+  await expect(issuePanel.locator('.document-row')).toContainText('synthetic-summary.pdf')
+  const appealPanel = page.locator('details').filter({ hasText: 'Documents · Synthetic Document Appeal' })
+  await appealPanel.locator('summary').click()
+  await expect(appealPanel.getByLabel('Client Document')).toBeVisible()
+  await appealPanel.getByLabel('Client Document').selectOption(doc.id)
+  await appealPanel.getByRole('button', { name: 'Link document', exact: true }).click()
+  await expect(issuePanel.getByRole('button', { name: 'Unlink appeal' })).toBeVisible()
+  await appealPanel.getByRole('button', { name: 'Unlink appeal' }).click()
+  await expect(issuePanel.getByRole('button', { name: 'Unlink appeal' })).toHaveCount(0)
+  await expect(appealPanel.locator('.document-row')).toHaveCount(0)
+  expect(appeal.id).toBeTruthy()
+  await page.goto(`/clients/${client.id}`)
+  await page.evaluate(() => sessionStorage.setItem('hf_token', 'expired'))
+  const content = page.waitForResponse((response) => response.url().includes(`/documents/${doc.id}/content`) && response.status() === 200)
+  const popup = page.waitForEvent('popup')
+  await page.locator('.document-row').filter({ hasText: 'synthetic-summary.pdf' }).getByRole('button', { name: 'Open', exact: true }).click()
+  expect((await content).headers()['content-disposition']).toMatch(/^inline/)
+  await (await popup).close()
+  await page.locator('.document-row').filter({ hasText: 'synthetic-summary.pdf' }).getByRole('button', { name: 'Unlink issue', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Unlink issue', exact: true })).toHaveCount(0)
+  await page.locator('.document-row').filter({ hasText: 'synthetic-summary.pdf' }).getByRole('button', { name: 'Archive document' }).click()
+  await expect(page.locator('.document-row').filter({ hasText: 'synthetic-summary.pdf' })).toHaveCount(0)
+  await page.goto('/documents/archive')
+  await page.reload()
+  const archived = page.locator('.document-row').filter({ hasText: 'synthetic-summary.pdf' })
+  await expect(archived.getByRole('button', { name: 'Unlink enrollment' })).toBeVisible()
+  await archived.getByRole('button', { name: 'Restore document' }).click()
+  await expect(archived).toHaveCount(0)
+  const links = await (await page.request.get(`/documents/${doc.id}/links`, { headers })).json()
+  expect(links.map((link) => link.target_type)).toEqual(['enrollment'])
+  await page.goto(`/clients/${client.id}`)
+  await page.reload()
+  page.once('dialog', (dialog) => dialog.accept())
+  await page.getByRole('button', { name: 'Archive client' }).click()
+  await expect(page.getByRole('button', { name: 'Upload document' })).toHaveCount(0)
+  await page.goto('/enrollments')
+  await enrollmentPanel.locator('summary').click()
+  await expect(enrollmentPanel.getByRole('button', { name: 'Link document', exact: true })).toHaveCount(0)
+  await page.goto('/appeals')
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Issue context' })).toBeVisible()
+})
+
+test('Phase 3 documents archive supports direct navigation and refresh', async ({ authedPage: page }) => {
+  await page.goto('/documents/archive')
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Document archive', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Upload document' })).toHaveCount(0)
+})
+
+test('Phase 3 documents uses server upload capability and shows synthetic Client Documents', async ({ authedPage: page }) => {
+  await page.goto('/today')
+  const token = await page.evaluate(() => sessionStorage.getItem('hf_token'))
+  const headers = { Authorization: `Bearer ${token}` }
+  const clients = await (await page.request.get('/clients', { headers })).json()
+  const client = clients.find((item) => item.full_name === 'Eleanor Rigby') || clients[0]
+  const capability = await (await page.request.get('/documents/capabilities', { headers })).json()
+  await page.goto(`/clients/${client.id}`)
+  await expect(page.getByRole('heading', { name: 'Documents', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Upload document', exact: true })).toHaveCount(capability.upload_enabled ? 1 : 0)
+  if (!capability.upload_enabled) {
+    const denied = await page.request.post(`/clients/${client.id}/documents`, { headers, multipart: { file: { name: 'synthetic.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%%EOF') } } })
+    expect(denied.status()).toBe(503)
+    expect((await denied.json()).detail).toBe('Document uploads are disabled')
+  }
+})
 
 test('archived client remains in history and keeps Today and Scheduling deadlines visible', async ({ authedPage: page }) => {
   await page.goto('/today')

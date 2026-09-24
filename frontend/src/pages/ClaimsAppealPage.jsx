@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../api/client';
+import DocumentList from '../components/DocumentList';
 import { workspaceApi } from '../api/workspace';
 import TopBar from '../components/TopBar';
 import Icon from '../components/ui/Icon';
@@ -28,6 +29,7 @@ export default function ClaimsAppealPage() {
   const [context, setContext] = useState('');
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
+  const [savedAppeal, setSavedAppeal] = useState(null);
   const [error, setError] = useState('');
   const [issues, setIssues] = useState([]);
   const [clients, setClients] = useState([]);
@@ -65,6 +67,7 @@ export default function ClaimsAppealPage() {
     }
     setError('');
     setRunning(true);
+    setSavedAppeal(null);
     try {
       const issueContext = `Issue context: ${issue.title}`;
       const additionalContext = [context, issueContext].filter(Boolean).join('\n\n');
@@ -78,11 +81,12 @@ export default function ClaimsAppealPage() {
       });
       setResult(res);
       try {
-        await workspaceApi.createAppeal({
+        const saved = await workspaceApi.createAppeal({
           issue_id: issueId,
           title: `${APPEAL_TITLE_PREFIX}${issue.title.slice(0, MAX_APPEAL_TITLE - APPEAL_TITLE_PREFIX.length)}`,
           draft_text: res.appeal_letter,
         });
+        setSavedAppeal({ ...saved, client_id: issue.client_id });
       } catch {
         setError('The Appeal was generated, but the draft could not be saved. Copy the letter before leaving this page and try again.');
       }
@@ -126,6 +130,7 @@ export default function ClaimsAppealPage() {
           </div>
         </section>
 
+        {savedAppeal && <DocumentList clientId={savedAppeal.client_id} targetType="appeal" targetId={savedAppeal.id} />}
         <div className="grid-12" style={{ gap: 24 }}>
           <div style={{ gridColumn: 'span 5' }}>
             <div className="section-head" style={{ marginTop: 0 }}>

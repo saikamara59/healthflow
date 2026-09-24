@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import api from '../api/client';
+import DocumentList from '../components/DocumentList';
 import TopBar from '../components/TopBar';
 import Icon from '../components/ui/Icon';
 import Chip from '../components/ui/Chip';
@@ -185,6 +186,7 @@ export default function ClientProfilePage() {
           </div>
         </div>
 
+        <DocumentList clientId={id} archived={Boolean(client.archived_at)} />
         <div className="tabs-row" style={{ marginTop: 20 }}>
           {TABS.filter((t) => !client.archived_at || t !== 'edit').map((t) => (
             <button key={t} onClick={() => setTab(t)} className={`tab-btn ${tab === t ? 'active' : ''}`}>

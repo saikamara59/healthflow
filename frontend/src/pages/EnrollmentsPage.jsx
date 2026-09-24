@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { workspaceApi } from '../api/workspace'
 import TopBar from '../components/TopBar'
+import DocumentList from '../components/DocumentList'
 import useLayout from '../components/ui/useLayout'
 
 const EMPTY = { client_id: '', plan_name: '', effective_date: '', notes: '' }
@@ -21,6 +22,7 @@ export default function EnrollmentsPage() {
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [documentRecord, setDocumentRecord] = useState(null)
 
   async function refresh(nextFilter = filter) {
     const query = nextFilter ? `status=${encodeURIComponent(nextFilter)}` : ''
@@ -99,6 +101,7 @@ export default function EnrollmentsPage() {
           {enrollments && <ul className="workspace-list">{enrollments.map((item) => <li className="workspace-list-row" key={item.id}><div className="workspace-row-copy"><strong>{item.client_name} · {item.plan_name}</strong><small>{LABELS[item.status]}{item.effective_date ? ` · Effective ${item.effective_date}` : ''}</small></div><div className="workspace-row-actions"><button className="btn sm ghost" onClick={() => edit(item)}>Edit</button>{item.status === 'preparing' && <button className="btn sm" onClick={() => act(item, 'ready')}>Ready to submit</button>}{item.status === 'ready_to_submit' && <button className="btn sm accent" onClick={() => act(item, 'submit')}>Mark Submitted</button>}{item.status === 'submitted' && <button className="btn sm" onClick={() => act(item, 'confirm')}>Confirm</button>}{!['confirmed', 'canceled'].includes(item.status) && <button className="btn sm ghost" onClick={() => act(item, 'cancel')}>Cancel</button>}</div></li>)}</ul>}
         </section>
       </div>
+      {(enrollments || []).map((item) => <details className="card workspace-section" key={item.id} open={documentRecord === item.id} onToggle={(event) => { if (event.currentTarget.open) setDocumentRecord(item.id); else setDocumentRecord((current) => current === item.id ? null : current) }}><summary>Documents · {item.client_name} · {item.plan_name}</summary>{documentRecord === item.id && <DocumentList clientId={item.client_id} targetType="enrollment" targetId={item.id} />}</details>)}
     </main>
   </>
 }
