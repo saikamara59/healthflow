@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../api/client'
 
-export default function DocumentList({ clientId, targetType, targetId, archived = false }) {
+export default function DocumentList({ clientId, targetType, targetId, archived }) {
   const [state, setState] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -41,7 +41,7 @@ export default function DocumentList({ clientId, targetType, targetId, archived 
     catch (err) { setError(err.message) }
     finally { setBusy(false) }
   }
-  const clientArchived = archived || Boolean(state?.client?.archived_at)
+  const clientArchived = archived ?? Boolean(state?.client?.archived_at)
   const candidates = state?.available.filter((doc) => !state.documents.some((item) => item.id === doc.id)) || []
   return <section className="document-panel" aria-label="Documents">
     <div className="between"><h2>Documents</h2>{!archiveView && <Link to="/documents/archive">Document archive</Link>}</div>

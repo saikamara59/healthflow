@@ -144,6 +144,23 @@ test('Phase 3 documents upload, reuse, Unlink, archive and restore retain only a
   await expect(page.getByRole('heading', { name: 'Issue context' })).toBeVisible()
 })
 
+test('Phase 3 documents restores upload controls without reloading an archived Client', async ({ authedPage: page }) => {
+  await page.goto('/documents/archive')
+  const headers = { Authorization: `Bearer ${await page.evaluate(() => sessionStorage.getItem('hf_token'))}` }
+  const capability = await (await page.request.get('/documents/capabilities', { headers })).json()
+  test.skip(!capability.upload_enabled, 'Private synthetic-test environment required')
+  const client = (await (await page.request.get('/clients', { headers })).json())[0]
+  expect((await page.request.post(`/clients/${client.id}/archive`, { headers })).ok()).toBe(true)
+  await page.goto(`/clients/${client.id}`)
+  const panel = page.getByRole('region', { name: 'Documents', exact: true })
+  await expect(panel.getByText('No active Documents.')).toBeVisible()
+  await expect(panel.getByText(/Archived client/)).toBeVisible()
+  await expect(panel.getByRole('button', { name: 'Upload document' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Restore client', exact: true }).click()
+  await expect(panel.getByRole('button', { name: 'Upload document', exact: true })).toBeVisible()
+  await expect(panel.getByText(/Archived client/)).toHaveCount(0)
+})
+
 test('Phase 3 documents archive supports direct navigation and refresh', async ({ authedPage: page }) => {
   await page.goto('/documents/archive')
   await page.reload()
