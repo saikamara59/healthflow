@@ -47,7 +47,11 @@ def word_zip(extra=None):
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w", zipfile.ZIP_DEFLATED) as archive:
         for name, data in parts.items():
-            archive.writestr(name, data)
+            # ZIP's wall-clock timestamp otherwise changes expected bytes
+            # when an upload/open test crosses a two-second DOS time boundary.
+            entry = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(entry, data)
     return stream.getvalue()
 
 
