@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 from sqlalchemy import select
@@ -200,6 +201,7 @@ async def test_delete_client(client):
 
 @pytest.mark.asyncio
 async def test_archive_client_preserves_workspace_records_and_audits(client, db_session):
+    started = datetime.now(timezone.utc)
     token = await _register_and_login(client, "delete-linked-client@example.com")
     headers = {"Authorization": f"Bearer {token}"}
     created = await client.post("/clients", json={
@@ -245,6 +247,8 @@ async def test_archive_client_preserves_workspace_records_and_audits(client, db_
     ))).scalars().all()
     assert {item.action for item in activities} == {"archived", "restored"}
     for item in activities:
+        assert item.broker_id == uuid.UUID(created.json()["broker_id"])
+        assert started <= item.created_at.replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc)
         assert item.entity_type == "client"
         assert item.client_id == uuid.UUID(client_id)
         assert item.details == {"outcome": "success"}

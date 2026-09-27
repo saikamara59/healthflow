@@ -61,6 +61,126 @@ async def document_targets(db_session, document):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["enrollment", "issue", "appeal"])
+@pytest.mark.parametrize("history", ["active", "ended", "archived"])
+async def test_document_history_prevents_target_client_reassignment(client, records, service, db_session, kind, history):
+    data = (await upload(client, records)).json()
+    document = await db_session.get(Document, UUID(data["id"]))
+    targets = await document_targets(db_session, document)
+    other_client = await _client_record(client, records[0], "Another synthetic Client")
+    base = f"/documents/{document.id}"
+    link = (await client.post(base + "/links", headers=records[0], json={
+        "target_type": kind, "target_id": str(targets[kind]),
+    })).json()
+    if history == "ended":
+        await client.delete(base + f"/links/{link['id']}", headers=records[0])
+    elif history == "archived":
+        await client.post(base + "/archive", headers=records[0])
+    parent = "enrollment" if kind == "enrollment" else "issue"
+    response = await client.put(f"/{parent}s/{targets[parent]}", headers=records[0],
+                                json={"client_id": other_client["id"]})
+    assert response.status_code == 409, response.text
+    assert (await client.get(f"/{parent}s/{targets[parent]}", headers=records[0])).json()["client_id"] == records[2]
+
+
+@pytest.mark.asyncio
+async def test_denied_open_attempts_are_durable_without_foreign_client_metadata(client, records, service, db_session):
+    data = (await upload(client, records)).json()
+    service.storage.get = Mock(wraps=service.storage.get)
+    requested = [data["id"], str(uuid4())]
+    for document_id in requested:
+        response = await client.get(f"/documents/{document_id}/content", headers=records[1])
+        assert response.status_code == 404
+    rows = (await db_session.scalars(select(DocumentEvent).where(DocumentEvent.outcome == "denied"))).all()
+    assert {str(row.document_id) for row in rows} == set(requested)
+    assert all(row.action == "open" and row.client_id is None and row.actor_id == row.broker_id for row in rows)
+    document = await db_session.get(Document, UUID(data["id"]))
+    assert all(row.broker_id != document.broker_id for row in rows)
+    service.storage.get.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["enrollment", "issue", "appeal"])
+@pytest.mark.parametrize("first", ["link", "move"])
+async def test_link_and_reassignment_serialize_on_target(client, records, service, db_session, tmp_path, monkeypatch, kind, first):
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from healthflow.database.config import get_db
+    from healthflow.database.models import Base, Broker, Client
+    from healthflow.workspace import document_service, enrollments_router, issues_router
+    from healthflow.workspace.linking import lock_document_target
+
+    data = (await upload(client, records)).json()
+    document = await db_session.get(Document, UUID(data["id"]))
+    targets = await document_targets(db_session, document)
+    destination = await _client_record(client, records[0], "Synthetic destination")
+    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'target-race.db'}")
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with factory() as session:
+        for model in (Broker, Client, Document, Enrollment, Issue, Appeal):
+            for row in (await db_session.scalars(select(model))).all():
+                await session.merge(row)
+        await session.commit()
+    previous = app.dependency_overrides[get_db]
+
+    async def race_db():
+        async with factory() as session:
+            yield session
+            await session.commit()
+
+    held, contender, release = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+    def coordinated_lock(operation):
+        async def lock(*args):
+            if operation != first:
+                contender.set()
+            record = await lock_document_target(*args)
+            if operation == first:
+                held.set()
+                await asyncio.wait_for(release.wait(), 5)
+            return record
+        return lock
+
+    monkeypatch.setattr(document_service, "lock_document_target", coordinated_lock("link"))
+    parent = "enrollment" if kind == "enrollment" else "issue"
+    module = enrollments_router if parent == "enrollment" else issues_router
+    monkeypatch.setattr(module, "lock_document_target", coordinated_lock("move"))
+    app.dependency_overrides[get_db] = race_db
+
+    async def perform(operation):
+        if operation == "link":
+            return await client.post(f"/documents/{data['id']}/links", headers=records[0],
+                                     json={"target_type": kind, "target_id": str(targets[kind])})
+        return await client.put(f"/{parent}s/{targets[parent]}", headers=records[0],
+                                json={"client_id": destination["id"]})
+
+    tasks = []
+    try:
+        tasks.append(asyncio.create_task(perform(first)))
+        await asyncio.wait_for(held.wait(), 5)
+        second = "move" if first == "link" else "link"
+        tasks.append(asyncio.create_task(perform(second)))
+        await asyncio.wait_for(contender.wait(), 5)
+        # The second connection must wait while the first holds the row lock.
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(asyncio.shield(tasks[1]), .05)
+        release.set()
+        responses = await asyncio.gather(*tasks)
+        assert [response.status_code for response in responses] == ([201, 409] if first == "link" else [200, 404])
+        async with factory() as session:
+            links = (await session.scalars(select(DocumentLink))).all()
+            target = await session.get(Enrollment if parent == "enrollment" else Issue, targets[parent])
+            assert len(links) == (1 if first == "link" else 0)
+            assert str(target.client_id) == (records[2] if first == "link" else destination["id"])
+    finally:
+        release.set()
+        await asyncio.gather(*tasks, return_exceptions=True)
+        app.dependency_overrides[get_db] = previous
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
 async def test_link_history_archive_restore_keep_one_object(client, records, service, db_session):
     service.storage.put = Mock(wraps=service.storage.put)
     service.storage.remove = Mock(wraps=service.storage.remove)

@@ -128,13 +128,15 @@ export default function ClientListPage() {
   const [selected, setSelected] = useState(() => new Set());
 
   useEffect(() => {
+    let current = true;
     setLoading(true);
     setSelected(new Set());
     setFilter('all');
     api.get(archived ? '/clients?archived=true' : '/clients')
-      .then((d) => setClients(Array.isArray(d) ? d : []))
-      .catch(() => setClients([]))
-      .finally(() => setLoading(false));
+      .then((d) => { if (current) setClients(Array.isArray(d) ? d : []); })
+      .catch(() => { if (current) setClients([]); })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
   }, [archived]);
 
   const filtered = useMemo(() => {

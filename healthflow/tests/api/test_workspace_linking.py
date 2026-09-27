@@ -8,6 +8,28 @@ from healthflow.database.models import Broker, Client, Contact, Issue, Organizat
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["appeals", "tasks", "appointments"])
+async def test_archived_issue_client_blocks_new_work_but_allows_existing_updates(client, kind):
+    from healthflow.tests.api.test_enrollments import _client_record, _headers
+
+    headers = await _headers(client, "archived-issue-parent@example.com")
+    parent = await _client_record(client, headers, "Synthetic parent")
+    issue = (await client.post("/issues", headers=headers, json={"client_id": parent["id"], "title": "Synthetic"})).json()
+    payload = {"issue_id": issue["id"], "title": "Synthetic work"}
+    if kind == "appointments":
+        payload.update(starts_at="2030-01-15T10:00:00Z", ends_at="2030-01-15T11:00:00Z")
+    existing = await client.post(f"/{kind}", headers=headers, json=payload)
+    assert existing.status_code == 201
+    assert (await client.post(f"/clients/{parent['id']}/archive", headers=headers)).status_code == 200
+    assert (await client.post(f"/{kind}", headers=headers, json=payload)).status_code == 404
+    assert (await client.put(f"/{kind}/{existing.json()['id']}", headers=headers, json={"title": "Updated existing work"})).status_code == 200
+    if kind == "tasks":
+        assert (await client.post(f"/tasks/{existing.json()['id']}/complete", headers=headers)).status_code == 200
+    assert (await client.post(f"/clients/{parent['id']}/restore", headers=headers)).status_code == 200
+    assert (await client.post(f"/{kind}", headers=headers, json=payload)).status_code == 201
+
+
+@pytest.mark.asyncio
 async def test_link_validation_rejects_foreign_and_mismatched_records(db_session_factory):
     from healthflow.workspace.linking import require_owned_links
 

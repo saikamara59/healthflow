@@ -17,6 +17,7 @@ from starlette.concurrency import run_in_threadpool
 from healthflow.database.config import async_session_factory
 from healthflow.database.models import Appeal, Client, Document, DocumentEvent, DocumentLink, Enrollment, Issue, _utcnow
 from healthflow.workspace.document_storage import DocumentStorage
+from healthflow.workspace.linking import lock_document_target
 from healthflow.workspace.document_validation import (
     CONTENT_TYPES, DocumentTooLarge, InvalidDocumentType, validate_upload,
 )
@@ -149,6 +150,7 @@ class DocumentService:
             raise HTTPException(503, "Document update unavailable; retry later") from None
 
     async def link(self, db, broker_id, document_id, target_type: TargetType, target_id):
+        await lock_document_target(db, broker_id, target_type, target_id)
         document = await self.owned_document(db, broker_id, document_id, lock=True)
         client = await self.target_client(db, broker_id, target_type, target_id)
         if client.id != document.client_id:
@@ -255,7 +257,16 @@ class DocumentService:
         return document
 
     async def open(self, db: AsyncSession, broker_id: UUID, document_id: UUID) -> StreamingResponse:
-        document = await self.owned_document(db, broker_id, document_id)
+        try:
+            document = await self.owned_document(db, broker_id, document_id)
+        except HTTPException as error:
+            if error.status_code != 404:
+                raise
+            # Release the request's read-audit transaction before the independent
+            # durable write (required for SQLite). Never look up foreign metadata.
+            await db.rollback()
+            await self._outcome(broker_id, None, document_id, "denied")
+            raise
         client_id, key = document.client_id, document.object_key
         kind, filename = document.verified_type, document.display_filename
         db.add(self.event(broker_id, client_id, document_id, "open", "started"))

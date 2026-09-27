@@ -2,6 +2,35 @@ import { test, expect } from '../fixtures'
 import path from 'node:path'
 import { test as publicTest } from '@playwright/test'
 
+test('Phase 3 Client status ignores an older response after switching views', async ({ authedPage: page }) => {
+  await page.goto('/today')
+  let releaseActive
+  const activeReady = new Promise((resolve) => { releaseActive = resolve })
+  let activeStarted
+  const started = new Promise((resolve) => { activeStarted = resolve })
+  await page.route('**/clients', async (route) => {
+    if (route.request().isNavigationRequest()) return route.continue()
+    activeStarted()
+    await activeReady
+    await route.fulfill({ json: [{ id: 'old-active', full_name: 'Old active result', age: 40 }] })
+  })
+  await page.route('**/clients?archived=true', (route) => {
+    if (route.request().isNavigationRequest()) return route.continue()
+    return route.fulfill({ json: [{ id: 'current-archive', full_name: 'Current archived result', age: 40 }] })
+  })
+  await page.goto('/clients')
+  await started
+  await page.getByRole('link', { name: 'Archived clients', exact: true }).click()
+  await expect(page.getByText('Current archived result', { exact: true })).toBeVisible()
+  const oldResponse = page.waitForResponse((response) => response.url().endsWith('/clients'))
+  releaseActive()
+  await oldResponse
+  // Wait until the older fetch has completed and React has rendered its callbacks.
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  await expect(page.getByText('Current archived result', { exact: true })).toBeVisible()
+  await expect(page.getByText('Old active result', { exact: true })).toHaveCount(0)
+})
+
 publicTest('Phase 3 documents public demo seeded files are visible and direct upload is denied', async ({ page, request }) => {
   publicTest.skip(process.env.PHASE3_PUBLIC_DEMO !== '1', 'Requires separately seeded upload-disabled synthetic demo')
   const login = await request.post('/auth/login', { data: { email: process.env.PHASE3_DEMO_EMAIL, password: process.env.PHASE3_DEMO_PASSWORD } })

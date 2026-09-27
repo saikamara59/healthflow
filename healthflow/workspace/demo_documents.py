@@ -164,18 +164,36 @@ async def reset_demo_documents(session, storage, broker_id, fixture_ids) -> int:
         documents = (await session.scalars(select(Document).where(
             Document.broker_id == broker_id, Document.demo_fixture_marker.in_(markers),
         ))).all()
+        removed = 0
         for document in documents:
+            document_id, object_key = document.id, document.object_key
             session.add(_event(document, "demo_reset", "started", actor_id))
             await session.commit()
             try:
-                storage.remove(document.object_key)
+                # The durable event releases the earlier transaction. Another
+                # reset may have removed and reseeded this deterministic ID.
+                # Lock again, then refresh and verify the exact generation.
+                locked = await session.execute(update(Document).where(
+                    Document.id == document_id, Document.broker_id == broker_id,
+                ).values(created_at=Document.created_at).execution_options(synchronize_session=False))
+                if locked.rowcount != 1:
+                    await session.commit()
+                    continue
+                await session.refresh(document)
+                if document.object_key != object_key:
+                    await session.commit()
+                    continue
+                # Keep the lock through storage removal and metadata commit;
+                # a replacement cannot be inserted while this row still exists.
+                storage.remove(object_key)
                 await session.execute(delete(DocumentLink).where(
                     DocumentLink.broker_id == broker_id, DocumentLink.document_id == document.id,
                 ))
                 session.add(_event(document, "demo_reset", "success", actor_id))
                 await session.delete(document)
                 await session.commit()
+                removed += 1
             except BaseException:
                 await session.rollback()
                 raise
-        return len(documents)
+        return removed

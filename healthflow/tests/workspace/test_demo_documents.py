@@ -20,6 +20,53 @@ async def setup_demo(db, monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_stale_reset_preserves_reseeded_generation_and_links(db_session, db_session_factory, monkeypatch):
+    broker, admin = await setup_demo(db_session, monkeypatch)
+    store = FakeDocumentStorage()
+    markers = [DEMO_FIXTURE_MARKERS[0]]
+    await seed_demo_documents(db_session, store, broker.id, fixture_ids=markers)
+    old = (await db_session.scalars(select(Document))).one()
+    old_key = old.object_key
+    commit = db_session.commit
+    overlapped = False
+    replacement_key = None
+
+    async def overlap_after_started():
+        nonlocal overlapped, replacement_key
+        await commit()
+        if overlapped:
+            return
+        overlapped = True
+        async with db_session_factory() as other:
+            actor_token = current_broker_id.set(admin.id)
+            try:
+                assert await reset_demo_documents(other, store, broker.id, markers) == 1
+            finally:
+                current_broker_id.reset(actor_token)
+            assert await seed_demo_documents(other, store, broker.id, fixture_ids=markers) == 1
+            replacement = (await other.scalars(select(Document))).one()
+            replacement_key = replacement.object_key
+            enrollment = Enrollment(broker_id=broker.id, client_id=replacement.client_id, plan_name="Replacement")
+            other.add(enrollment)
+            await other.flush()
+            other.add(DocumentLink(broker_id=broker.id, client_id=replacement.client_id,
+                                   document_id=replacement.id, enrollment_id=enrollment.id))
+            await other.commit()
+
+    monkeypatch.setattr(db_session, "commit", overlap_after_started)
+    token = current_broker_id.set(admin.id)
+    try:
+        assert await reset_demo_documents(db_session, store, broker.id, markers) == 0
+    finally:
+        current_broker_id.reset(token)
+    db_session.expire_all()
+    replacement = (await db_session.scalars(select(Document))).one()
+    assert replacement.object_key == replacement_key != old_key
+    assert set(store._objects) == {replacement_key}
+    assert len((await db_session.scalars(select(DocumentLink))).all()) == 1
+
+
+@pytest.mark.anyio
 async def test_seed_idempotent_and_preserves_archive(db_session, monkeypatch):
     broker, _ = await setup_demo(db_session, monkeypatch)
     store = FakeDocumentStorage()
