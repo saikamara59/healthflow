@@ -2,7 +2,7 @@
 import pytest
 from sqlalchemy import select
 
-from healthflow.database.models import Broker, Client
+from healthflow.database.models import Broker, Client, Document, DocumentEvent, DocumentLink, Enrollment
 from healthflow.seed_data import (
     TEST_CLIENTS,
     seed_for_worker,
@@ -92,3 +92,53 @@ async def test_seed_for_worker_isolates_brokers(db_session):
     assert len(a_clients) == len(TEST_CLIENTS)
     assert len(b_clients) == len(TEST_CLIENTS)
     assert {c.id for c in a_clients}.isdisjoint({c.id for c in b_clients})
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("via_router", [False, True])
+async def test_document_reset_worker_scope_and_history(db_session, db_session_factory, monkeypatch, via_router):
+    from sqlalchemy import event
+    from healthflow.api import test_router
+    from healthflow.workspace.document_storage import FakeDocumentStorage
+    store = FakeDocumentStorage()
+    owners = [await seed_for_worker(db_session, f"e2e-worker-{index}") for index in (80, 81)]
+    ids = []
+    for broker in owners:
+        client = (await db_session.scalars(select(Client).where(Client.broker_id == broker.id))).first()
+        document = Document(broker_id=broker.id, client_id=client.id, display_filename="test.pdf", verified_type="pdf", byte_length=1, object_key=str(broker.id))
+        db_session.add(document)
+        await db_session.flush()
+        ids.append(document.id)
+        if via_router:
+            enrollment = Enrollment(broker_id=broker.id, client_id=client.id, plan_name="Synthetic")
+            db_session.add(enrollment)
+            await db_session.flush()
+            db_session.add(DocumentLink(broker_id=broker.id, client_id=client.id, document_id=document.id, enrollment_id=enrollment.id))
+        db_session.add(DocumentEvent(broker_id=broker.id, document_id=document.id, client_id=client.id, actor_kind="system", action="seed", outcome="success"))
+        store._objects[document.object_key] = b"synthetic"
+    await db_session.commit()
+    statements = []
+    engine = db_session.bind.sync_engine
+
+    def capture(conn, cursor, statement, parameters, context, executemany):
+        if statement.startswith("DELETE"):
+            statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", capture)
+    try:
+        if via_router:
+            monkeypatch.setattr(test_router, "async_session_factory", db_session_factory)
+            await test_router.reset_db(test_router.ResetRequest(worker_id="e2e-worker-80"))
+        else:
+            await seed_for_worker(db_session, "e2e-worker-80")
+            await db_session.commit()
+    finally:
+        event.remove(engine, "before_cursor_execute", capture)
+    remaining = (await db_session.scalars(select(Document))).all()
+    assert [row.id for row in remaining] == [ids[1]]
+    assert len((await db_session.scalars(select(DocumentEvent))).all()) == 2
+    assert len(store._objects) == 2
+    assert next(i for i, stmt in enumerate(statements) if "DELETE FROM document_links " in stmt) < next(i for i, stmt in enumerate(statements) if "DELETE FROM documents " in stmt) < next(i for i, stmt in enumerate(statements) if "DELETE FROM clients " in stmt)
+    if via_router:
+        assert len((await db_session.scalars(select(DocumentLink))).all()) == 1
+        assert next(i for i, stmt in enumerate(statements) if "DELETE FROM document_links " in stmt) < next(i for i, stmt in enumerate(statements) if "DELETE FROM enrollments " in stmt)

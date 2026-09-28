@@ -3,12 +3,14 @@ from datetime import date, datetime, timezone
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
     Index,
     Integer,
     String,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON, TypeDecorator
@@ -92,6 +94,7 @@ class Client(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
     )
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     broker: Mapped["Broker"] = relationship(back_populates="clients")
     actions: Mapped[list["ActionHistory"]] = relationship(back_populates="client", cascade="all, delete-orphan")
@@ -280,6 +283,117 @@ class Appeal(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
+    )
+
+
+class Document(Base):
+    """Broker-owned private file metadata; object keys never leave the server."""
+
+    __tablename__ = "documents"
+    __table_args__ = (
+        Index("uq_documents_broker_demo_fixture", "broker_id", "demo_fixture_marker",
+              unique=True, sqlite_where=text("demo_fixture_marker IS NOT NULL"),
+              postgresql_where=text("demo_fixture_marker IS NOT NULL")),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    broker_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("brokers.id"), index=True, nullable=False
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("clients.id"), index=True, nullable=False
+    )
+    display_filename: Mapped[str] = mapped_column(EncryptedString(4000), nullable=False)
+    verified_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    byte_length: Mapped[int] = mapped_column(Integer, nullable=False)
+    object_key: Mapped[str] = mapped_column(String(1024), nullable=False)
+    demo_fixture_marker: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class DemoDocumentCleanupIntent(Base):
+    """Private recovery journal, committed before any synthetic object PUT.
+
+    Keys are encrypted and never copied into DocumentEvent or API payloads.
+    Unique marker ownership coordinates seeding and exact-target recovery.
+    """
+
+    __tablename__ = "demo_document_cleanup_intents"
+    __table_args__ = (
+        Index("uq_demo_cleanup_broker_fixture", "broker_id", "fixture_marker", unique=True),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    broker_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("brokers.id"), nullable=False, index=True)
+    fixture_marker: Mapped[str] = mapped_column(String(255), nullable=False)
+    object_key: Mapped[str] = mapped_column(EncryptedString(4000), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+
+
+class DocumentLink(Base):
+    """One typed association; ending a Link retains its history for re-linking."""
+
+    __tablename__ = "document_links"
+    __table_args__ = (
+        CheckConstraint(
+            "(CASE WHEN enrollment_id IS NOT NULL THEN 1 ELSE 0 END + "
+            "CASE WHEN issue_id IS NOT NULL THEN 1 ELSE 0 END + "
+            "CASE WHEN appeal_id IS NOT NULL THEN 1 ELSE 0 END) = 1",
+            name="ck_document_link_one_target",
+        ),
+        Index("uq_document_links_active_enrollment", "document_id", "enrollment_id",
+              unique=True, sqlite_where=text("ended_at IS NULL"), postgresql_where=text("ended_at IS NULL")),
+        Index("uq_document_links_active_issue", "document_id", "issue_id",
+              unique=True, sqlite_where=text("ended_at IS NULL"), postgresql_where=text("ended_at IS NULL")),
+        Index("uq_document_links_active_appeal", "document_id", "appeal_id",
+              unique=True, sqlite_where=text("ended_at IS NULL"), postgresql_where=text("ended_at IS NULL")),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    broker_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("brokers.id"), index=True, nullable=False
+    )
+    client_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("clients.id"), index=True, nullable=False
+    )
+    document_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("documents.id"), index=True, nullable=False
+    )
+    enrollment_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("enrollments.id"), nullable=True)
+    issue_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("issues.id"), nullable=True)
+    appeal_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("appeals.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class DocumentEvent(Base):
+    """Explicit audit writes, excluded from tenant and PHI-audit registries.
+
+    Identifier snapshots intentionally have no FKs so demo resets retain the
+    audit trail. Unknown Client/Document IDs can be absent on denied attempts.
+    System seed/reset events explicitly identify a system actor.
+    """
+
+    __tablename__ = "document_events"
+    __table_args__ = (
+        CheckConstraint(
+            "(actor_kind = 'broker' AND actor_id IS NOT NULL) OR "
+            "(actor_kind = 'system' AND actor_id IS NULL)",
+            name="ck_document_event_actor",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    broker_id: Mapped[uuid.UUID] = mapped_column(GUID(), index=True, nullable=False)
+    document_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), index=True, nullable=True)
+    client_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), index=True, nullable=True)
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    actor_kind: Mapped[str] = mapped_column(String(10), nullable=False)
+    action: Mapped[str] = mapped_column(String(50), nullable=False)
+    outcome: Mapped[str] = mapped_column(String(50), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, index=True, nullable=False
     )
 
 

@@ -67,6 +67,9 @@ def test_registry_lists_tenant_scoped_tables():
         "appeals",
         "workspace_activity",
         "workspace_search_tokens",
+        "documents",
+        "document_links",
+        "demo_document_cleanup_intents",
     }
 
 
@@ -76,6 +79,25 @@ async def test_query_with_no_context_raises(session_with_filter):
     # current_broker_id is unset here.
     with pytest.raises(TenantContextMissing):
         await session.execute(select(Client))
+
+
+@pytest.mark.anyio
+async def test_demo_cleanup_journal_is_broker_scoped(session_with_filter):
+    from healthflow.database.models import DemoDocumentCleanupIntent
+    session, broker_a, broker_b, _, _ = session_with_filter
+    with system_context("seed private demo recovery ownership"):
+        for broker in (broker_a, broker_b):
+            session.add(DemoDocumentCleanupIntent(broker_id=broker.id,
+                fixture_marker="synthetic-summary-v1", object_key=str(uuid.uuid4())))
+        await session.commit()
+    with pytest.raises(TenantContextMissing):
+        await session.execute(select(DemoDocumentCleanupIntent))
+    token = current_broker_id.set(broker_a.id)
+    try:
+        intents = (await session.scalars(select(DemoDocumentCleanupIntent))).all()
+        assert len(intents) == 1 and intents[0].broker_id == broker_a.id
+    finally:
+        current_broker_id.reset(token)
 
 
 @pytest.mark.anyio
@@ -292,3 +314,33 @@ async def test_multi_entity_select_filters_on_first_tenant_entity(session_with_f
             f"Cross-broker leak via multi-entity select: {rows}"
     finally:
         current_broker_id.reset(token)
+
+
+@pytest.mark.anyio
+async def test_documents_and_links_are_broker_scoped(session_with_filter):
+    from healthflow.database.models import Document, DocumentEvent, DocumentLink, Enrollment
+
+    session, broker_a, broker_b, client_a, client_b = session_with_filter
+    owned_ids = []
+    with system_context("seed document ownership"):
+        for broker, client in ((broker_a, client_a), (broker_b, client_b)):
+            document = Document(broker_id=broker.id, client_id=client.id,
+                                display_filename="Synthetic.pdf", verified_type="application/pdf",
+                                byte_length=123, object_key=str(uuid.uuid4()))
+            enrollment = Enrollment(broker_id=broker.id, client_id=client.id, plan_name="Test")
+            session.add_all([document, enrollment])
+            await session.flush()
+            link = DocumentLink(broker_id=broker.id, client_id=client.id,
+                                document_id=document.id, enrollment_id=enrollment.id)
+            session.add(link)
+            await session.flush()
+            owned_ids.append((document.id, link.id))
+        await session.commit()
+    assert DocumentEvent not in TENANT_SCOPED_MODELS
+    for broker, expected in ((broker_a, owned_ids[0]), (broker_b, owned_ids[1])):
+        token = current_broker_id.set(broker.id)
+        try:
+            assert [row.id for row in (await session.execute(select(Document))).scalars()] == [expected[0]]
+            assert [row.id for row in (await session.execute(select(DocumentLink))).scalars()] == [expected[1]]
+        finally:
+            current_broker_id.reset(token)

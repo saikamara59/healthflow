@@ -5,7 +5,7 @@ export default defineConfig({
   globalSetup: './tests/global-setup.js',
   globalTeardown: './tests/global-teardown.js',
   fullyParallel: true,
-  workers: process.env.CI ? 4 : undefined,
+  workers: process.env.CI ? 2 : undefined,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: [['html', { open: 'never' }], ['list']],

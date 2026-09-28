@@ -1,14 +1,16 @@
 """Unit tests for EncryptedString and EncryptedJSON TypeDecorators.
 
-Uses a throwaway in-memory SQLite session with a real key — no mocking,
-real encrypt + real decrypt round-trip.
+Uses a throwaway in-memory SQLite session with a real key and real
+encrypt + decrypt round-trips; one regression fixes only the nonce source.
 """
+import base64
+
 import pytest
 import pytest_asyncio
 from sqlalchemy import Column, Integer, MetaData, Table, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from healthflow.auth.phi_crypto import PhiDecryptionError
+from healthflow.auth.phi_crypto import PhiDecryptionError, decrypt
 from healthflow.auth.security import hash_password
 from healthflow.auth.tenant_context import current_broker_id, current_endpoint, system_context
 from healthflow.database.encrypted_types import EncryptedJSON, EncryptedString
@@ -65,9 +67,13 @@ async def test_encrypted_json_roundtrips_list_of_dicts(encrypted_session):
 
 
 @pytest.mark.anyio
-async def test_encrypted_columns_store_ciphertext_on_disk(encrypted_session):
+async def test_encrypted_columns_store_ciphertext_on_disk(encrypted_session, monkeypatch):
     """Raw SQL bypasses the TypeDecorator — proves the value is ciphertext at rest."""
     session, test_table = encrypted_session
+    # A valid nonce can contain a plaintext-looking fragment in its Base64 form.
+    nonces = iter((bytes(range(12)), base64.b64decode("dxAAAAAAAAAAAAAA")))
+    monkeypatch.setattr("healthflow.auth.phi_crypto.secrets.token_bytes",
+                        lambda size: next(nonces))
     await session.execute(
         test_table.insert().values(id=3, secret_str="Walt Whitman", secret_json=["dx"])
     )
@@ -78,8 +84,13 @@ async def test_encrypted_columns_store_ciphertext_on_disk(encrypted_session):
     # Both should be ciphertext-shaped: starts with vN: and has the three-part form
     assert secret_str.startswith("v1:") and secret_str.count(":") == 2
     assert "Walt Whitman" not in secret_str
-    assert secret_json.startswith("v1:")
-    assert "dx" not in secret_json
+    assert secret_json.startswith("v1:") and secret_json.count(":") == 2
+    assert '["dx"]' not in secret_json
+    assert decrypt(secret_str) == "Walt Whitman"
+    assert decrypt(secret_json) == '["dx"]'
+    row = (await session.execute(select(test_table).where(test_table.c.id == 3))).first()
+    assert row.secret_str == "Walt Whitman"
+    assert row.secret_json == ["dx"]
 
 
 @pytest_asyncio.fixture

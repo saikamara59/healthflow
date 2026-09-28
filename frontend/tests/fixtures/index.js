@@ -43,8 +43,8 @@ export const test = base.extend({
     await use(page)
   },
 
-  // Pre-authenticated page using the worker's broker identity.
-  authedPage: async ({ context, baseURL, request, workerBroker }, use) => {
+  // Share the existing login with API setup that must precede browser navigation.
+  authedSession: async ({ baseURL, request, workerBroker }, use) => {
     const api = apiOrigin(baseURL)
     await resetForWorkerViaPlaywright(api, workerBroker.workerId, request)
 
@@ -55,7 +55,12 @@ export const test = base.extend({
       throw new Error(`API login failed: ${loginRes.status()} ${await loginRes.text()}`)
     }
     const { access_token, refresh_token } = await loginRes.json()
+    await use({ access_token, refresh_token })
+  },
 
+  // Pre-authenticated page using the worker's broker identity.
+  authedPage: async ({ context, authedSession }, use) => {
+    const { access_token, refresh_token } = authedSession
     await context.addInitScript(([access, refresh]) => {
       sessionStorage.setItem('hf_token', access)
       sessionStorage.setItem('hf_refresh', refresh)

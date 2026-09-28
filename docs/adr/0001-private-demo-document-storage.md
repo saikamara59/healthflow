@@ -1,0 +1,5 @@
+# Private storage for synthetic demo Documents
+
+The public HealthFlow demo will keep only synthetic Documents in its own private Tigris bucket, separate from any future real-client storage. Document access will still pass through HealthFlow's authenticated, Broker-scoped routes; bucket privacy alone does not establish Broker ownership. This uses Fly's S3-compatible object storage for the existing demo while avoiding an AWS account and real-data hosting decision before those are needed. Public-demo uploads remain disabled because its shared demo credentials cannot establish that a visitor's file is synthetic. A future real-data deployment requires a separately approved storage and operating boundary.
+
+Demo Documents are replaceable data, not a long-term backup source. Ordinary users may archive and restore them without deleting their files. A separate, explicit administrator reset may clear demo Documents and recreate them from a small set of synthetic source files; recovery from lost demo storage is reseeding, not restoring a bucket backup. This policy does not apply to future real-client Documents, whose retention and backup rules must be approved before use.

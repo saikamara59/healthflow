@@ -3,6 +3,10 @@ import pytest
 
 from healthflow.auth.security import hash_password
 from healthflow.database.models import Broker, Client
+from healthflow.tests.api import test_documents
+
+records = test_documents.records
+service = test_documents.service
 
 
 async def _make_broker(session, email: str) -> Broker:
@@ -96,3 +100,53 @@ async def test_analytics_endpoint_returns_only_current_brokers_aggregates(client
     body = res.json()
     assert body["total_feedback"] == 5
     assert {a["agent_type"] for a in body["agents"]} == {"translate"}
+
+
+@pytest.mark.anyio
+async def test_document_links_require_same_broker_and_client(client, db_session, records, service):
+    from uuid import UUID, uuid4
+    from sqlalchemy import select
+    from healthflow.database.models import Appeal, Document, DocumentLink, Enrollment, Issue
+    from healthflow.tests.api.test_documents import document_targets, upload
+    from healthflow.tests.api.test_enrollments import _client_record
+
+    owner, other, client_id = records
+    data = (await upload(client, records)).json()
+    document = await db_session.get(Document, UUID(data["id"]))
+    valid = await document_targets(db_session, document)
+    other_client = await _client_record(client, owner, "Other synthetic Client")
+    foreign_client = await _client_record(client, other, "Foreign synthetic Client")
+    foreign = await db_session.get(Client, UUID(foreign_client["id"]))
+    forbidden = []
+    for broker_id, target_client in [(document.broker_id, UUID(other_client["id"])),
+                                     (foreign.broker_id, foreign.id)]:
+        issue = Issue(broker_id=broker_id, client_id=target_client, title="Synthetic")
+        enrollment = Enrollment(broker_id=broker_id, client_id=target_client, plan_name="Synthetic")
+        db_session.add_all([issue, enrollment])
+        await db_session.flush()
+        # Even an owned Appeal cannot bypass its Issue's Broker/Client scope.
+        appeal = Appeal(broker_id=document.broker_id, issue_id=issue.id, title="Synthetic")
+        db_session.add(appeal)
+        await db_session.flush()
+        forbidden.extend([("issue", issue.id), ("enrollment", enrollment.id), ("appeal", appeal.id)])
+    await db_session.commit()
+    base = f"/documents/{document.id}"
+    for kind, target in forbidden:
+        response = await client.post(base + "/links", headers=owner,
+                                     json={"target_type": kind, "target_id": str(target)})
+        assert response.status_code == 404
+    for kind, target in valid.items():
+        payload = {"target_type": kind, "target_id": str(target)}
+        assert (await client.post(base + "/links", headers=other, json=payload)).status_code == 404
+        assert (await client.get("/documents", headers=other, params=payload)).status_code == 404
+    assert (await db_session.execute(select(DocumentLink))).scalars().all() == []
+    for suffix in ("archive", "restore"):
+        assert (await client.post(base + f"/{suffix}", headers=other)).status_code == 404
+    assert (await client.get(base + "/links?include_ended=true", headers=other)).status_code == 404
+    created = (await client.post(base + "/links", headers=owner,
+                                 json={"target_type": "issue", "target_id": str(valid["issue"])})).json()
+    assert (await client.delete(base + f"/links/{created['id']}", headers=other)).status_code == 404
+    assert (await client.delete(f"/documents/{uuid4()}/links/{created['id']}", headers=owner)).status_code == 404
+    await client.post(f"/clients/{client_id}/archive", headers=owner)
+    assert (await client.post(base + "/links", headers=owner,
+                              json={"target_type": "appeal", "target_id": str(valid["appeal"])})).status_code == 409

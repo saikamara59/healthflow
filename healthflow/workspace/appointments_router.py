@@ -37,6 +37,7 @@ async def _response(
     return appointment_response(
         appointment,
         client_name=names["client"].get(appointment.client_id),
+        client_archived=names["client_archived"].get(appointment.client_id, False),
         organization_name=names["organization"].get(appointment.organization_id),
         contact_name=names["contact"].get(appointment.contact_id),
     )

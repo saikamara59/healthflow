@@ -434,3 +434,48 @@ async def test_query_by_broker_finds_that_brokers_entries(audited_session):
     test_hits = [e for e in hits if e.endpoint == "GET /clients/{id} (qbb)"]
     assert len(test_hits) >= 1
     assert all(e.broker_id == broker.id for e in test_hits)
+
+
+@pytest.mark.anyio
+async def test_document_metadata_access_is_audited_but_events_are_explicit(audited_session):
+    from healthflow.database.models import Document, DocumentEvent, DocumentLink, Enrollment
+    from healthflow.database.phi_audit import _AUDITED_MODELS
+
+    session, broker, client, _ = audited_session
+    assert DocumentEvent not in _AUDITED_MODELS
+    with system_context("document audit setup"):
+        enrollment = Enrollment(broker_id=broker.id, client_id=client.id, plan_name="Test")
+        session.add(enrollment)
+        await session.commit()
+    token = current_broker_id.set(broker.id)
+    endpoint_token = current_endpoint.set("document metadata audit test")
+    try:
+        document = Document(broker_id=broker.id, client_id=client.id, display_filename="Synthetic.pdf",
+                            verified_type="application/pdf", byte_length=123, object_key=str(uuid.uuid4()))
+        session.add(document)
+        await session.flush()
+        link = DocumentLink(broker_id=broker.id, client_id=client.id,
+                            document_id=document.id, enrollment_id=enrollment.id)
+        session.add(link)
+        await session.commit()
+        await session.execute(select(Document))
+        await session.execute(select(DocumentLink))
+        assert (await session.execute(select(DocumentEvent))).scalars().all() == []
+        session.add(DocumentEvent(broker_id=broker.id, client_id=client.id, document_id=document.id,
+                                  actor_kind="broker", actor_id=broker.id, action="link", outcome="success"))
+        await session.commit()
+        assert len((await session.execute(select(DocumentEvent))).scalars().all()) == 1
+    finally:
+        current_endpoint.reset(endpoint_token)
+        current_broker_id.reset(token)
+    logs = (await session.execute(select(PhiAccessLog).where(
+        PhiAccessLog.endpoint == "document metadata audit test",
+    ))).scalars().all()
+    assert {(entry.table_name, entry.operation) for entry in logs} == {
+        ("documents", "create"), ("documents", "read"),
+        ("document_links", "create"), ("document_links", "read"),
+    }
+    assert len(logs) == 4
+    for entry in logs:
+        assert entry.broker_id == broker.id
+        assert entry.row_ids == [str(document.id if entry.table_name == "documents" else link.id)]

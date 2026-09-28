@@ -281,10 +281,11 @@ def main():
     headers = {"Authorization": f"Bearer {token}"}
 
     # Check existing clients to avoid duplicates
-    existing = httpx.get(f"{BASE_URL}/clients", headers=headers)
     existing_names = set()
-    if existing.status_code == 200:
-        existing_names = {c["full_name"] for c in existing.json()}
+    for archived in (False, True):
+        existing = httpx.get(f"{BASE_URL}/clients", headers=headers, params={"archived": str(archived).lower()})
+        existing.raise_for_status()
+        existing_names.update(c["full_name"] for c in existing.json())
 
     # Create clients (skip duplicates)
     created = 0
@@ -314,6 +315,27 @@ def main():
     print()
     print(f"  Demo broker: {BROKER['email']} (password from DEMO_BROKER_PASSWORD)")
     print()
+    if os.getenv("SEED_DEMO") == "1":
+        try:
+            asyncio.run(_seed_documents())
+        except Exception:
+            print("Synthetic Document seeding failed; deployment requires operator attention.", file=sys.stderr)
+            sys.exit(1)
+
+
+async def _seed_documents():
+    from sqlalchemy import select
+    from healthflow.auth.tenant_context import system_context
+    from healthflow.database.config import async_session_factory
+    from healthflow.database.models import Broker
+    from healthflow.workspace.demo_documents import seed_demo_documents
+    from healthflow.workspace.document_storage import S3DocumentStorage
+
+    async with async_session_factory() as session:
+        with system_context("seed checked-in synthetic demo Documents"):
+            broker = (await session.scalars(select(Broker).where(Broker.email == BROKER["email"]))).one()
+            count = await seed_demo_documents(session, S3DocumentStorage.from_environment(), broker.id)
+            print(f"  Synthetic Documents created: {count}")
 
 
 if __name__ == "__main__":

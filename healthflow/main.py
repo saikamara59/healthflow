@@ -29,6 +29,9 @@ from healthflow.auth.router import auth_router
 from healthflow.auth.admin_router import admin_router
 from healthflow.api.drug_router import drug_router
 from healthflow.api.client_router import client_router
+from healthflow.api.documents_router import (
+    DocumentUploadLimitMiddleware, configure_documents, documents_router,
+)
 from healthflow.api.history_router import history_router
 from healthflow.feedback.router import feedback_router
 from healthflow.agents.temporal_awareness.routes import temporal_router
@@ -46,15 +49,20 @@ from healthflow.workspace.issues_router import appeals_router, issues_router
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize database tables and optional agent telemetry on startup."""
+    configure_documents(app)
     from healthflow.database.config import async_session_factory, engine
     from healthflow.database.models import Base
-    from healthflow.database.schema_migrations import ensure_phase2_issue_links
+    from healthflow.database.schema_migrations import (
+        ensure_client_archive_column, ensure_demo_document_cleanup_intents, ensure_phase2_issue_links,
+    )
     from healthflow.logs.invocation import configure_agent_logfire
     from healthflow.workspace.search_index import backfill_search_index
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(ensure_phase2_issue_links)
+        await conn.run_sync(ensure_client_archive_column)
+        await conn.run_sync(ensure_demo_document_cleanup_intents)
     configure_agent_logfire()
 
     async def backfill_in_background():
@@ -105,6 +113,9 @@ _cors_origins += [
 ]
 ALLOWED_ORIGINS = list(dict.fromkeys(_cors_origins))  # de-dup, preserve order
 
+# Middleware added later wraps earlier entries. Keep CORS outside the limiter
+# so its direct 413 responses receive the same allowed-origin headers.
+app.add_middleware(DocumentUploadLimitMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -132,6 +143,7 @@ app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(drug_router)
 app.include_router(client_router)
+app.include_router(documents_router)
 app.include_router(history_router)
 app.include_router(feedback_router)
 app.include_router(temporal_router)

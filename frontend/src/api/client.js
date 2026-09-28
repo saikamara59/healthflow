@@ -21,7 +21,16 @@ export function clearTokens() {
   sessionStorage.removeItem('hf_refresh')
 }
 
-async function refreshAccessToken() {
+let refreshInFlight = null
+
+function refreshAccessToken() {
+  if (!refreshInFlight) {
+    refreshInFlight = exchangeRefreshToken().finally(() => { refreshInFlight = null })
+  }
+  return refreshInFlight
+}
+
+async function exchangeRefreshToken() {
   const refresh = getRefreshToken()
   if (!refresh) return false
 
@@ -36,6 +45,7 @@ async function refreshAccessToken() {
 
     const data = await res.json()
     setToken(data.access_token)
+    if (data.refresh_token) setRefreshToken(data.refresh_token)
     return true
   } catch {
     return false
@@ -43,8 +53,9 @@ async function refreshAccessToken() {
 }
 
 /** Sends an authenticated API request and retries once after refreshing an expired session. */
-async function request(method, path, body = null) {
-  const headers = { 'Content-Type': 'application/json' }
+async function request(method, path, body = null, raw = false) {
+  const multipart = body instanceof FormData
+  const headers = multipart ? {} : { 'Content-Type': 'application/json' }
   const token = getToken()
 
   if (token) {
@@ -53,14 +64,14 @@ async function request(method, path, body = null) {
 
   const config = { method, headers }
   if (body !== null) {
-    config.body = JSON.stringify(body)
+    config.body = multipart ? body : JSON.stringify(body)
   }
 
   let res = await fetch(`${API_BASE_URL}${path}`, config)
 
   // On 401, attempt token refresh and retry once
   if (res.status === 401 && getRefreshToken()) {
-    const refreshed = await refreshAccessToken()
+    const refreshed = getToken() !== token && getToken() ? true : await refreshAccessToken()
     if (refreshed) {
       headers['Authorization'] = `Bearer ${getToken()}`
       res = await fetch(`${API_BASE_URL}${path}`, { method, headers, body: config.body })
@@ -95,7 +106,49 @@ async function request(method, path, body = null) {
     throw error
   }
 
-  return res.json()
+  return raw ? res : res.json()
+}
+
+async function openDocument(documentId) {
+  // Reserve the tab during the click, before awaiting the authenticated fetch.
+  const viewer = window.open('about:blank', '_blank')
+  if (viewer) viewer.opener = null
+  let release = () => {}
+  try {
+    const response = await request('GET', `/documents/${documentId}/content`, null, true)
+    const blob = await response.blob()
+    const disposition = response.headers.get('Content-Disposition') || ''
+    const url = URL.createObjectURL(blob)
+    let timer
+    release = () => {
+      URL.revokeObjectURL(url)
+      clearTimeout(timer)
+      window.removeEventListener('pagehide', release)
+    }
+    window.addEventListener('pagehide', release, { once: true })
+    timer = setTimeout(release, 60000)
+    if (disposition.startsWith('attachment')) {
+      viewer?.close()
+      const link = document.createElement('a')
+      link.href = url
+      const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+      try { link.download = encoded ? decodeURIComponent(encoded) : 'document' } catch { link.download = 'document' }
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      clearTimeout(timer)
+      timer = setTimeout(release, 1000)
+    } else if (viewer) {
+      viewer.location.replace(url)
+    } else {
+      release()
+      throw new Error('Allow pop-ups to open this Document, then try again.')
+    }
+  } catch (error) {
+    release()
+    viewer?.close()
+    throw error
+  }
 }
 
 const api = {
@@ -103,6 +156,12 @@ const api = {
   post: (path, body) => request('POST', path, body),
   put: (path, body) => request('PUT', path, body),
   del: (path) => request('DELETE', path),
+  uploadDocument: (clientId, file) => {
+    const form = new FormData()
+    form.append('file', file)
+    return request('POST', `/clients/${clientId}/documents`, form)
+  },
+  openDocument,
 }
 
 export default api

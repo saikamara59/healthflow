@@ -19,6 +19,7 @@ const NAV = [
     group: 'Workspace',
     items: [
       { path: '/clients', label: 'Clients', icon: 'users', countKey: 'clients' },
+      { path: '/documents/archive', label: 'Document archive', icon: 'note' },
       { path: '/organizations', label: 'Organizations', icon: 'organization' },
       { path: '/enrollments', label: 'Enrollments', icon: 'note' },
       { path: '/issues', label: 'Issues & Appeals', icon: 'appeal' },

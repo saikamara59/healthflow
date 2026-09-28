@@ -11,7 +11,7 @@ from healthflow.auth.dependencies import get_current_broker
 from healthflow.database.config import get_db
 from healthflow.database.models import Appeal, Appointment, Broker, Client, Issue, Task
 from healthflow.workspace.appointments_router import _response as appointment_with_names
-from healthflow.workspace.linking import require_owned_links
+from healthflow.workspace.linking import lock_document_target, require_no_document_history, require_owned_links
 from healthflow.workspace.schemas import (
     AppealCreate,
     AppealResponse,
@@ -50,7 +50,7 @@ async def _issue_response(db: AsyncSession, issue: Issue, *, expanded: bool = Tr
     if client is None:
         raise HTTPException(status_code=404, detail="Client not found")
     if not expanded:
-        return issue_response(issue, client_name=client.full_name)
+        return issue_response(issue, client_name=client.full_name, client_archived=client.archived_at is not None)
     appeals = list(
         (
             await db.execute(
@@ -79,6 +79,7 @@ async def _issue_response(db: AsyncSession, issue: Issue, *, expanded: bool = Tr
     return issue_response(
         issue,
         client_name=client.full_name,
+        client_archived=client.archived_at is not None,
         appeals=[appeal_response(item) for item in appeals],
         follow_ups=[await task_with_names(db, item) for item in tasks],
         appointments=[await appointment_with_names(db, item) for item in appointments],
@@ -132,10 +133,12 @@ async def update_issue(
     broker: Broker = Depends(get_current_broker),
     db: AsyncSession = Depends(get_db),
 ) -> IssueResponse:
-    issue = await _issue(db, issue_id)
     changes = data.model_dump(exclude_unset=True)
+    issue = (await lock_document_target(db, broker.id, "issue", issue_id)
+             if "client_id" in changes else await _issue(db, issue_id))
     if "client_id" in changes and changes["client_id"] != issue.client_id:
         await require_owned_links(db, client_id=changes["client_id"])
+        await require_no_document_history(db, broker.id, "issue", issue.id)
         linked_task = (
             await db.execute(select(Task.id).where(Task.issue_id == issue.id).limit(1))
         ).scalar_one_or_none()
@@ -166,7 +169,7 @@ async def create_appeal(
     broker: Broker = Depends(get_current_broker),
     db: AsyncSession = Depends(get_db),
 ) -> AppealResponse:
-    await _issue(db, data.issue_id)
+    await require_owned_links(db, issue_id=data.issue_id)
     appeal = Appeal(broker_id=broker.id, **data.model_dump())
     db.add(appeal)
     await db.flush()

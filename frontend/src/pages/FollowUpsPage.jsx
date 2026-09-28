@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import api from '../api/client'
 import TopBar from '../components/TopBar'
 import useLayout from '../components/ui/useLayout'
@@ -14,12 +14,19 @@ export default function FollowUpsPage() {
   const [zone, setZone] = useState('UTC')
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
-  const refresh = () => workspaceApi.listAllTasks('is_follow_up=true&status=open').then(setTasks)
+  const taskGeneration = useRef(0)
+  const refresh = async () => {
+    const generation = ++taskGeneration.current
+    const items = await workspaceApi.listAllTasks('is_follow_up=true&status=open')
+    if (generation === taskGeneration.current) setTasks(items)
+  }
   useEffect(() => {
     let alive = true
+    const generation = ++taskGeneration.current
     Promise.all([workspaceApi.listAllTasks('is_follow_up=true&status=open'), api.get('/clients'), workspaceApi.listOrganizations(true), workspaceApi.getPreferences()]).then(([items, clientData, orgData, preferences]) => {
       if (!alive) return
-      setTasks(items); setClients(clientData); setOrganizations(orgData); setZone(preferences.timezone_name)
+      if (generation === taskGeneration.current) setTasks(items)
+      setClients(clientData); setOrganizations(orgData); setZone(preferences.timezone_name)
     }).catch(() => { if (alive) setError('Follow-ups could not be loaded.') })
     return () => { alive = false }
   }, [])

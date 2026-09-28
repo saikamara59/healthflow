@@ -12,9 +12,8 @@
 # non-privileged demo broker; admins are created out-of-band via
 # scripts/promote_admin.py with a deployment-specific password.
 #
-# seed.py only runs ONCE on first boot since broker registration is idempotent
-# and add_client checks for duplicates. Re-runs across deploys cost ~2s and
-# don't mutate anything.
+# seed.py runs after readiness on each boot. Existing Clients and fixture
+# markers (including archived records) are skipped. Seeding errors fail boot.
 
 set -eu
 
@@ -41,7 +40,11 @@ fi
 
 if [ "${SEED_DEMO:-0}" = "1" ]; then
     echo "[entrypoint] SEED_DEMO=1 — seeding demo data (idempotent)"
-    python seed.py || echo "[entrypoint] seed.py exited non-zero — broker probably already exists; continuing"
+    if ! python seed.py; then
+        echo "[entrypoint] demo seeding failed — exiting"
+        kill "$UVICORN_PID" 2>/dev/null || true
+        exit 1
+    fi
 else
     echo "[entrypoint] SEED_DEMO not set — skipping demo seeding"
 fi

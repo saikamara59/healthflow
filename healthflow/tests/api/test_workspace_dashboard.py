@@ -83,6 +83,42 @@ async def test_today_uses_saved_timezone_and_separates_sections(client):
 
 
 @pytest.mark.asyncio
+async def test_archived_client_work_remains_in_today_with_history_marker(client):
+    headers = await _headers(client, "archived-today@example.com")
+    created = await client.post("/clients", json={
+        "full_name": "Eleanor Rigby", "zip_code": "10001", "age": 68,
+        "income_level": "medium", "doctors": [], "prescriptions": [], "procedures": [],
+    }, headers=headers)
+    assert created.status_code == 201
+    client_id = created.json()["id"]
+    task = await client.post("/tasks", json={
+        "title": "Renew coverage", "client_id": client_id,
+        "due_at": "2026-09-15T16:00:00+00:00",
+    }, headers=headers)
+    appointment = await client.post("/appointments", json={
+        "title": "Review options", "client_id": client_id,
+        "starts_at": "2026-09-15T10:00:00+00:00",
+        "ends_at": "2026-09-15T10:30:00+00:00",
+    }, headers=headers)
+    assert task.status_code == appointment.status_code == 201
+
+    assert (await client.post(f"/clients/{client_id}/archive", headers=headers)).status_code == 200
+    archived = (await client.get("/workspace/today?local_date=2026-09-15", headers=headers)).json()
+    assert [(item["id"], item["client_archived"]) for item in archived["due_today_tasks"]] == [
+        (task.json()["id"], True)
+    ]
+    assert [(item["id"], item["client_archived"]) for item in archived["appointments_today"]] == [
+        (appointment.json()["id"], True)
+    ]
+    assert (await client.get("/tasks", headers=headers)).json()[0]["client_archived"] is True
+    assert (await client.get("/appointments", headers=headers)).json()[0]["client_archived"] is True
+    assert (await client.post(f"/clients/{client_id}/restore", headers=headers)).status_code == 200
+    restored = (await client.get("/workspace/today?local_date=2026-09-15", headers=headers)).json()
+    assert restored["due_today_tasks"][0]["client_archived"] is False
+    assert restored["appointments_today"][0]["client_archived"] is False
+
+
+@pytest.mark.asyncio
 async def test_today_marks_task_due_earlier_this_day_as_overdue(client):
     headers = await _headers(client, "today-overdue@example.com")
     due_at = datetime.now(timezone.utc) - timedelta(minutes=10)
@@ -110,6 +146,30 @@ async def test_overview_counts_only_current_broker_records(client):
     assert response.json()["organizations"] == 1
     assert response.json()["open_tasks"] == 1
     assert response.json()["clients"] == 0
+
+
+@pytest.mark.asyncio
+async def test_overview_shows_only_active_clients_and_restores_them(client):
+    headers = await _headers(client, "overview-archive@example.com")
+    client_ids = []
+    for name in ("Active Client", "Archived Client"):
+        response = await client.post("/clients", json={
+            "full_name": name, "zip_code": "10001", "age": 68,
+            "income_level": "medium", "doctors": [], "prescriptions": [], "procedures": [],
+        }, headers=headers)
+        assert response.status_code == 201
+        client_ids.append(response.json()["id"])
+
+    archived_id = client_ids[1]
+    assert (await client.post(f"/clients/{archived_id}/archive", headers=headers)).status_code == 200
+    archived_view = (await client.get("/workspace/overview", headers=headers)).json()
+    assert archived_view["clients"] == 1
+    assert [item["id"] for item in archived_view["recent_clients"]] == [client_ids[0]]
+
+    assert (await client.post(f"/clients/{archived_id}/restore", headers=headers)).status_code == 200
+    restored_view = (await client.get("/workspace/overview", headers=headers)).json()
+    assert restored_view["clients"] == 2
+    assert {item["id"] for item in restored_view["recent_clients"]} == set(client_ids)
 
 
 @pytest.mark.asyncio

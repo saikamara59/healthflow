@@ -163,7 +163,9 @@ async def get_overview(
     zone = _zone(preference.timezone_name if preference is not None else "UTC")
     now = datetime.now(timezone.utc)
     day_start, _, week_end = _day_bounds(now.astimezone(zone).date(), zone)
-    clients = await db.scalar(select(func.count(Client.id)).where(Client.broker_id == broker.id))
+    clients = await db.scalar(select(func.count(Client.id)).where(
+        Client.broker_id == broker.id, Client.archived_at.is_(None)
+    ))
     organizations = await db.scalar(select(func.count(Organization.id)).where(
         Organization.broker_id == broker.id, Organization.archived_at.is_(None)
     ))
@@ -184,7 +186,7 @@ async def get_overview(
         )
     ).scalars().all()
     recent_clients = (await db.execute(
-        select(Client).where(Client.broker_id == broker.id)
+        select(Client).where(Client.broker_id == broker.id, Client.archived_at.is_(None))
         .order_by(Client.updated_at.desc(), Client.id.desc()).limit(5)
     )).scalars().all()
     return OverviewResponse(
@@ -218,6 +220,9 @@ async def search_workspace(
     ]
     # Exclude archived records in SQL so they cannot exhaust the bounded
     # candidate pool before an active result is considered.
+    active_clients = select(Client.id).where(
+        Client.broker_id == broker.id, Client.archived_at.is_(None)
+    )
     active_organizations = select(Organization.id).where(
         Organization.broker_id == broker.id, Organization.archived_at.is_(None)
     )
@@ -228,7 +233,9 @@ async def search_workspace(
         Organization.broker_id == broker.id, Organization.archived_at.is_(None),
     )
     eligible = or_(
-        WorkspaceSearchToken.kind.in_(("client", "task", "appointment")),
+        WorkspaceSearchToken.kind.in_(("task", "appointment")),
+        and_(WorkspaceSearchToken.kind == "client",
+             WorkspaceSearchToken.record_id.in_(active_clients)),
         and_(WorkspaceSearchToken.kind == "organization",
              WorkspaceSearchToken.record_id.in_(active_organizations)),
         and_(WorkspaceSearchToken.kind == "contact",
@@ -255,7 +262,7 @@ async def search_workspace(
         ids = ids_by_kind[kind]
         return (await db.execute(select(model).where(model.id.in_(ids)))).scalars().all() if ids else []
 
-    clients = await load(Client, "client")
+    clients = [item for item in await load(Client, "client") if item.archived_at is None]
     organizations = [item for item in await load(Organization, "organization") if item.archived_at is None]
     contacts = [item for item in await load(Contact, "contact") if item.archived_at is None]
     contact_org_ids = {item.organization_id for item in contacts}

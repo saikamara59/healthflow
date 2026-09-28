@@ -142,6 +142,7 @@ test('keyboard search finds a Broker task', async ({ authedPage }) => {
   await authedPage.getByRole('button', { name: 'New Task' }).click()
   await authedPage.getByLabel('Task title').fill('Review Harbor renewal')
   await authedPage.getByRole('button', { name: 'Create Task', exact: true }).click()
+  await expect(authedPage.getByRole('listitem', { name: 'Review Harbor renewal' })).toBeVisible()
   await authedPage.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K')
   await authedPage.getByRole('searchbox', { name: 'Search workspace' }).fill('Harbor')
   await expect(authedPage.getByRole('option', { name: /Review Harbor renewal/i })).toBeVisible()
@@ -239,6 +240,8 @@ test('Activity includes completed workspace tasks', async ({ authedPage }) => {
   await authedPage.getByLabel('Task title').fill('Send renewal packet')
   await authedPage.getByRole('button', { name: 'Create Task', exact: true }).click()
   await authedPage.getByRole('listitem', { name: 'Send renewal packet' }).getByRole('checkbox').click()
+  // Completion refreshes the open-task list only after the save succeeds.
+  await expect(authedPage.getByRole('listitem', { name: 'Send renewal packet' })).toHaveCount(0)
   await authedPage.goto('/overview')
   await expect(authedPage.getByText('Completed Send renewal packet')).toBeVisible()
   await authedPage.getByRole('link', { name: 'View activity' }).click()
@@ -287,8 +290,13 @@ test('Appointment entry uses the saved workspace time zone', async ({ authedPage
   await authedPage.getByLabel('End time').fill('09:30')
   await authedPage.getByRole('button', { name: 'Create Appointment', exact: true }).click()
   const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
-  const response = await authedPage.request.get('/appointments', { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } })
-  expect(response.ok()).toBe(true)
-  const saved = (await response.json()).find((item) => item.title === 'Zone conversion check')
+  let saved
+  // Clicking submit does not await the asynchronous save or its database commit.
+  await expect.poll(async () => {
+    const response = await authedPage.request.get('/appointments', { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } })
+    expect(response.ok()).toBe(true)
+    saved = (await response.json()).find((item) => item.title === 'Zone conversion check')
+    return Boolean(saved)
+  }).toBe(true)
   expect(new Date(saved.starts_at).toISOString()).toBe('2030-01-15T15:00:00.000Z')
 })

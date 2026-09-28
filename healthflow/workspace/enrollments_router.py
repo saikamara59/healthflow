@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from healthflow.auth.dependencies import get_current_broker
 from healthflow.database.config import get_db
 from healthflow.database.models import Broker, Client, Enrollment
-from healthflow.workspace.linking import require_owned_links
+from healthflow.workspace.linking import lock_document_target, require_no_document_history, require_owned_links
 from healthflow.workspace.schemas import (
     EnrollmentCreate,
     EnrollmentResponse,
@@ -93,8 +93,9 @@ async def update_enrollment(
     broker: Broker = Depends(get_current_broker),
     db: AsyncSession = Depends(get_db),
 ) -> EnrollmentResponse:
-    enrollment = await _enrollment(db, enrollment_id)
     changes = data.model_dump(exclude_unset=True)
+    enrollment = (await lock_document_target(db, broker.id, "enrollment", enrollment_id)
+                  if "client_id" in changes else await _enrollment(db, enrollment_id))
     details_changed = any(getattr(enrollment, field) != value for field, value in changes.items())
     if details_changed and enrollment.status in {"submitted", "confirmed", "canceled"}:
         raise HTTPException(
@@ -103,6 +104,8 @@ async def update_enrollment(
         )
     if "client_id" in changes:
         await require_owned_links(db, client_id=changes["client_id"])
+        if changes["client_id"] != enrollment.client_id:
+            await require_no_document_history(db, broker.id, "enrollment", enrollment.id)
     if not details_changed:
         return await _response(db, enrollment)
 

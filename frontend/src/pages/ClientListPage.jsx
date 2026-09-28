@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import TopBar from '../components/TopBar';
 import Icon from '../components/ui/Icon';
@@ -117,6 +117,8 @@ function downloadCsv(filename, csv) {
 /** Displays searchable client records and the actions available for each client. */
 export default function ClientListPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const archived = new URLSearchParams(location.search).get('archived') === 'true';
   const { openMenu, openNotifications } = useLayout();
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -126,11 +128,16 @@ export default function ClientListPage() {
   const [selected, setSelected] = useState(() => new Set());
 
   useEffect(() => {
-    api.get('/clients')
-      .then((d) => setClients(Array.isArray(d) ? d : []))
-      .catch(() => setClients([]))
-      .finally(() => setLoading(false));
-  }, []);
+    let current = true;
+    setLoading(true);
+    setSelected(new Set());
+    setFilter('all');
+    api.get(archived ? '/clients?archived=true' : '/clients')
+      .then((d) => { if (current) setClients(Array.isArray(d) ? d : []); })
+      .catch(() => { if (current) setClients([]); })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
+  }, [archived]);
 
   const filtered = useMemo(() => {
     let out = [...clients];
@@ -203,7 +210,7 @@ export default function ClientListPage() {
         onMenuClick={openMenu}
         onNotificationsClick={openNotifications}
         action={
-          <button className="btn accent" onClick={() => navigate('/clients/new')}>
+          !archived && <button className="btn accent" onClick={() => navigate('/clients/new')}>
             <Icon name="plus" size={14} /> Add client
           </button>
         }
@@ -211,7 +218,7 @@ export default function ClientListPage() {
       <div className="page wide">
         <div className="page-head">
           <div>
-            <div className="eyebrow" style={{ marginBottom: 14 }}>{clients.length} active clients</div>
+            <div className="eyebrow" style={{ marginBottom: 14 }}>{clients.length} {archived ? 'archived' : 'active'} clients</div>
             <h1 className="page-title"><em>Clients</em></h1>
             <p className="page-sub">
               Sorted by most-recent touch. Click a row to open the profile, or select rows to act in bulk.
@@ -224,9 +231,14 @@ export default function ClientListPage() {
           </div>
         </div>
 
+        <nav className="client-archive-nav" aria-label="Client status">
+          <Link to="/clients" aria-current={!archived ? 'page' : undefined}>Active clients</Link>
+          <Link to="/clients?archived=true" aria-current={archived ? 'page' : undefined}>Archived clients</Link>
+        </nav>
+
         <div className="between" style={{ marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
           <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-            {filters.map((f) => (
+            {!archived && filters.map((f) => (
               <button
                 key={f.key}
                 onClick={() => setFilter(f.key)}
@@ -382,14 +394,14 @@ export default function ClientListPage() {
                   <td colSpan={9}>
                     <div className="empty">
                       <div className="empty-title">
-                        {clients.length === 0 ? 'No clients yet' : 'No matches'}
+                        {clients.length === 0 ? (archived ? 'No archived clients' : 'No clients yet') : 'No matches'}
                       </div>
                       <div>
                         {clients.length === 0
-                          ? 'Add your first client to start tracking renewals and running comparisons.'
+                          ? (archived ? 'Clients you archive will appear here for history and restoration.' : 'Add your first client to start tracking renewals and running comparisons.')
                           : 'Try clearing the filter or searching a different name.'}
                       </div>
-                      {clients.length === 0 && (
+                      {clients.length === 0 && !archived && (
                         <div style={{ marginTop: 18 }}>
                           <button className="btn accent" onClick={() => navigate('/clients/new')}>
                             <Icon name="plus" size={14} /> Add client

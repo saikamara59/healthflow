@@ -36,6 +36,7 @@ async def _response(
     return task_response(
         task,
         client_name=names["client"].get(task.client_id),
+        client_archived=names["client_archived"].get(task.client_id, False),
         organization_name=names["organization"].get(task.organization_id),
         contact_name=names["contact"].get(task.contact_id),
     )

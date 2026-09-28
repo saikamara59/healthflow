@@ -4,6 +4,10 @@
 .workspace-section h2 { font-family: var(--serif); font-size: 1.25rem; margin: 0 0 14px; color: var(--ink); }
 .workspace-section p { color: var(--ink-2); }
 .workspace-list-row { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
+.status-label { display: inline-block; width: fit-content; padding: 3px 8px; border-radius: 999px; background: var(--warn-soft, #fff1d6); color: var(--warn, #8a5100); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.client-archive-nav { display: flex; gap: 8px; margin-bottom: 18px; }
+.client-archive-nav a { color: var(--ink-2); text-decoration: none; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius); }
+.client-archive-nav a[aria-current="page"] { color: var(--ink); background: var(--accent-soft); border-color: var(--accent-line); }
 .quick-create-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .workspace-error { color: var(--neg); background: var(--neg-soft); padding: 12px 16px; border-radius: var(--radius); }
 .workspace-list { list-style: none; margin: 0; padding: 0; }
@@ -79,3 +83,12 @@
 @media (max-width: 1000px) { .today-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 900px) { .phase2-grid { grid-template-columns: minmax(0, 1fr); } .phase2-detail { position: static; } }
 @media (max-width: 700px) { .quick-create-actions > * { width: 100%; min-height: 44px; } .workspace-section { padding: 18px; } .workspace-form-grid { grid-template-columns: 1fr; } .workspace-row-actions { flex-direction: column; } .workspace-link-suggestion { align-items: stretch; flex-direction: column; } }
+.document-panel { margin-block: 24px; padding: 20px; border: 1px solid var(--line); border-radius: 12px; }
+.document-panel h2 { font-family: var(--serif); }
+.document-controls { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; margin-block: 16px; }
+.document-controls label { display: grid; gap: 8px; min-width: 0; }
+.document-controls input, .document-controls select { max-width: 100%; }
+.document-row { display: flex; justify-content: space-between; gap: 16px; padding-block: 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; overflow-wrap: anywhere; }
+.document-row small { display: block; color: var(--ink-3); margin-top: 4px; }
+.document-links { padding-left: 16px; margin-top: 8px; }
+.document-links li { margin-block: 4px; }

@@ -27,7 +27,7 @@ test('an old action refresh cannot replace the selected Scheduling week', async 
     sessionStorage.setItem('hf_token', `test.${payload}.signature`)
   })
   await page.route('**/workspace/preferences', (route) => route.fulfill({ json: { timezone_name: 'UTC' } }))
-  await page.route('**/clients', (route) => route.fulfill({ json: [] }))
+  await page.route(/\/clients\?linkable=true$/, (route) => route.fulfill({ json: [] }))
   await page.route(/\/organizations\?/, (route) => route.fulfill({ json: [] }))
   await page.route('**/health', (route) => route.fulfill({ json: { status: 'ok' } }))
 

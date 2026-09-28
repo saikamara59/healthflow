@@ -1,10 +1,12 @@
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 from sqlalchemy import select
 
-from healthflow.auth.tenant_context import system_context
-from healthflow.database.models import DecisionRecord, PhiAccessLog
+from healthflow.database.models import (
+    Appeal, DecisionRecord, Enrollment, Issue, WorkspaceActivity,
+)
 
 
 async def _register_and_login(client, email="crud@example.com"):
@@ -189,16 +191,17 @@ async def test_delete_client(client):
     )
     assert response.status_code == 204
 
-    # Verify it's gone
-    get_resp = await client.get(
-        f"/clients/{client_id}",
-        headers={"Authorization": f"Bearer {token}"},
-    )
-    assert get_resp.status_code == 404
+    auth = {"Authorization": f"Bearer {token}"}
+    assert client_id not in {row["id"] for row in (await client.get("/clients", headers=auth)).json()}
+    assert (await client.get("/clients?archived=true", headers=auth)).json()[0]["id"] == client_id
+    assert (await client.get(f"/clients/{client_id}", headers=auth)).json()["archived_at"]
+    assert (await client.post(f"/clients/{client_id}/restore", headers=auth)).status_code == 200
+    assert (await client.get("/clients?linkable=true", headers=auth)).json()[0]["id"] == client_id
 
 
 @pytest.mark.asyncio
-async def test_delete_client_detaches_workspace_records(client, db_session):
+async def test_archive_client_preserves_workspace_records_and_audits(client, db_session):
+    started = datetime.now(timezone.utc)
     token = await _register_and_login(client, "delete-linked-client@example.com")
     headers = {"Authorization": f"Bearer {token}"}
     created = await client.post("/clients", json={
@@ -223,20 +226,38 @@ async def test_delete_client_detaches_workspace_records(client, db_session):
         client_id=uuid.UUID(client_id), agent_type="compare", content={},
     ))
     await db_session.commit()
-    assert (await client.delete(f"/clients/{client_id}", headers=headers)).status_code == 204
-    assert (await client.get(f"/tasks/{task.json()['id']}", headers=headers)).json()["client_id"] is None
-    assert (await client.get(f"/appointments/{appointment.json()['id']}", headers=headers)).json()["client_id"] is None
-    assert (await client.get("/workspace/activity", headers=headers)).json()[0]["client_id"] is None
-    assert (await client.get("/history", headers=headers)).json() == []
+    task_id, appointment_id = task.json()["id"], appointment.json()["id"]
+    assert (await client.get(f"/tasks/{task_id}", headers=headers)).json()["client_id"] == client_id
+    assert (await client.get(f"/appointments/{appointment_id}", headers=headers)).json()["client_id"] == client_id
+    assert (await client.post(f"/clients/{client_id}/archive", headers=headers)).status_code == 200
+    assert (await client.get("/clients?linkable=true", headers=headers)).json() == []
+    assert (await client.get(f"/tasks/{task_id}", headers=headers)).json()["client_id"] == client_id
+    assert (await client.get(f"/appointments/{appointment_id}", headers=headers)).json()["client_id"] == client_id
+    assert (await client.get("/history", headers=headers)).json()[0]["client_id"] == client_id
     db_session.expire_all()
     record = (await db_session.execute(
         select(DecisionRecord).where(DecisionRecord.id == decision_id)
     )).scalar_one()
-    assert record.client_id is None
+    assert record.client_id == uuid.UUID(client_id)
+    assert (await client.post(f"/clients/{client_id}/restore", headers=headers)).status_code == 200
+    db_session.expire_all()
+    activities = (await db_session.execute(select(WorkspaceActivity).where(
+        WorkspaceActivity.entity_id == uuid.UUID(client_id),
+        WorkspaceActivity.action.in_(["archived", "restored"]),
+    ))).scalars().all()
+    assert {item.action for item in activities} == {"archived", "restored"}
+    for item in activities:
+        assert item.broker_id == uuid.UUID(created.json()["broker_id"])
+        assert started <= item.created_at.replace(tzinfo=timezone.utc) <= datetime.now(timezone.utc)
+        assert item.entity_type == "client"
+        assert item.client_id == uuid.UUID(client_id)
+        assert item.details == {"outcome": "success"}
+        assert "Linked Client" not in item.summary
+        assert "Linked Client" not in str(item.details)
 
 
 @pytest.mark.asyncio
-async def test_delete_client_audits_phase2_record_ids(client, db_session):
+async def test_archive_client_preserves_phase2_record_ids(client, db_session):
     token = await _register_and_login(client, "delete-phase2-client@example.com")
     headers = {"Authorization": f"Bearer {token}"}
     created = await client.post(
@@ -269,26 +290,21 @@ async def test_delete_client_audits_phase2_record_ids(client, db_session):
         headers=headers,
     )
 
-    deleted = await client.delete(f"/clients/{client_id}", headers=headers)
-
-    assert deleted.status_code == 204
-    await db_session.rollback()
-    with system_context("verify phase 2 delete audit"):
-        logs = (
-            await db_session.execute(
-                select(PhiAccessLog).where(
-                    PhiAccessLog.endpoint == f"DELETE /clients/{client_id}",
-                    PhiAccessLog.operation == "delete",
-                    PhiAccessLog.table_name.in_(["enrollments", "issues", "appeals"]),
-                )
-            )
-        ).scalars().all()
-    ids_by_table = {entry.table_name: entry.row_ids for entry in logs}
-    assert ids_by_table == {
-        "appeals": [appeal.json()["id"]],
-        "enrollments": [enrollment.json()["id"]],
-        "issues": [issue.json()["id"]],
-    }
+    enrollment_id, issue_id, appeal_id = (uuid.UUID(response.json()["id"]) for response in (enrollment, issue, appeal))
+    assert (await client.delete(f"/clients/{client_id}", headers=headers)).status_code == 204
+    db_session.expire_all()
+    for model, record_id, fk, expected in (
+        (Enrollment, enrollment_id, "client_id", uuid.UUID(client_id)),
+        (Issue, issue_id, "client_id", uuid.UUID(client_id)),
+        (Appeal, appeal_id, "issue_id", issue_id),
+    ):
+        row = (await db_session.execute(select(model).where(model.id == record_id))).scalar_one()
+        assert getattr(row, fk) == expected
+    assert (await client.post(f"/clients/{client_id}/restore", headers=headers)).status_code == 200
+    db_session.expire_all()
+    assert (await db_session.execute(select(Enrollment).where(Enrollment.id == enrollment_id))).scalar_one().client_id == uuid.UUID(client_id)
+    assert (await db_session.execute(select(Issue).where(Issue.id == issue_id))).scalar_one().client_id == uuid.UUID(client_id)
+    assert (await db_session.execute(select(Appeal).where(Appeal.id == appeal_id))).scalar_one().issue_id == issue_id
 
 
 @pytest.mark.asyncio
@@ -382,6 +398,21 @@ async def test_ownership_check_delete(client):
     # 404 (not 403) per the multi-tenancy spec: don't leak existence of
     # another broker's records.
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_only_owner_can_archive_or_restore_client(client):
+    owner = await _register_and_login(client, "archive-owner@example.com")
+    other = await _register_and_login(client, "archive-other@example.com")
+    created = await client.post("/clients", json=_SAMPLE_CLIENT,
+                                headers={"Authorization": f"Bearer {owner}"})
+    client_id = created.json()["id"]
+    outsider = {"Authorization": f"Bearer {other}"}
+    for action in ("archive", "restore"):
+        assert (await client.post(f"/clients/{client_id}/{action}", headers=outsider)).status_code == 404
+    assert (await client.post(f"/clients/{client_id}/archive", headers={"Authorization": f"Bearer {owner}"})).status_code == 200
+    assert (await client.get("/clients?archived=true", headers=outsider)).json() == []
+    assert (await client.post(f"/clients/{client_id}/restore", headers=outsider)).status_code == 404
 
 
 @pytest.mark.asyncio
@@ -492,6 +523,19 @@ async def test_admin_cannot_update_other_brokers_clients(client, db_session):
     )
     # Tenant filter prunes the SELECT inside the PUT handler → 404 (no row found)
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_admin_read_bypass_does_not_allow_archive_or_restore(client, db_session):
+    owner = await _register_and_login(client, "archive-admin-owner@example.com")
+    created = await client.post("/clients", json=_SAMPLE_CLIENT,
+                                headers={"Authorization": f"Bearer {owner}"})
+    client_id = created.json()["id"]
+    admin = await _make_admin(client, db_session, "archive-admin@example.com")
+    headers = {"Authorization": f"Bearer {admin}"}
+    assert (await client.get(f"/clients/{client_id}", headers=headers)).status_code == 200
+    for action in ("archive", "restore"):
+        assert (await client.post(f"/clients/{client_id}/{action}", headers=headers)).status_code == 404
 
 
 @pytest.mark.asyncio

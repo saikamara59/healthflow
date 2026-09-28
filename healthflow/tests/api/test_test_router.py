@@ -21,6 +21,8 @@ from datetime import datetime, timezone
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
+from sqlalchemy import inspect, text
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from healthflow.auth.tenant_context import system_context
 from healthflow.database.models import (
@@ -42,9 +44,9 @@ from healthflow.seed_data import worker_email
 async def _build_client(db_session_factory):
     """Reload healthflow.main and return an AsyncClient against the fresh app.
 
-    Calls create_all on the reloaded engine to mirror what the app's startup
-    lifespan does — ASGITransport bypasses lifespan, so listener-required
-    tables (especially phi_access_log) need to be created here directly.
+    Calls create_all and schema bridges on the reloaded engine to mirror what
+    app startup does — ASGITransport bypasses lifespan, so tables and columns
+    must be initialized here directly.
     """
     import healthflow.database.config as db_config
     reload(db_config)
@@ -55,8 +57,13 @@ async def _build_client(db_session_factory):
     app = main_module.app
 
     from healthflow.database.models import Base
+    from healthflow.database.schema_migrations import (
+        ensure_client_archive_column, ensure_phase2_issue_links,
+    )
     async with db_config.engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(ensure_phase2_issue_links)
+        await conn.run_sync(ensure_client_archive_column)
 
     transport = ASGITransport(app=app)
     return AsyncClient(transport=transport, base_url="http://test"), app
@@ -83,6 +90,34 @@ async def test_reset_endpoint_returns_200_with_valid_worker_id(monkeypatch, db_s
         response = await client_.post("/__test/reset", json={"worker_id": "e2e-worker-0"})
         assert response.status_code == 200
         assert response.json() == {"status": "reset", "worker_id": "e2e-worker-0"}
+    finally:
+        await client_.aclose()
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.anyio
+async def test_reset_initialization_bridges_old_clients_table(monkeypatch, tmp_path, db_session_factory):
+    from healthflow.database.models import Base
+
+    database_url = f"sqlite+aiosqlite:///{tmp_path / 'legacy-reset.sqlite'}"
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    monkeypatch.setenv("HEALTHFLOW_TEST_MODE", "1")
+    engine = create_async_engine(database_url)
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+        await connection.execute(text("ALTER TABLE clients DROP COLUMN archived_at"))
+    await engine.dispose()
+
+    client_, app = await _build_client(db_session_factory)
+    try:
+        response = await client_.post("/__test/reset", json={"worker_id": "e2e-worker-77"})
+        assert response.status_code == 200
+        import healthflow.database.config as db_config
+        async with db_config.engine.begin() as connection:
+            columns = await connection.run_sync(
+                lambda sync_connection: [column["name"] for column in inspect(sync_connection).get_columns("clients")]
+            )
+        assert columns.count("archived_at") == 1
     finally:
         await client_.aclose()
         app.dependency_overrides.clear()

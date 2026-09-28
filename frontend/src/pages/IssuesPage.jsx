@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { workspaceApi } from '../api/workspace'
 import TopBar from '../components/TopBar'
+import DocumentList from '../components/DocumentList'
 import useLayout from '../components/ui/useLayout'
 import QuickCreateModal from '../components/workspace/QuickCreateModal'
 
@@ -11,6 +12,14 @@ const STATUS = {
   in_progress: 'In progress',
   waiting_on_outside_party: 'Waiting on an outside party',
   resolved: 'Resolved',
+}
+
+function AppealDocuments({ clientId, appeal }) {
+  const [expanded, setExpanded] = useState(false)
+  return <details onToggle={(event) => setExpanded(event.currentTarget.open)}>
+    <summary>Documents · {appeal.title}</summary>
+    {expanded && <DocumentList clientId={clientId} targetType="appeal" targetId={appeal.id} />}
+  </details>
 }
 
 export default function IssuesPage() {
@@ -81,6 +90,8 @@ export default function IssuesPage() {
             <div className="between"><h3 className="workspace-subheading">Appointments</h3><button className="btn sm ghost" onClick={() => setQuickCreate('appointment')}>Add Appointment</button></div>{selected.appointments.length ? <ul className="workspace-list">{selected.appointments.map((item) => <li className="workspace-list-row" key={item.id}><div className="workspace-row-copy"><strong>{item.title}</strong><small>{new Intl.DateTimeFormat(undefined, { timeZone, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(item.starts_at))}</small></div></li>)}</ul> : <p className="workspace-empty">No linked Appointments.</p>}
             <h3 className="workspace-subheading">Appeals</h3>{selected.appeals.length ? <ul className="workspace-list">{selected.appeals.map((item) => <li className="workspace-list-row" key={item.id}><details className="workspace-appeal-draft"><summary><strong>{item.title}</strong><small>Draft</small></summary><div className="workspace-appeal-text">{item.draft_text || 'No draft text has been saved yet.'}</div></details></li>)}</ul> : <p className="workspace-empty">No Appeal is required unless the case needs a formal challenge.</p>}
             <form className="workspace-inline-form phase2-appeal-form" onSubmit={addAppeal}><label>New Appeal title<input required value={appealTitle} onChange={(event) => setAppealTitle(event.target.value)} /></label><div className="quick-create-actions"><button className="btn">Add Appeal</button><Link className="btn accent" to={`/appeals?issue=${selected.id}`}>Draft with HealthFlow</Link></div></form>
+            <DocumentList key={selected.id} clientId={selected.client_id} targetType="issue" targetId={selected.id} />
+            {selected.appeals.map((appeal) => <AppealDocuments key={appeal.id} clientId={selected.client_id} appeal={appeal} />)}
           </>}
         </section>
       </div>

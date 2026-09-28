@@ -41,7 +41,7 @@ test('Enrollment selector offers only Clients the Broker can link', async ({ aut
   await selector.selectOption(ownClient.id)
   await authedPage.getByLabel('Plan name').fill('Harbor Gold PPO')
   await authedPage.getByRole('button', { name: 'Create Enrollment' }).click()
-  await expect(authedPage.getByText('Enrollment owner client · Harbor Gold PPO')).toBeVisible()
+  await expect(authedPage.getByText('Enrollment owner client · Harbor Gold PPO', { exact: true })).toBeVisible()
   await expect(authedPage.getByRole('alert')).toHaveCount(0)
 })
 
@@ -69,7 +69,7 @@ test('Broker reviews an Enrollment before confirming an external submission', as
   await authedPage.getByLabel('Client').selectOption(client.id)
   await authedPage.getByLabel('Plan name').fill('Harbor Gold PPO')
   await authedPage.getByRole('button', { name: 'Create Enrollment' }).click()
-  await expect(authedPage.getByText('Enrollment Review Client · Harbor Gold PPO')).toBeVisible()
+  await expect(authedPage.getByText('Enrollment Review Client · Harbor Gold PPO', { exact: true })).toBeVisible()
   const enrollmentRow = authedPage.locator('.workspace-list-row').filter({ hasText: 'Enrollment Review Client · Harbor Gold PPO' })
 
   await authedPage.getByRole('button', { name: 'Ready to submit' }).click()
@@ -127,14 +127,15 @@ test('Issue can resolve without an Appeal and Draft Appeal requires Issue contex
   await expect(authedPage.getByLabel('Existing Issue')).not.toHaveValue('')
 })
 
-test('Issue details recover from an error, use workspace time, and reopen a saved Appeal draft', async ({ authedPage }) => {
-  await authedPage.goto('/today')
-  const client = await createClient(authedPage, 'Review Finding Client')
-  const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
-  await authedPage.request.put('/workspace/preferences', {
+test('Issue details recover from an error, use workspace time, and reopen a saved Appeal draft', async ({ authedPage, authedSession }) => {
+  const token = authedSession.access_token
+  // Establish the deliberate workspace timezone before Today can initialize it.
+  expect((await authedPage.request.put('/workspace/preferences', {
     headers: { Authorization: `Bearer ${token}` },
     data: { timezone_name: 'America/New_York' },
-  })
+  })).ok()).toBe(true)
+  await authedPage.goto('/today')
+  const client = await createClient(authedPage, 'Review Finding Client')
   const issueResponse = await authedPage.request.post('/issues', {
     headers: { Authorization: `Bearer ${token}` },
     data: { client_id: client.id, title: 'Reopen this appeal' },
@@ -165,12 +166,20 @@ test('Issue details recover from an error, use workspace time, and reopen a save
   await authedPage.getByRole('button', { name: /Reopen this appeal/ }).click()
 
   await expect(authedPage.getByRole('alert')).toHaveCount(0)
-  await expect(authedPage.getByText('Jan 15, 2030, 10:00 AM')).toBeVisible()
-  await authedPage.getByText('Saved draft').click()
+  const appointmentRow = authedPage.locator('.workspace-list-row').filter({ hasText: 'Workspace-time meeting' })
+  // WebKit's Intl uses "at" where Chromium/Firefox use a comma.
+  await expect(appointmentRow.locator('small')).toHaveText(/^Jan 15, 2030(?:,| at) 10:00 AM$/)
+  await authedPage.locator('.workspace-appeal-draft summary').filter({ hasText: 'Saved draft' }).click()
   await expect(authedPage.getByText('Persisted broker appeal text.')).toBeVisible()
 })
 
 test('Appeal drafting keeps generated requests within schema limits', async ({ authedPage }) => {
+  // Delay the real write: generated output is visible before persistence completes.
+  await authedPage.route('**/appeals', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue()
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    await route.continue()
+  })
   await authedPage.goto('/today')
   const client = await createClient(authedPage, 'Appeal Boundary Client')
   const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
@@ -216,15 +225,16 @@ test('Appeal drafting keeps generated requests within schema limits', async ({ a
   await expect(authedPage.getByRole('heading', { name: 'Drafted appeal letter' })).toBeVisible()
   expect((await savedAppealResponse).ok()).toBe(true)
   expect(generatedRequest.additional_context.length).toBeLessThanOrEqual(1000)
-  const fetchSavedAppeals = async () => {
-    const response = await authedPage.request.get(`/appeals?issue_id=${issue.id}`, {
+  let saved
+  await expect.poll(async () => {
+    const appeals = await authedPage.request.get(`/appeals?issue_id=${issue.id}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-    expect(response.ok()).toBe(true)
-    return response.json()
-  }
-  await expect.poll(fetchSavedAppeals).toHaveLength(1)
-  const saved = await fetchSavedAppeals()
+    expect(appeals.ok()).toBe(true)
+    saved = await appeals.json()
+    return saved.length
+  }).toBe(1)
+  expect(saved[0].draft_text).toBe('Persisted generated appeal letter.')
   expect(saved[0].title.length).toBeLessThanOrEqual(300)
 })
 
