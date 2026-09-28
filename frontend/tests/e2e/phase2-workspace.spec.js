@@ -41,7 +41,7 @@ test('Enrollment selector offers only Clients the Broker can link', async ({ aut
   await selector.selectOption(ownClient.id)
   await authedPage.getByLabel('Plan name').fill('Harbor Gold PPO')
   await authedPage.getByRole('button', { name: 'Create Enrollment' }).click()
-  await expect(authedPage.getByText('Enrollment owner client · Harbor Gold PPO')).toBeVisible()
+  await expect(authedPage.getByText('Enrollment owner client · Harbor Gold PPO', { exact: true })).toBeVisible()
   await expect(authedPage.getByRole('alert')).toHaveCount(0)
 })
 
@@ -69,7 +69,7 @@ test('Broker reviews an Enrollment before confirming an external submission', as
   await authedPage.getByLabel('Client').selectOption(client.id)
   await authedPage.getByLabel('Plan name').fill('Harbor Gold PPO')
   await authedPage.getByRole('button', { name: 'Create Enrollment' }).click()
-  await expect(authedPage.getByText('Enrollment Review Client · Harbor Gold PPO')).toBeVisible()
+  await expect(authedPage.getByText('Enrollment Review Client · Harbor Gold PPO', { exact: true })).toBeVisible()
   const enrollmentRow = authedPage.locator('.workspace-list-row').filter({ hasText: 'Enrollment Review Client · Harbor Gold PPO' })
 
   await authedPage.getByRole('button', { name: 'Ready to submit' }).click()
@@ -165,8 +165,10 @@ test('Issue details recover from an error, use workspace time, and reopen a save
   await authedPage.getByRole('button', { name: /Reopen this appeal/ }).click()
 
   await expect(authedPage.getByRole('alert')).toHaveCount(0)
-  await expect(authedPage.getByText('Jan 15, 2030, 10:00 AM')).toBeVisible()
-  await authedPage.getByText('Saved draft').click()
+  const appointmentRow = authedPage.locator('.workspace-list-row').filter({ hasText: 'Workspace-time meeting' })
+  // WebKit's Intl uses "at" where Chromium/Firefox use a comma.
+  await expect(appointmentRow.locator('small')).toHaveText(/^Jan 15, 2030(?:,| at) 10:00 AM$/)
+  await authedPage.locator('.workspace-appeal-draft summary').filter({ hasText: 'Saved draft' }).click()
   await expect(authedPage.getByText('Persisted broker appeal text.')).toBeVisible()
 })
 

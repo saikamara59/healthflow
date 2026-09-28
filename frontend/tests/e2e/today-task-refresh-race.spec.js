@@ -22,7 +22,7 @@ test('Today discards a task page loaded before a task refresh', async ({ page })
     timezone_name: 'UTC', local_date: '2026-09-22', overdue_tasks: [], due_today_tasks: [],
     appointments_today: [], appointments_next_seven_days: [],
   } }))
-  await page.route('**/clients', (route) => route.fulfill({ json: [] }))
+  await page.route(/\/clients\?linkable=true$/, (route) => route.fulfill({ json: [] }))
   await page.route(/\/organizations\?/, (route) => route.fulfill({ json: [] }))
   await page.route('**/health', (route) => route.fulfill({ json: { status: 'ok' } }))
   await page.route('**/tasks/task-0/complete', (route) => {

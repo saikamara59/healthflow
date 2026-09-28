@@ -287,8 +287,13 @@ test('Appointment entry uses the saved workspace time zone', async ({ authedPage
   await authedPage.getByLabel('End time').fill('09:30')
   await authedPage.getByRole('button', { name: 'Create Appointment', exact: true }).click()
   const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
-  const response = await authedPage.request.get('/appointments', { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } })
-  expect(response.ok()).toBe(true)
-  const saved = (await response.json()).find((item) => item.title === 'Zone conversion check')
+  let saved
+  // Clicking submit does not await the asynchronous save or its database commit.
+  await expect.poll(async () => {
+    const response = await authedPage.request.get('/appointments', { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } })
+    expect(response.ok()).toBe(true)
+    saved = (await response.json()).find((item) => item.title === 'Zone conversion check')
+    return Boolean(saved)
+  }).toBe(true)
   expect(new Date(saved.starts_at).toISOString()).toBe('2030-01-15T15:00:00.000Z')
 })
