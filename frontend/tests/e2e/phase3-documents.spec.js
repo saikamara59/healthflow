@@ -229,6 +229,74 @@ async function createArchiveClient(page, { access_token }) {
   return { client, headers }
 }
 
+test('archived Client Issue cannot start Appeal generation from a direct link', async ({ authedPage: page, authedSession }) => {
+  const { client, headers } = await createArchiveClient(page, authedSession)
+  const issue = await (await page.request.post('/issues', { headers, data: { client_id: client.id, title: 'Historical Issue' } })).json()
+  expect((await page.request.post(`/clients/${client.id}/archive`, { headers })).ok()).toBe(true)
+  let generations = 0
+  await page.route('**/appeal', async (route) => {
+    generations += 1
+    await route.fulfill({ status: 503, json: { detail: 'Generation must not be called' } })
+  })
+  await page.goto(`/appeals?issue=${issue.id}`)
+  await expect(page.getByText(/Restore the Client before drafting/)).toBeVisible()
+  await expect(page.getByLabel('Existing Issue').locator(`option[value="${issue.id}"]`)).toHaveCount(0)
+  await page.getByRole('button', { name: 'Use sample' }).click()
+  await page.getByRole('button', { name: 'Analyze & draft' }).click()
+  await expect(page.getByRole('alert')).toContainText('Restore the Client')
+  expect(generations).toBe(0)
+  await page.goto('/issues')
+  await page.getByRole('button', { name: /Historical Issue/ }).click()
+  await expect(page.getByRole('heading', { name: 'Historical Issue', exact: true })).toBeVisible()
+})
+
+test('collapsed Appeal Documents never fetch or join global refresh until expanded', async ({ authedPage: page, authedSession }) => {
+  const { client, headers } = await createArchiveClient(page, authedSession)
+  const issue = await (await page.request.post('/issues', { headers, data: { client_id: client.id, title: 'Lazy Documents Issue' } })).json()
+  const appeal = await (await page.request.post('/appeals', { headers, data: { issue_id: issue.id, title: 'Lazy Appeal' } })).json()
+  let appealReads = 0
+  page.on('request', (request) => {
+    if (request.url().includes(`target_type=appeal&target_id=${appeal.id}`)) appealReads += 1
+  })
+  await page.goto('/issues')
+  await page.getByRole('button', { name: /Lazy Documents Issue/ }).click()
+  const panel = page.locator('details').filter({ hasText: 'Documents · Lazy Appeal' })
+  const issueDocuments = page.locator('.phase2-detail > .document-panel')
+  await expect(issueDocuments.getByText('No active Documents.')).toBeVisible()
+  await expect(panel.locator('.document-panel')).toHaveCount(0)
+  expect(appealReads).toBe(0)
+  await panel.locator('summary').click()
+  await expect(panel.getByText('No active Documents.')).toBeVisible()
+  // Development StrictMode may run mount effects twice. The contract is no
+  // requests while collapsed, and no further refresh requests after closing.
+  const expandedReads = appealReads
+  expect(expandedReads).toBeGreaterThan(0)
+  await panel.locator('summary').click()
+  await expect(panel.locator('.document-panel')).toHaveCount(0)
+  const refreshed = page.waitForResponse((response) => response.url().includes(`target_type=issue&target_id=${issue.id}`))
+  await page.evaluate(() => window.dispatchEvent(new Event('healthflow:documents-changed')))
+  await refreshed
+  await expect(issueDocuments.getByText('No active Documents.')).toBeVisible()
+  expect(appealReads).toBe(expandedReads)
+})
+
+test('Appeal generation rechecks a Client archived after Issue selection', async ({ authedPage: page, authedSession }) => {
+  const { client, headers } = await createArchiveClient(page, authedSession)
+  const issue = await (await page.request.post('/issues', { headers, data: { client_id: client.id, title: 'Selected Issue' } })).json()
+  let generations = 0
+  await page.route('**/appeal', async (route) => {
+    generations += 1
+    await route.fulfill({ status: 503, json: { detail: 'Generation must not be called' } })
+  })
+  await page.goto(`/appeals?issue=${issue.id}`)
+  await expect(page.getByLabel('Existing Issue').locator(`option[value="${issue.id}"]`)).toHaveCount(1)
+  expect((await page.request.post(`/clients/${client.id}/archive`, { headers })).ok()).toBe(true)
+  await page.getByRole('button', { name: 'Use sample' }).click()
+  await page.getByRole('button', { name: 'Analyze & draft' }).click()
+  await expect(page.getByRole('alert')).toContainText('Restore the Client')
+  expect(generations).toBe(0)
+})
+
 test('archived client remains in history and can be restored to the active list', async ({ authedPage: page, authedSession }) => {
   const { client } = await createArchiveClient(page, authedSession)
   const clientRow = page.locator('[data-testid="client-row"]').filter({ hasText: client.id.slice(0, 8) })

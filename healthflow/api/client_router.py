@@ -14,6 +14,8 @@ from healthflow.database.models import (
 )
 from healthflow.models.schemas import ClientCreate, ClientResponse, ClientUpdate
 from healthflow.workspace.activity import record_workspace_activity
+from healthflow.workspace.linking import lock_client
+from healthflow.workspace.serializers import _as_utc
 
 
 def _admin_bypass(broker: Broker):
@@ -46,7 +48,7 @@ def _client_to_response(client: Client) -> ClientResponse:
         procedures=client.procedures,
         created_at=client.created_at.isoformat(),
         updated_at=client.updated_at.isoformat(),
-        archived_at=client.archived_at.isoformat() if client.archived_at else None,
+        archived_at=_as_utc(client.archived_at).isoformat() if client.archived_at else None,
     )
 
 
@@ -63,16 +65,28 @@ async def _owned_client(db: AsyncSession, client_id: str) -> Client:
 
 
 async def _set_archive_state(
-    db: AsyncSession, *, client: Client, broker: Broker, archived: bool,
-) -> None:
+    db: AsyncSession, *, client_id: str, broker: Broker, archived: bool,
+) -> Client:
+    try:
+        parsed_id = uuid.UUID(client_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Client not found") from None
+    broker_id = broker.id
+    # End the authentication read transaction before acquiring the write lock,
+    # including on SQLite WAL. Preserve any access-audit rows.
+    await db.commit()
+    client = await lock_client(db, broker_id, parsed_id)
+    if (client.archived_at is not None) == archived:
+        return client
     client.archived_at = _utcnow() if archived else None
     await db.flush()
     action = "archived" if archived else "restored"
     await record_workspace_activity(
-        db, broker_id=broker.id, client_id=client.id, entity_type="client",
+        db, broker_id=broker_id, client_id=client.id, entity_type="client",
         entity_id=client.id, action=action, summary=f"Client {action}",
         details={"outcome": "success"},
     )
+    return client
 
 
 @client_router.post("", response_model=ClientResponse, status_code=201)
@@ -170,8 +184,7 @@ async def delete_client(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Compatibility endpoint: archive a Client and preserve linked work."""
-    owned = await _owned_client(db, client_id)
-    await _set_archive_state(db, client=owned, broker=broker, archived=True)
+    await _set_archive_state(db, client_id=client_id, broker=broker, archived=True)
     return Response(status_code=204)
 
 
@@ -181,8 +194,7 @@ async def archive_client(
     broker: Broker = Depends(get_current_broker),
     db: AsyncSession = Depends(get_db),
 ) -> ClientResponse:
-    owned = await _owned_client(db, client_id)
-    await _set_archive_state(db, client=owned, broker=broker, archived=True)
+    owned = await _set_archive_state(db, client_id=client_id, broker=broker, archived=True)
     return _client_to_response(owned)
 
 
@@ -192,6 +204,5 @@ async def restore_client(
     broker: Broker = Depends(get_current_broker),
     db: AsyncSession = Depends(get_db),
 ) -> ClientResponse:
-    owned = await _owned_client(db, client_id)
-    await _set_archive_state(db, client=owned, broker=broker, archived=False)
+    owned = await _set_archive_state(db, client_id=client_id, broker=broker, archived=False)
     return _client_to_response(owned)

@@ -50,7 +50,7 @@ async def _issue_response(db: AsyncSession, issue: Issue, *, expanded: bool = Tr
     if client is None:
         raise HTTPException(status_code=404, detail="Client not found")
     if not expanded:
-        return issue_response(issue, client_name=client.full_name)
+        return issue_response(issue, client_name=client.full_name, client_archived=client.archived_at is not None)
     appeals = list(
         (
             await db.execute(
@@ -79,6 +79,7 @@ async def _issue_response(db: AsyncSession, issue: Issue, *, expanded: bool = Tr
     return issue_response(
         issue,
         client_name=client.full_name,
+        client_archived=client.archived_at is not None,
         appeals=[appeal_response(item) for item in appeals],
         follow_ups=[await task_with_names(db, item) for item in tasks],
         appointments=[await appointment_with_names(db, item) for item in appointments],

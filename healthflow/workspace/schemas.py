@@ -286,6 +286,7 @@ class IssueResponse(BaseModel):
     id: UUID
     client_id: UUID
     client_name: str
+    client_archived: bool = False
     title: str
     description: str | None
     deadline: date | None

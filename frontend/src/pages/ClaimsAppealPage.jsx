@@ -65,10 +65,20 @@ export default function ClaimsAppealPage() {
       setError('Choose an existing Issue or confirm creation of a new one before drafting an Appeal.');
       return;
     }
+    if (issue.client_archived) {
+      setError('Restore the Client before drafting a new Appeal. Historical Issues and Appeals remain available in Issues & Appeals.');
+      return;
+    }
     setError('');
     setRunning(true);
     setSavedAppeal(null);
     try {
+      const currentIssue = await workspaceApi.getIssue(issueId);
+      if (currentIssue.client_archived) {
+        setIssues((current) => current.map((item) => item.id === issueId ? currentIssue : item));
+        setError('Restore the Client before drafting a new Appeal.');
+        return;
+      }
       const issueContext = `Issue context: ${issue.title}`;
       const additionalContext = [context, issueContext].filter(Boolean).join('\n\n');
       if (additionalContext.length > MAX_ADDITIONAL_CONTEXT) {
@@ -125,9 +135,10 @@ export default function ClaimsAppealPage() {
           <h2>Issue context</h2>
           <p>Every Appeal stays inside an Issue so its deadline, Follow-ups, and Appointments remain together.</p>
           <div className="workspace-form-grid">
-            <label className="field"><span className="field-label">Existing Issue</span><select className="select" value={issueId} onChange={(event) => { setIssueId(event.target.value); setError('') }}><option value="">Choose an Issue</option>{issues.map((issue) => <option key={issue.id} value={issue.id}>{issue.client_name} · {issue.title}</option>)}</select></label>
+            <label className="field"><span className="field-label">Existing Issue</span><select className="select" value={selectedIssue?.client_archived ? '' : issueId} onChange={(event) => { setIssueId(event.target.value); setError('') }}><option value="">Choose an Issue</option>{issues.filter((issue) => !issue.client_archived).map((issue) => <option key={issue.id} value={issue.id}>{issue.client_name} · {issue.title}</option>)}</select></label>
             <form className="workspace-inline-form" onSubmit={createIssue} style={{ marginBottom: 0 }}><div className="workspace-form-grid"><label>Client<select required value={newIssue.client_id} onChange={(event) => setNewIssue({ ...newIssue, client_id: event.target.value })}><option value="">Choose a Client</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.full_name}</option>)}</select></label><label>New Issue title<input required value={newIssue.title} onChange={(event) => setNewIssue({ ...newIssue, title: event.target.value })} /></label></div><button className="btn sm" type="submit">Create and use Issue</button></form>
           </div>
+          {selectedIssue?.client_archived && <p className="notice">Restore the Client before drafting a new Appeal. Historical Issues and Appeals remain available in Issues &amp; Appeals.</p>}
         </section>
 
         {savedAppeal && <DocumentList clientId={savedAppeal.client_id} targetType="appeal" targetId={savedAppeal.id} />}

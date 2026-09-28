@@ -14,6 +14,14 @@ const STATUS = {
   resolved: 'Resolved',
 }
 
+function AppealDocuments({ clientId, appeal }) {
+  const [expanded, setExpanded] = useState(false)
+  return <details onToggle={(event) => setExpanded(event.currentTarget.open)}>
+    <summary>Documents · {appeal.title}</summary>
+    {expanded && <DocumentList clientId={clientId} targetType="appeal" targetId={appeal.id} />}
+  </details>
+}
+
 export default function IssuesPage() {
   const { openMenu, openNotifications } = useLayout()
   const [issues, setIssues] = useState(null)
@@ -83,7 +91,7 @@ export default function IssuesPage() {
             <h3 className="workspace-subheading">Appeals</h3>{selected.appeals.length ? <ul className="workspace-list">{selected.appeals.map((item) => <li className="workspace-list-row" key={item.id}><details className="workspace-appeal-draft"><summary><strong>{item.title}</strong><small>Draft</small></summary><div className="workspace-appeal-text">{item.draft_text || 'No draft text has been saved yet.'}</div></details></li>)}</ul> : <p className="workspace-empty">No Appeal is required unless the case needs a formal challenge.</p>}
             <form className="workspace-inline-form phase2-appeal-form" onSubmit={addAppeal}><label>New Appeal title<input required value={appealTitle} onChange={(event) => setAppealTitle(event.target.value)} /></label><div className="quick-create-actions"><button className="btn">Add Appeal</button><Link className="btn accent" to={`/appeals?issue=${selected.id}`}>Draft with HealthFlow</Link></div></form>
             <DocumentList key={selected.id} clientId={selected.client_id} targetType="issue" targetId={selected.id} />
-            {selected.appeals.map((appeal) => <details key={appeal.id}><summary>Documents · {appeal.title}</summary><DocumentList clientId={selected.client_id} targetType="appeal" targetId={appeal.id} /></details>)}
+            {selected.appeals.map((appeal) => <AppealDocuments key={appeal.id} clientId={selected.client_id} appeal={appeal} />)}
           </>}
         </section>
       </div>

@@ -17,7 +17,7 @@ from starlette.concurrency import run_in_threadpool
 from healthflow.database.config import async_session_factory
 from healthflow.database.models import Appeal, Client, Document, DocumentEvent, DocumentLink, Enrollment, Issue, _utcnow
 from healthflow.workspace.document_storage import DocumentStorage
-from healthflow.workspace.linking import lock_document_target
+from healthflow.workspace.linking import lock_client, lock_document_target
 from healthflow.workspace.document_validation import (
     CONTENT_TYPES, DocumentTooLarge, InvalidDocumentType, validate_upload,
 )
@@ -219,6 +219,9 @@ class DocumentService:
             raise HTTPException(409, "Restore Client before uploading Documents")
         if self.storage is None:
             raise HTTPException(503, "Document storage unavailable")
+        # Preserve the read audit, but release its transaction/snapshot before
+        # validation and storage. Archive must be able to commit during PUT.
+        await db.commit()
         try:
             # Task 4's validator is async for UploadFile reads but its parsers
             # and temp-file I/O are synchronous. Run the whole owned operation
@@ -229,32 +232,69 @@ class DocumentService:
         except InvalidDocumentType:
             raise HTTPException(422, "Unsupported or malformed Document") from None
         key = str(uuid4())
-        document = Document(id=uuid4(), broker_id=broker_id, client_id=client_id,
+        document_id = uuid4()
+        document = Document(id=document_id, broker_id=broker_id, client_id=client_id,
                             display_filename=validated.display_filename,
                             verified_type=validated.verified_type, byte_length=validated.byte_length,
                             object_key=key)
+        commit_attempted = False
         try:
             await run_in_threadpool(self.storage.put, key, validated.stream, validated.content_type)
+            client = await lock_client(db, broker_id, client_id)
+            if client.archived_at is not None:
+                raise HTTPException(409, "Restore Client before uploading Documents")
             db.add(document)
             db.add(self.event(broker_id, client_id, document.id, "upload", "success"))
+            commit_attempted = True
             await db.commit()
         except BaseException as error:
             with anyio.CancelScope(shield=True):
+                rolled_back = False
                 try:
                     await db.rollback()
+                    rolled_back = True
                 except Exception:
-                    logger.error("document_upload_rollback_failed document_id=%s", document.id)
-                try:
-                    # Even a failed PUT may have left an object behind.
-                    await run_in_threadpool(self.storage.remove, key)
-                except Exception:
-                    logger.error("document_cleanup_failed object_key=%s", key)
+                    logger.error("document_upload_rollback_failed document_id=%s", document_id)
+                safe_to_remove = not commit_attempted
+                if commit_attempted and rolled_back:
+                    safe_to_remove = await self._upload_definitely_absent(broker_id, client_id, document_id)
+                if safe_to_remove:
+                    try:
+                        # Even a failed PUT may have left an object behind.
+                        await run_in_threadpool(self.storage.remove, key)
+                    except Exception:
+                        logger.error("document_cleanup_failed object_key=%s", key)
+                elif commit_attempted:
+                    logger.warning("document_upload_content_retained document_id=%s object_key=%s", document_id, key)
             if not isinstance(error, Exception):
+                raise
+            if isinstance(error, HTTPException):
                 raise
             raise HTTPException(503, "Document upload unavailable; retry later") from None
         finally:
             validated.stream.close()
         return document
+
+    async def _upload_definitely_absent(self, broker_id, client_id, document_id):
+        """An uncertain commit never justifies deleting possibly committed bytes.
+
+        After successful rollback, independently acquire the same Client lock
+        before checking. This waits for any still-deciding upload transaction;
+        a fresh negative SELECT alone would not establish commit ordering.
+        Failure to verify retains content for explicit operator reconciliation.
+        """
+        try:
+            async with self.session_factory() as verification:
+                await lock_client(verification, broker_id, client_id)
+                found = (await verification.execute(select(Document.id).where(
+                    Document.id == document_id, Document.broker_id == broker_id,
+                    Document.client_id == client_id,
+                ))).scalar_one_or_none()
+                await verification.commit()
+                return found is None
+        except Exception:
+            logger.error("document_upload_verification_unknown document_id=%s", document_id)
+            return False
 
     async def open(self, db: AsyncSession, broker_id: UUID, document_id: UUID) -> StreamingResponse:
         try:

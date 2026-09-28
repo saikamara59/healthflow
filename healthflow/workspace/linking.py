@@ -9,6 +9,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from healthflow.database.models import Appeal, Client, Contact, DocumentLink, Enrollment, Issue, Organization
 
 
+async def lock_client(db, broker_id, client_id):
+    """Serialize Client lifecycle and Document commits across processes.
+
+    Call in a fresh transaction: SQLite cannot upgrade an old WAL snapshot.
+    UPDATE locks the row on PostgreSQL and the writer on SQLite. Reload after
+    waiting so a cached Client cannot conceal a completed archive transition.
+    """
+    result = await db.execute(update(Client).where(
+        Client.id == client_id, Client.broker_id == broker_id,
+    ).values(updated_at=Client.updated_at).execution_options(synchronize_session=False))
+    if result.rowcount != 1:
+        raise HTTPException(404, "Client not found")
+    return (await db.execute(select(Client).where(
+        Client.id == client_id, Client.broker_id == broker_id,
+    ).execution_options(populate_existing=True))).scalar_one()
+
+
 async def lock_document_target(db, broker_id, target_type, target_id):
     """Serialize Link creation and Client reassignment on the same parent row.
 
