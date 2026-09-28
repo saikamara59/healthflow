@@ -214,12 +214,7 @@ test('Phase 3 documents uses server upload capability and shows synthetic Client
   }
 })
 
-async function createArchiveClient(page, workerBroker) {
-  const login = await page.request.post('/auth/login', { data: {
-    email: workerBroker.email, password: workerBroker.password,
-  } })
-  expect(login.ok()).toBe(true)
-  const { access_token } = await login.json()
+async function createArchiveClient(page, { access_token }) {
   const headers = { Authorization: `Bearer ${access_token}` }
   // Configure before Today mounts, avoiding the unrelated automatic timezone PUT race (#87).
   expect((await page.request.put('/workspace/preferences', { headers, data: {
@@ -234,8 +229,8 @@ async function createArchiveClient(page, workerBroker) {
   return { client, headers }
 }
 
-test('archived client remains in history and can be restored to the active list', async ({ authedPage: page, workerBroker }) => {
-  const { client } = await createArchiveClient(page, workerBroker)
+test('archived client remains in history and can be restored to the active list', async ({ authedPage: page, authedSession }) => {
+  const { client } = await createArchiveClient(page, authedSession)
   const clientRow = page.locator('[data-testid="client-row"]').filter({ hasText: client.id.slice(0, 8) })
 
   await page.goto(`/clients/${client.id}`)
@@ -244,23 +239,22 @@ test('archived client remains in history and can be restored to the active list'
   await expect(page.locator('.profile-hero .status-label')).toHaveText('Archived client')
   await page.reload()
   await expect(page.locator('.profile-hero .status-label')).toHaveText('Archived client')
-  await page.getByRole('link', { name: 'Archived clients' }).click()
-  await page.getByRole('link', { name: 'Active clients' }).click()
+  await page.getByRole('complementary').locator('a[href="/clients"]').click()
   await expect(clientRow).toHaveCount(0)
   await page.getByRole('link', { name: 'Archived clients' }).click()
   await expect(clientRow).toBeVisible()
   await page.reload()
   await expect(clientRow).toBeVisible()
 
-  await page.goto(`/clients/${client.id}`)
+  await clientRow.getByText('Eleanor Rigby', { exact: true }).click()
   await page.getByRole('button', { name: 'Restore client' }).click()
   await expect(page.locator('.profile-hero .status-label')).toHaveCount(0)
   await page.getByRole('link', { name: 'Active clients' }).click()
   await expect(clientRow).toBeVisible()
 })
 
-test('archived client keeps Today and Scheduling deadlines visible', async ({ authedPage: page, workerBroker }) => {
-  const { client, headers } = await createArchiveClient(page, workerBroker)
+test('archived client keeps Today and Scheduling deadlines visible', async ({ authedPage: page, authedSession }) => {
+  const { client, headers } = await createArchiveClient(page, authedSession)
   const due = new Date()
   due.setUTCHours(12, 0, 0, 0)
   const ends = new Date(due.getTime() + 1_800_000)
@@ -275,9 +269,9 @@ test('archived client keeps Today and Scheduling deadlines visible', async ({ au
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: 'Archive client' }).click()
   await expect(page.locator('.profile-hero .status-label')).toHaveText('Archived client')
-  await page.goto('/today')
+  await page.getByRole('link', { name: 'Today', exact: true }).click()
   await expect(page.locator('.workspace-list-row').filter({ hasText: 'Archive deadline' }).getByText('Archived client')).toBeVisible()
   await expect(page.locator('.workspace-list-row').filter({ hasText: 'Archive meeting' }).getByText('Archived client')).toBeVisible()
-  await page.goto('/scheduling')
+  await page.getByRole('link', { name: 'Scheduling', exact: true }).click()
   await expect(page.locator('.workspace-list-row').filter({ hasText: 'Archive meeting' }).getByText('Archived client')).toBeVisible()
 })

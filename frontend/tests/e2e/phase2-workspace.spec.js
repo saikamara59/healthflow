@@ -127,14 +127,15 @@ test('Issue can resolve without an Appeal and Draft Appeal requires Issue contex
   await expect(authedPage.getByLabel('Existing Issue')).not.toHaveValue('')
 })
 
-test('Issue details recover from an error, use workspace time, and reopen a saved Appeal draft', async ({ authedPage }) => {
-  await authedPage.goto('/today')
-  const client = await createClient(authedPage, 'Review Finding Client')
-  const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
-  await authedPage.request.put('/workspace/preferences', {
+test('Issue details recover from an error, use workspace time, and reopen a saved Appeal draft', async ({ authedPage, authedSession }) => {
+  const token = authedSession.access_token
+  // Establish the deliberate workspace timezone before Today can initialize it.
+  expect((await authedPage.request.put('/workspace/preferences', {
     headers: { Authorization: `Bearer ${token}` },
     data: { timezone_name: 'America/New_York' },
-  })
+  })).ok()).toBe(true)
+  await authedPage.goto('/today')
+  const client = await createClient(authedPage, 'Review Finding Client')
   const issueResponse = await authedPage.request.post('/issues', {
     headers: { Authorization: `Bearer ${token}` },
     data: { client_id: client.id, title: 'Reopen this appeal' },
@@ -173,6 +174,12 @@ test('Issue details recover from an error, use workspace time, and reopen a save
 })
 
 test('Appeal drafting keeps generated requests within schema limits', async ({ authedPage }) => {
+  // Delay the real write: generated output is visible before persistence completes.
+  await authedPage.route('**/appeals', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue()
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    await route.continue()
+  })
   await authedPage.goto('/today')
   const client = await createClient(authedPage, 'Appeal Boundary Client')
   const token = await authedPage.evaluate(() => sessionStorage.getItem('hf_token'))
@@ -214,11 +221,16 @@ test('Appeal drafting keeps generated requests within schema limits', async ({ a
 
   await expect(authedPage.getByRole('heading', { name: 'Drafted appeal letter' })).toBeVisible()
   expect(generatedRequest.additional_context.length).toBeLessThanOrEqual(1000)
-  const appeals = await authedPage.request.get(`/appeals?issue_id=${issue.id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  const saved = await appeals.json()
-  expect(saved).toHaveLength(1)
+  let saved
+  await expect.poll(async () => {
+    const appeals = await authedPage.request.get(`/appeals?issue_id=${issue.id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    expect(appeals.ok()).toBe(true)
+    saved = await appeals.json()
+    return saved.length
+  }).toBe(1)
+  expect(saved[0].draft_text).toBe('Persisted generated appeal letter.')
   expect(saved[0].title.length).toBeLessThanOrEqual(300)
 })
 
