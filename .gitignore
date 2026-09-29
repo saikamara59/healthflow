@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 *.pyo
 .venv/
+.venv
 venv/
 .env
 *.egg-info/
@@ -14,6 +15,7 @@ build/
 
 # Frontend
 frontend/node_modules/
+frontend/node_modules
 frontend/dist/
 healthflow.db
 healthflow_data.db
