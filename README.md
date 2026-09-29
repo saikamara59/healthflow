@@ -387,7 +387,10 @@ React Frontend → Nginx → FastAPI Backend → Harness → Tools + Agents → 
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ANTHROPIC_API_KEY` | (required) | Claude API key for AI recommendations |
+| `ANTHROPIC_API_KEY` | (required) | Claude API key for AI recommendations and Ask HealthFlow text. |
+| `OPENAI_API_KEY` | unset | Server-only key for opt-in Ask HealthFlow voice. Without it, voice returns 503. |
+| `ASK_HEALTHFLOW_VOICE_MODEL` | `gpt-realtime-1.5` | Realtime voice model configured on the server. |
+| `ASK_HEALTHFLOW_TEXT_MODEL` | current healthflow-agents Claude model | Optional Ask HealthFlow text model override. |
 | `LOGFIRE_TOKEN` | unset | Optional Logfire project write token. Exports only allowlisted agent invocation metadata (agent, operation, duration, success/failure), not prompts, responses, identifiers, details, or exception text. |
 | `DATABASE_URL` | `sqlite+aiosqlite:///healthflow.db` | Database connection string |
 | `JWT_SECRET` | **(required, fail-loud)** | JWT signing secret. Module-import raises if unset or set to the legacy default. Generate with `python -c "import secrets; print(secrets.token_urlsafe(32))"`. |

@@ -162,6 +162,7 @@ export default function ClientProfilePage() {
               {client.full_name}
             </h1>
             {client.archived_at && <span className="status-label">Archived client</span>}
+            {!client.archived_at && <Link className="btn sm" to={`/ask?client=${client.id}`}>Ask HealthFlow about this Client</Link>}
             <div className="row" style={{ gap: 12, marginTop: 14, flexWrap: 'wrap' }}>
               <Chip tone={incomeTone} dot>{client.income_level} income</Chip>
               <Chip>Age {client.age}</Chip>

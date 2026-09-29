@@ -30,6 +30,7 @@ const NAV = [
   {
     group: 'AI Tools',
     items: [
+      { path: '/ask', label: 'Ask HealthFlow', icon: 'support' },
       { path: '/compare', label: 'Compare Plans', icon: 'compare' },
       { path: '/calculator', label: 'Estimate Costs', icon: 'calculator' },
       { path: '/network', label: 'Check Network', icon: 'network' },
