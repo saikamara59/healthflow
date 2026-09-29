@@ -31,6 +31,8 @@ export default defineConfig({
       '/issues': proxyToBackend,
       '/appeals': proxyToBackend,
       '/workspace': proxyToBackend,
+      '/ask-healthflow': proxyToBackend,
+      '/tool-output': proxyToBackend,
       '/compare': proxyToBackend,
       '/calculate': proxyToBackend,
       '/translate': proxyToBackend,
