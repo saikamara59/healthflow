@@ -27,8 +27,10 @@ test('Phase 3 Client status ignores an older response after switching views', as
   await oldResponse
   // Wait until the older fetch has completed and React has rendered its callbacks.
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
-  await expect(page.getByText('Current archived result', { exact: true })).toBeVisible()
-  await expect(page.getByText('Old active result', { exact: true })).toHaveCount(0)
+  // Scope to the list: the top bar's "Working with" picker also loads /clients.
+  const rows = page.getByTestId('client-row')
+  await expect(rows.getByText('Current archived result', { exact: true })).toBeVisible()
+  await expect(rows.getByText('Old active result', { exact: true })).toHaveCount(0)
 })
 
 publicTest('Phase 3 documents public demo seeded files are visible and direct upload is denied', async ({ page, request }) => {

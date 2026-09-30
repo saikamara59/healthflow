@@ -142,6 +142,8 @@ test('keyboard search finds a Broker task', async ({ authedPage }) => {
   await authedPage.getByRole('button', { name: 'New Task' }).click()
   await authedPage.getByLabel('Task title').fill('Review Harbor renewal')
   await authedPage.getByRole('button', { name: 'Create Task', exact: true }).click()
+  // An unscheduled Task lands in the collapsed "other open tasks" group.
+  await authedPage.getByRole('button', { name: /other open task/ }).click()
   await expect(authedPage.getByRole('listitem', { name: 'Review Harbor renewal' })).toBeVisible()
   await authedPage.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K')
   await authedPage.getByRole('searchbox', { name: 'Search workspace' }).fill('Harbor')
@@ -240,6 +242,7 @@ test('Activity includes completed workspace tasks', async ({ authedPage }) => {
   await authedPage.getByRole('button', { name: 'New Task' }).click()
   await authedPage.getByLabel('Task title').fill('Send renewal packet')
   await authedPage.getByRole('button', { name: 'Create Task', exact: true }).click()
+  await authedPage.getByRole('button', { name: /other open task/ }).click()
   await authedPage.getByRole('listitem', { name: 'Send renewal packet' }).getByRole('checkbox').click()
   // Completion refreshes the open-task list only after the save succeeds.
   await expect(authedPage.getByRole('listitem', { name: 'Send renewal packet' })).toHaveCount(0)

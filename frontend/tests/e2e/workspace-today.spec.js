@@ -39,6 +39,7 @@ test('mock inbox requires Broker confirmation before linking its suggested Clien
   await expect(authedPage.getByText('Client link confirmed: Eleanor Rigby')).toBeVisible()
 
   await authedPage.getByRole('button', { name: 'Create Task', exact: true }).click()
+  await authedPage.getByRole('button', { name: /other open task/ }).click()
   const row = authedPage.getByRole('listitem', { name: /Renewal documents are ready/i })
   await expect(row).toContainText('Eleanor Rigby')
 })
