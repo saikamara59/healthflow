@@ -273,3 +273,29 @@ html[data-mode="dark"] .doc-type { color: color-mix(in oklch, var(--t) 70%, whit
   .ar-act { justify-content: flex-start; flex-wrap: wrap; }
 }
 @media (max-width: 620px) { .ar-policy { flex-wrap: wrap; } .ar-stat { justify-items: start; } .ar-bulk { flex-wrap: wrap; } }
+
+/* ---- Follow-ups ---- */
+.ws-tasks .workspace-list-row { align-items: flex-start; }
+.ws-tasks .workspace-list-row input[type="checkbox"] { margin-top: 2px; }
+.ws-tasks .td-when { font-size: 12px; color: var(--ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; padding-top: 2px; }
+.ws-tasks .td-when.neg { color: var(--neg); font-weight: 600; }
+.ws-tasks .td-links { display: inline-flex; align-items: center; gap: 4px; }
+.ws-tasks .td-links svg { color: var(--ink-4); flex-shrink: 0; }
+.td-neg { color: var(--neg); }
+
+/* ---- Scheduling ---- */
+.workspace-agenda-controls .btn:disabled { opacity: .5; }
+.ws-day { transition: border-color 200ms; }
+.ws-day h2 { display: flex; align-items: center; gap: 8px; }
+.ws-day.today { border-color: var(--accent-line); box-shadow: 0 0 0 1px var(--accent-line), var(--shadow-card); }
+.ws-day.today h2 { color: var(--accent); }
+.ws-day-pill { font: 600 10.5px var(--sans); color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent-line); border-radius: 999px; padding: 1px 7px; }
+.ws-slot { display: grid !important; gap: 3px; padding: 10px 0; }
+.ws-slot small { color: var(--ink-3); font-size: 11.5px; }
+.ws-slot strong { font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+.ws-slot.done strong { color: var(--ink-3); }
+.ws-slot-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.ws-slot .workspace-row-actions { flex-wrap: wrap; margin-top: 4px; }
+.ws-search-hit { margin-bottom: 18px; border-color: var(--accent-line); }
+.ws-search-hit h2 { display: flex; align-items: center; gap: 8px; }
+@media (max-width: 900px) { .ws-slot { display: grid !important; } }
