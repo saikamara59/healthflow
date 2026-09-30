@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
 
 from healthflow.database.models import PhiAccessLog, WorkspaceSearchToken
 from healthflow.workspace.search_index import backfill_search_index
@@ -284,3 +284,31 @@ async def test_search_backfill_restores_existing_records(client, db_session):
     assert [item["id"] for item in (
         await client.get("/workspace/search?q=Legacy", headers=headers)
     ).json()] == [created.json()["id"]]
+
+
+@pytest.mark.asyncio
+async def test_search_backfill_skips_undecryptable_records(client, db_session):
+    headers = await _headers(client, "search-backfill-poison@example.com")
+    healthy = await client.post(
+        "/organizations", json={"name": "Harbor Health", "kind": "carrier"}, headers=headers
+    )
+    poisoned = await client.post(
+        "/organizations", json={"name": "Harbor Legacy", "kind": "carrier"}, headers=headers
+    )
+    await db_session.execute(delete(WorkspaceSearchToken).where(
+        WorkspaceSearchToken.kind == "organization",
+        WorkspaceSearchToken.record_id.in_([healthy.json()["id"], poisoned.json()["id"]]),
+    ))
+    # Raw SQL skips EncryptedString, leaving ciphertext this app's key cannot open.
+    await db_session.execute(
+        text("UPDATE organizations SET name = :name WHERE id = :id"),
+        {"name": "v1:AAAAAAAAAAAAAAAA:AAAAAAAAAAAAAAAAAAAAAAAA", "id": poisoned.json()["id"]},
+    )
+    await db_session.commit()
+    assert (await client.get("/workspace/search?q=Harbor", headers=headers)).json() == []
+
+    await backfill_search_index(db_session)
+
+    assert [item["id"] for item in (
+        await client.get("/workspace/search?q=Harbor", headers=headers)
+    ).json()] == [healthy.json()["id"]]
