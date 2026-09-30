@@ -32,6 +32,7 @@ import FeedbackDashboardPage from './pages/FeedbackDashboardPage'
 import AdminPage from './pages/AdminPage'
 import AdminRoute from './components/AdminRoute'
 import DocumentArchivePage from './pages/DocumentArchivePage'
+import DocumentsPage from './pages/DocumentsPage'
 import ComingSoonPage from './pages/ComingSoonPage'
 
 // At `/`, show the public marketing page to logged-out visitors; redirect
@@ -66,6 +67,7 @@ export default function App() {
             <Route path="enrollments" element={<EnrollmentsPage />} />
             <Route path="issues" element={<IssuesPage />} />
             <Route path="clients" element={<ClientListPage />} />
+            <Route path="documents" element={<DocumentsPage />} />
             <Route path="documents/archive" element={<DocumentArchivePage />} />
             <Route path="clients/new" element={<AddClientPage />} />
             <Route path="clients/success" element={<OnboardingSuccessPage />} />

@@ -22,7 +22,7 @@ const NAV = [
       { path: '/organizations', label: 'Organizations', icon: 'orgs' },
       { path: '/enrollments', label: 'Enrollments', icon: 'enroll' },
       { path: '/issues', label: 'Issues & Appeals', icon: 'issues' },
-      { path: '/documents/archive', label: 'Documents', icon: 'docs' },
+      { path: '/documents', label: 'Documents', icon: 'docs' },
       { path: '/follow-ups', label: 'Follow-ups', icon: 'follow' },
       { path: '/scheduling', label: 'Scheduling', icon: 'cal' },
     ],

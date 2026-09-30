@@ -345,3 +345,27 @@ test('archived client keeps Today and Scheduling deadlines visible', async ({ au
   await page.getByRole('link', { name: 'Scheduling', exact: true }).click()
   await expect(page.locator('.workspace-list-row').filter({ hasText: 'Archive meeting' }).getByText('Archived client')).toBeVisible()
 })
+
+test('Documents page uploads a file to a Client record and archives it', async ({ authedPage: page }) => {
+  await page.goto('/documents')
+  const headers = { Authorization: `Bearer ${await page.evaluate(() => sessionStorage.getItem('hf_token'))}` }
+  const capability = await (await page.request.get('/documents/capabilities', { headers })).json()
+  test.skip(!capability.upload_enabled, 'Private synthetic-test environment required')
+  const client = (await (await page.request.get('/clients', { headers })).json())[0]
+  await page.request.post('/enrollments', { headers, data: { client_id: client.id, plan_name: 'Documents Page Plan' } })
+  await page.reload()
+
+  const form = page.locator('.doc-upload')
+  await form.getByRole('combobox', { name: 'Client' }).selectOption(client.id)
+  await form.getByRole('combobox', { name: 'Related record' }).selectOption({ label: 'Enrollment · Documents Page Plan' })
+  await page.getByLabel('Document file').setInputFiles(path.resolve('../demo_documents/synthetic-summary.pdf'))
+  await form.getByRole('button', { name: 'Upload document', exact: true }).click()
+
+  const row = page.locator('.doc-row').filter({ hasText: 'synthetic-summary.pdf' }).first()
+  await expect(row).toContainText(client.full_name)
+  await expect(row).toContainText('Enrollment · Documents Page Plan')
+  await row.getByRole('button', { name: /^Archive / }).click()
+  await expect(page.getByRole('link', { name: /Archived \(\d+\)/ })).toContainText('Archived (1)')
+  await page.getByRole('link', { name: /Archived \(/ }).click()
+  await expect(page.locator('.document-row').filter({ hasText: 'synthetic-summary.pdf' })).toContainText('Enrollment · Documents Page Plan')
+})
