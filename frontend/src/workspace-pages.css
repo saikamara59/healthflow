@@ -162,3 +162,40 @@
   .ws-carrier-chip.adding .ws-carrier-plus, .ws-org-new, .ws-org-new .org-logo { animation: none; }
   .ws-carrier-chip:hover:not(:disabled) .org-logo { transform: none; }
 }
+
+/* ---- Enrollments + Issues & Appeals (two-column work pages) ---- */
+.ws-note { margin: 16px 0 0; padding: 14px 16px; border-radius: var(--radius); background: var(--bg-2); color: var(--ink-2); font-size: 13px; line-height: 1.55; }
+.ws-sec-head { align-items: flex-start; gap: 16px; margin-bottom: 6px; }
+.ws-sec-head h2 { margin: 0; }
+.ws-inline-filter { max-width: 220px; margin: 0; }
+.ws-enr { padding: 18px 0; }
+.ws-enr .workspace-row-copy { gap: 6px; }
+.ws-enr-head { gap: 12px; }
+.ws-enr-head strong { font-size: 15px; }
+.ws-enr-actions { margin-top: 6px; gap: 6px; }
+.ws-steps { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+.ws-steps span { flex: 1; min-width: 90px; font-size: 11px; color: var(--ink-4); padding-top: 6px; border-top: 3px solid var(--line); transition: color 300ms, border-color 300ms; }
+.ws-steps span.on { color: var(--accent); border-top-color: var(--accent); }
+.ws-review { align-items: flex-end; flex-wrap: wrap; margin-top: 6px; }
+.ws-confirm { display: flex !important; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink); margin-top: 6px; cursor: pointer; }
+.ws-confirm input { accent-color: var(--accent); width: 16px; height: 16px; }
+.ws-row-docs { margin-top: 4px; font-size: 13px; }
+.ws-row-docs > summary { cursor: pointer; color: var(--ink-3); width: fit-content; }
+.ws-row-docs > summary:hover { color: var(--ink); }
+.ws-row-docs[open] > summary { margin-bottom: 8px; color: var(--ink-2); }
+.ws-issue-row { gap: 10px; }
+.ws-issue-row .chip { flex-shrink: 0; }
+.ws-due.warn { color: var(--warn); font-weight: 600; }
+.ws-due.neg { color: var(--neg); font-weight: 600; }
+.ws-detail-title { font-size: 24px !important; margin: 4px 0 16px !important; }
+.ws-detail-meta { align-items: end; margin-bottom: 6px; }
+.ws-detail-meta .workspace-filter { margin: 0; }
+.ws-kv { display: grid; gap: 4px; }
+.ws-kv small { color: var(--ink-2); font-size: 12px; font-weight: 600; }
+.ws-kv strong { font-size: 14px; padding: 10px 0; font-weight: 500; }
+.ws-desc { font-size: 14px; line-height: 1.55; }
+.ws-linked { margin-top: 8px; }
+.ws-linked .workspace-subheading { margin-top: 20px; }
+.ws-linked > .between { align-items: flex-end; }
+.ws-detail-actions { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.workspace-appeal-draft summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
