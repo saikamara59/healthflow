@@ -82,3 +82,83 @@
   .cl-act { grid-column: 3; grid-row: 1; opacity: 1; }
   .cl-fields { grid-column: 2 / -1; grid-row: 2; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 }
+
+/* ---- segmented control (Active / Archived) ---- */
+.ws-seg { display: inline-flex; padding: 3px; border-radius: 9px; background: var(--bg-2); border: 1px solid var(--line); }
+.ws-seg button { height: 30px; padding: 0 14px; border-radius: 7px; border: 0; background: none; color: var(--ink-2); font: 600 13px var(--sans); cursor: pointer; }
+.ws-seg button.on { background: var(--card); color: var(--ink); box-shadow: var(--shadow-btn); }
+.ws-filter-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+.ws-filter-row .workspace-filter { margin-bottom: 0; flex: 1; }
+.ws-new { margin-bottom: 20px; }
+.ws-new .between h2 { margin: 0; }
+
+/* ---- Organizations ---- */
+.org-logo {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 10px;
+  background: var(--bg-2); border: 1px solid var(--line); color: var(--ink-2); font-weight: 600; letter-spacing: .02em;
+  box-shadow: 0 1px 2px oklch(0.3 0.03 240 / .08);
+}
+.org-logo.has-img { background: #fff; }
+.ws-org { border-top: 1px solid var(--line); padding: 6px 0; }
+.ws-org:first-child { border-top: 0; }
+.ws-org-head { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+.ws-org-head .phase2-row-button { flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ws-org-head .phase2-row-button > span:not(.org-logo) { flex: 1; min-width: 0; text-align: left; }
+.ws-org-head strong { font-size: 15px; }
+.ws-org-head small { white-space: nowrap; }
+.ws-org-head .workspace-tag { text-transform: capitalize; }
+.ws-org-caret { color: var(--ink-4); transition: transform 140ms; flex-shrink: 0; }
+.ws-org-head [aria-expanded="true"] .ws-org-caret { transform: rotate(90deg); }
+.ws-org-body { padding: 4px 0 14px 50px; display: grid; gap: 14px; }
+.ws-org-meta { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--ink-3); font-size: 13px; }
+.ws-org-meta a { color: var(--accent); }
+.ws-contacts { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.ws-contact { display: grid; gap: 2px; padding: 12px 14px; border-radius: var(--radius); background: var(--bg-2); }
+.ws-contact small { color: var(--ink-3); font-size: 12px; overflow-wrap: anywhere; }
+.ws-contact-form { display: grid; grid-template-columns: 1.3fr 1fr 1.3fr 1fr auto; gap: 8px; margin: 0; }
+@media (max-width: 1000px) { .ws-contact-form { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 700px) {
+  .ws-contact-form { grid-template-columns: 1fr; }
+  .ws-org-head { flex-wrap: wrap; }
+  .ws-org-body { padding-left: 0; }
+}
+.ws-org-eyebrow { display: inline-flex; align-items: center; gap: 8px; text-transform: capitalize; }
+.ws-org-eyebrow .org-logo { border-radius: 6px; }
+
+/* ---- common-carrier quick add ---- */
+.ws-carriers { display: grid; gap: 10px; padding: 12px 0 14px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.ws-carriers.prominent { padding: 18px; margin: 8px 0 0; border: 1px dashed var(--line-2); border-radius: var(--radius-lg); background: var(--bg-2); }
+.ws-carriers-copy { display: grid; gap: 2px; }
+.ws-carriers-copy strong { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.ws-carriers.prominent .ws-carriers-copy strong { font-size: 15px; color: var(--ink); }
+.ws-carriers-copy small { color: var(--ink-3); font-size: 12.5px; }
+.ws-carriers-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ws-carrier-chip {
+  display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px 0 6px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--ink);
+  font: 500 13px var(--sans); cursor: pointer; box-shadow: var(--shadow-btn); transition: border-color 120ms;
+}
+.ws-carrier-chip:hover:not(:disabled) { border-color: var(--accent-line); }
+.ws-carrier-chip:disabled { opacity: .55; cursor: progress; }
+.ws-carrier-chip .org-logo { border-radius: 50%; }
+.ws-carrier-chip svg { color: var(--ink-3); }
+.ws-carrier-chip.adding { cursor: progress; }
+.ws-carrier-chip.adding .ws-carrier-plus { animation: wsSpin 700ms linear infinite; }
+.ws-carrier-chip .org-logo { transition: transform 200ms cubic-bezier(.22, 1, .36, 1); }
+.ws-carrier-chip:hover:not(:disabled) .org-logo { transform: rotate(-8deg) scale(1.08); }
+@keyframes wsSpin { to { transform: rotate(360deg); } }
+
+/* newly added organization: brief accent glow */
+@keyframes wsGlow {
+  0% { background: color-mix(in oklch, var(--accent-soft) 100%, transparent); box-shadow: 0 0 0 1px var(--accent-line); }
+  100% { background: transparent; box-shadow: 0 0 0 1px transparent; }
+}
+.ws-org { border-radius: var(--radius); }
+.ws-org-new { animation: wsGlow 1600ms ease-out; }
+.ws-org-new .org-logo { animation: wsPop 500ms cubic-bezier(.34, 1.56, .64, 1); }
+@keyframes wsPop { from { transform: scale(.6); } to { transform: scale(1); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ws-carrier-chip.adding .ws-carrier-plus, .ws-org-new, .ws-org-new .org-logo { animation: none; }
+  .ws-carrier-chip:hover:not(:disabled) .org-logo { transform: none; }
+}

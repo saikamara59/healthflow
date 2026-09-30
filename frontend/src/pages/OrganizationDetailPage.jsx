@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { Plus } from '@phosphor-icons/react'
 import TopBar from '../components/TopBar'
+import OrgLogo from '../components/ui/OrgLogo'
+import PageHead from '../components/ui/PageHead'
 import useLayout from '../components/ui/useLayout'
 import { workspaceApi } from '../api/workspace'
 
@@ -63,7 +66,13 @@ export default function OrganizationDetailPage() {
   }
   const visibleOrganization = organization?.id === id ? organization : null
   const contacts = (visibleOrganization?.contacts || []).filter((item) => !item.archived_at)
-  return <><TopBar crumbs={['Workspace', 'Organizations', visibleOrganization?.name || 'Details']} onMenuClick={openMenu} onNotificationsClick={openNotifications} /><main className="page"><div className="page-head"><div><h1 className="page-title">{visibleOrganization?.name || 'Organization'}</h1><p className="page-sub">Contacts and shared context.</p></div>{visibleOrganization && <button className="btn accent" disabled={saving} onClick={() => openForm()}>New Contact</button>}</div>
+  return <><TopBar crumbs={['Workspace', 'Organizations', visibleOrganization?.name || 'Details']} onMenuClick={openMenu} onNotificationsClick={openNotifications} /><main className="page ws-page-in"><PageHead
+      icon="orgs"
+      eyebrow={visibleOrganization ? <span className="ws-org-eyebrow"><OrgLogo name={visibleOrganization.name} website={visibleOrganization.website} size={22} />{visibleOrganization.kind.replace('_', ' ')}</span> : null}
+      title={visibleOrganization?.name || 'Organization'}
+      sub="Contacts and shared context."
+      actions={visibleOrganization && <button className="btn accent" disabled={saving} onClick={() => openForm()}><Plus size={15} weight="bold" /> New Contact</button>}
+    />
     {error && <p role="alert" className="workspace-error">{error}</p>}{!visibleOrganization && !error && <p role="status">Loading organization…</p>}
     {visibleOrganization && <><section className="card workspace-section"><h2>Organization details</h2><p>{visibleOrganization.kind.replace('_', ' ')}{visibleOrganization.phone ? ` · ${visibleOrganization.phone}` : ''}</p>{visibleOrganization.website && <p>{/^https?:\/\//i.test(visibleOrganization.website) ? <a href={visibleOrganization.website} target="_blank" rel="noreferrer">Website</a> : visibleOrganization.website}</p>}{visibleOrganization.notes && <p>{visibleOrganization.notes}</p>}</section>
       {editing && <form className="card workspace-section workspace-inline-form" onSubmit={save}><h2>{editing === 'new' ? 'New Contact' : 'Edit Contact'}</h2><div className="workspace-form-grid"><label>Contact name<input value={fullName} onChange={(event) => setFullName(event.target.value)} required maxLength={200} /></label><label>Role<input value={role} onChange={(event) => setRole(event.target.value)} /></label><label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label><label>Phone<input value={phone} onChange={(event) => setPhone(event.target.value)} /></label></div><div className="quick-create-actions"><button type="button" className="btn" disabled={saving} onClick={() => setEditing(null)}>Cancel</button><button type="submit" className="btn accent" disabled={saving}>{saving ? 'Saving…' : editing === 'new' ? 'Create Contact' : 'Save Contact'}</button></div></form>}
