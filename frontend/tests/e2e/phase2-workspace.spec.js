@@ -223,6 +223,7 @@ test('Appeal drafting keeps generated requests within schema limits', async ({ a
   await authedPage.getByRole('button', { name: 'Analyze & draft' }).click()
 
   await expect(authedPage.getByRole('heading', { name: 'Drafted appeal letter' })).toBeVisible()
+  await authedPage.getByRole('button', { name: 'Confirm and save draft to Issue' }).click()
   expect((await savedAppealResponse).ok()).toBe(true)
   expect(generatedRequest.additional_context.length).toBeLessThanOrEqual(1000)
   let saved

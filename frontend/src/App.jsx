@@ -32,6 +32,7 @@ import FeedbackDashboardPage from './pages/FeedbackDashboardPage'
 import AdminPage from './pages/AdminPage'
 import AdminRoute from './components/AdminRoute'
 import DocumentArchivePage from './pages/DocumentArchivePage'
+import AskHealthFlowPage from './pages/AskHealthFlowPage'
 
 // At `/`, show the public marketing page to logged-out visitors; redirect
 // authenticated users into their workspace so they don't see a sales pitch
@@ -69,6 +70,7 @@ export default function App() {
             <Route path="clients/new" element={<AddClientPage />} />
             <Route path="clients/success" element={<OnboardingSuccessPage />} />
             <Route path="clients/:id" element={<ClientProfilePage />} />
+            <Route path="ask" element={<AskHealthFlowPage />} />
             <Route path="compare" element={<PlanComparisonPage />} />
             <Route path="network" element={<NetworkVerificationPage />} />
             <Route path="translator" element={<CoverageTranslatorPage />} />

@@ -92,3 +92,36 @@
 .document-row small { display: block; color: var(--ink-3); margin-top: 4px; }
 .document-links { padding-left: 16px; margin-top: 8px; }
 .document-links li { margin-block: 4px; }
+
+/* Ask HealthFlow text workspace */
+.ask-panel { max-width: 850px; }
+.ask-context-label, .ask-form label { display: block; font-weight: 600; margin-bottom: 8px; }
+.ask-context-note { margin: 8px 0 20px; }
+.ask-conversation { min-height: 180px; max-height: 52vh; overflow-y: auto; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 18px 0; }
+.ask-conversation .msg { margin-bottom: 14px; }
+.ask-suggestion { margin-top: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; }
+.ask-suggestion p { margin: 0 0 10px; }
+.ask-error { color: var(--neg); }
+.ask-form { margin-top: 20px; }
+.ask-form .textarea { width: 100%; }
+.ask-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; }
+@media (max-width: 600px) { .ask-actions { align-items: flex-start; flex-direction: column; } }
+
+.ask-voice { max-width: 850px; margin-top: 20px; }
+.ask-voice-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ask-mic-indicator { font-size: 12px; font-weight: 700; color: var(--ink-3); padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); }
+.ask-mic-indicator.on { color: var(--neg); border-color: var(--neg); }
+.ask-voice-transcript { max-height: 300px; overflow-y: auto; margin-top: 16px; }
+
+.ask-prepare-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.ask-prepared { margin-top: 16px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; }
+.ask-prepared label { display: block; margin-top: 12px; }
+.ask-prepared .input, .ask-prepared .textarea { display: block; width: 100%; margin-top: 6px; }
+.ask-dates { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+@media (max-width: 600px) { .ask-dates { grid-template-columns: 1fr; } }
+
+.ask-save-output { margin-top: 18px; }
+.ask-save-preview { display: block; width: 100%; min-height: 180px; margin-top: 14px; }
+.ask-confirm { display: flex !important; align-items: flex-start; gap: 8px; }
+
+.ask-voice-context { font-size: 13px; font-weight: 600; }

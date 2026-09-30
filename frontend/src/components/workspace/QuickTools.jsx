@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import Icon from '../ui/Icon'
 
 export const QUICK_TOOLS = [
+  { label: 'Ask HealthFlow', path: '/ask', icon: 'support' },
   { label: 'Compare Plans', path: '/compare', icon: 'compare' },
   { label: 'Estimate Costs', path: '/calculator', icon: 'calculator' },
   { label: 'Check Network', path: '/network', icon: 'network' },

@@ -44,6 +44,8 @@ from healthflow.workspace.appointments_router import appointments_router
 from healthflow.workspace.dashboard_router import dashboard_router
 from healthflow.workspace.enrollments_router import enrollments_router
 from healthflow.workspace.issues_router import appeals_router, issues_router
+from healthflow.workspace.ask_router import ask_router
+from healthflow.workspace.tool_output_router import output_router
 
 
 @asynccontextmanager
@@ -157,6 +159,8 @@ app.include_router(dashboard_router)
 app.include_router(enrollments_router)
 app.include_router(issues_router)
 app.include_router(appeals_router)
+app.include_router(ask_router)
+app.include_router(output_router)
 
 
 if (

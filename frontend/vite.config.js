@@ -11,7 +11,7 @@ const bypassHtmlNavigations = (req) => {
 }
 
 const proxyToBackend = {
-  target: 'http://localhost:8000',
+  target: process.env.VITE_BACKEND_URL || 'http://localhost:8000',
   changeOrigin: true,
   bypass: bypassHtmlNavigations,
 }
@@ -31,6 +31,8 @@ export default defineConfig({
       '/issues': proxyToBackend,
       '/appeals': proxyToBackend,
       '/workspace': proxyToBackend,
+      '/ask-healthflow': proxyToBackend,
+      '/tool-output': proxyToBackend,
       '/compare': proxyToBackend,
       '/calculate': proxyToBackend,
       '/translate': proxyToBackend,

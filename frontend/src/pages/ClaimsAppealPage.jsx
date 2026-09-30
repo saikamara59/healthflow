@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../api/client';
-import DocumentList from '../components/DocumentList';
 import { workspaceApi } from '../api/workspace';
 import TopBar from '../components/TopBar';
 import Icon from '../components/ui/Icon';
 import Chip from '../components/ui/Chip';
 import AgentMarkdown from '../components/ui/AgentMarkdown';
 import useLayout from '../components/ui/useLayout';
+import SaveToolOutput from '../components/workspace/SaveToolOutput';
+import DocumentList from '../components/DocumentList';
 
 const SAMPLE = `This letter is to inform you that your claim for MRI of the right shoulder
 performed on 03/14/2026 has been denied.
@@ -18,8 +19,6 @@ Denial date: 03/28/2026.
 You have 60 days to appeal this decision.`;
 
 const MAX_ADDITIONAL_CONTEXT = 1000;
-const MAX_APPEAL_TITLE = 300;
-const APPEAL_TITLE_PREFIX = 'Appeal draft: ';
 
 /** Analyzes a denial notice and prepares supporting material for an appeal. */
 export default function ClaimsAppealPage() {
@@ -30,6 +29,7 @@ export default function ClaimsAppealPage() {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
   const [savedAppeal, setSavedAppeal] = useState(null);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [error, setError] = useState('');
   const [issues, setIssues] = useState([]);
   const [clients, setClients] = useState([]);
@@ -51,6 +51,8 @@ export default function ClaimsAppealPage() {
       const created = await workspaceApi.createIssue(newIssue);
       setIssues((current) => [created, ...current]);
       setIssueId(created.id);
+      setResult(null);
+      setSavedAppeal(null);
       setNewIssue({ client_id: '', title: '' });
       setError('');
     } catch (err) {
@@ -90,20 +92,27 @@ export default function ClaimsAppealPage() {
         additional_context: additionalContext,
       });
       setResult(res);
-      try {
-        const saved = await workspaceApi.createAppeal({
-          issue_id: issueId,
-          title: `${APPEAL_TITLE_PREFIX}${issue.title.slice(0, MAX_APPEAL_TITLE - APPEAL_TITLE_PREFIX.length)}`,
-          draft_text: res.appeal_letter,
-        });
-        setSavedAppeal({ ...saved, client_id: issue.client_id });
-      } catch {
-        setError('The Appeal was generated, but the draft could not be saved. Copy the letter before leaving this page and try again.');
-      }
     } catch (err) {
       setError(err.message || 'Appeal generation failed');
     } finally {
       setRunning(false);
+    }
+  }
+
+  async function saveDraftToIssue() {
+    if (!result?.appeal_letter || !issueId || savingDraft) return;
+    setSavingDraft(true);
+    setError('');
+    try {
+      const issue = await workspaceApi.getIssue(issueId);
+      if (issue.client_archived) throw new Error('Restore the Client before saving an Appeal draft.');
+      const title = `Appeal draft: ${issue.title}`.slice(0, 300);
+      const saved = await workspaceApi.createAppeal({ issue_id: issueId, title, draft_text: result.appeal_letter });
+      setSavedAppeal({ ...saved, client_id: issue.client_id });
+    } catch (err) {
+      setError(err.message || 'Appeal draft could not be saved.');
+    } finally {
+      setSavingDraft(false);
     }
   }
 
@@ -135,7 +144,7 @@ export default function ClaimsAppealPage() {
           <h2>Issue context</h2>
           <p>Every Appeal stays inside an Issue so its deadline, Follow-ups, and Appointments remain together.</p>
           <div className="workspace-form-grid">
-            <label className="field"><span className="field-label">Existing Issue</span><select className="select" value={selectedIssue?.client_archived ? '' : issueId} onChange={(event) => { setIssueId(event.target.value); setError('') }}><option value="">Choose an Issue</option>{issues.filter((issue) => !issue.client_archived).map((issue) => <option key={issue.id} value={issue.id}>{issue.client_name} · {issue.title}</option>)}</select></label>
+            <label className="field"><span className="field-label">Existing Issue</span><select className="select" value={selectedIssue?.client_archived ? '' : issueId} onChange={(event) => { setIssueId(event.target.value); setResult(null); setSavedAppeal(null); setError('') }}><option value="">Choose an Issue</option>{issues.filter((issue) => !issue.client_archived).map((issue) => <option key={issue.id} value={issue.id}>{issue.client_name} · {issue.title}</option>)}</select></label>
             <form className="workspace-inline-form" onSubmit={createIssue} style={{ marginBottom: 0 }}><div className="workspace-form-grid"><label>Client<select required value={newIssue.client_id} onChange={(event) => setNewIssue({ ...newIssue, client_id: event.target.value })}><option value="">Choose a Client</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.full_name}</option>)}</select></label><label>New Issue title<input required value={newIssue.title} onChange={(event) => setNewIssue({ ...newIssue, title: event.target.value })} /></label></div><button className="btn sm" type="submit">Create and use Issue</button></form>
           </div>
           {selectedIssue?.client_archived && <p className="notice">Restore the Client before drafting a new Appeal. Historical Issues and Appeals remain available in Issues &amp; Appeals.</p>}
@@ -256,6 +265,8 @@ export default function ClaimsAppealPage() {
                   </AgentMarkdown>
                 </div>
 
+                {!savedAppeal && <button className="btn sm" type="button" disabled={savingDraft} onClick={saveDraftToIssue}>Confirm and save draft to Issue</button>}
+                <SaveToolOutput source="draft_appeal" text={result.appeal_letter} fixedClientId={selectedIssue?.client_id || ''} />
                 {result.disclaimer && <div className="notice" style={{ marginTop: 20 }}>{result.disclaimer}</div>}
               </>
             )}

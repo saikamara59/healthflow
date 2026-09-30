@@ -9,6 +9,8 @@ services:
       - "8000:8000"
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ASK_HEALTHFLOW_VOICE_MODEL=${ASK_HEALTHFLOW_VOICE_MODEL:-gpt-realtime-1.5}
       - LOGFIRE_TOKEN=${LOGFIRE_TOKEN:-}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set — see .env.example}
       - PHI_ENCRYPTION_KEY=${PHI_ENCRYPTION_KEY:?PHI_ENCRYPTION_KEY must be set — see .env.example}

@@ -5,6 +5,7 @@ import Icon from '../components/ui/Icon';
 import Chip from '../components/ui/Chip';
 import AgentMarkdown from '../components/ui/AgentMarkdown';
 import useLayout from '../components/ui/useLayout';
+import SaveToolOutput from '../components/workspace/SaveToolOutput';
 
 const SAMPLE_DOC = `SUMMARY OF BENEFITS: PRIME HMO
 Member Responsibility:
@@ -64,6 +65,7 @@ export default function CoverageTranslatorPage() {
   }
 
   const exchanges = messages.filter((m) => m.role !== 'system').length;
+  const latestAnswer = [...messages].reverse().find((message) => message.role === 'agent' && !message.error)?.body || '';
 
   return (
     <>
@@ -166,6 +168,7 @@ export default function CoverageTranslatorPage() {
                 )}
               </div>
 
+              <SaveToolOutput source="explain_coverage" text={latestAnswer} />
               <div className="row" style={{ gap: 8, marginTop: 18 }}>
                 <input
                   className="input"
