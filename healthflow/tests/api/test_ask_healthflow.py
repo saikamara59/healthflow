@@ -39,6 +39,7 @@ async def test_ask_requires_auth_and_only_sends_selected_client_context(client, 
     assert general.status_code == 200
     assert general.json()['client_id'] is None
     assert 'Ada Example' not in prompts[-1][0]
+    assert 'no live carrier or plan availability data' in prompts[-1][0]
     assert general.json()['suggested_tool'] == {'name': 'Compare Plans', 'path': '/compare'}
 
     denied = await client.post('/ask-healthflow/text', headers=other, json={**payload, 'client_id': client_id})
@@ -99,6 +100,7 @@ async def test_general_voice_secret_is_broker_only_and_contains_no_client_data(c
     assert captured['url'] == 'https://api.openai.com/v1/realtime/client_secrets'
     assert captured['json']['session']['model'] == 'gpt-realtime-1.5'
     assert 'No Client is selected' in captured['json']['session']['instructions']
+    assert 'no live carrier or plan availability data' in captured['json']['session']['instructions']
     assert captured['json']['session']['tools'] == []
     assert 'test-server-only-key' not in str(captured['json'])
 
