@@ -611,3 +611,20 @@ async def test_outcome_audit_failure_preserves_started_and_logs_only_metadata(cl
     assert (await events(db_session))[-1] == ("open", "started")
     assert "document_outcome_audit_failed" in caplog.text
     assert "secret filename and credentials" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_active_documents_lists_every_client_for_the_owner_only(client, records, service):
+    owner, other, client_id = records
+    second = await _client_record(client, owner, "Second synthetic Client")
+    first_doc = (await upload(client, records)).json()
+    second_doc = (await client.post(f"/clients/{second['id']}/documents", headers=owner,
+                                    files={"file": ("Synthetic.pdf", fixture_bytes("Synthetic.pdf"))})).json()
+    archived = (await upload(client, records)).json()
+    assert (await client.post(f"/documents/{archived['id']}/archive", headers=owner)).status_code == 200
+
+    listing = (await client.get("/documents/active", headers=owner)).json()
+    assert [row["id"] for row in listing] == [second_doc["id"], first_doc["id"]]
+    assert {row["client_id"] for row in listing} == {client_id, second["id"]}
+    assert (await client.get("/documents/active", headers=other)).json() == []
+    assert (await client.get("/documents/active")).status_code == 401
