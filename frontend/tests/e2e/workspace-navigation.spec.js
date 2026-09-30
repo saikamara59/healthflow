@@ -3,7 +3,7 @@ import { test, expect } from '../fixtures'
 test('authenticated root opens Today with Broker workspace navigation', async ({ authedPage }) => {
   await authedPage.goto('/')
   await expect(authedPage).toHaveURL(/\/today$/)
-  await expect(authedPage.getByRole('heading', { name: 'Today' })).toBeVisible()
+  await expect(authedPage.getByRole('heading', { name: 'Today', level: 1, exact: true })).toBeVisible()
 
   const nav = authedPage.locator('.side')
   await expect(nav.getByText('Daily', { exact: true })).toBeVisible()
@@ -163,6 +163,7 @@ test('search reveals a completed task outside the Today sections', async ({ auth
   expect(created.ok()).toBe(true)
   const taskId = (await created.json()).id
   await authedPage.goto('/today')
+  await authedPage.getByRole('button', { name: /other open task/ }).click()
   await expect(authedPage.getByRole('heading', { name: 'Other open tasks' }).locator('..').locator('..').getByRole('listitem', { name: 'Review archived renewal' })).toBeVisible()
   expect((await authedPage.request.post(`/tasks/${taskId}/complete`, { headers })).ok()).toBe(true)
   await authedPage.getByRole('button', { name: 'Search workspace' }).click()

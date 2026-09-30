@@ -1,39 +1,40 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { SignOut } from '@phosphor-icons/react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api/client';
-import Icon from './ui/Icon';
-import Avatar from './ui/Avatar';
 import BrandLogo from './ui/BrandLogo';
-import BrandWordmark from './ui/BrandWordmark';
+import HfTile from './ui/HfTile';
 
 const NAV = [
   {
     group: 'Daily',
     items: [
       { path: '/today', label: 'Today', icon: 'today', end: true },
-      { path: '/overview', label: 'Overview', icon: 'dashboard' },
+      { path: '/approvals', label: 'Approvals', icon: 'approve' },
+      { path: '/overview', label: 'Overview', icon: 'overview' },
     ],
   },
   {
     group: 'Workspace',
     items: [
-      { path: '/clients', label: 'Clients', icon: 'users', countKey: 'clients' },
-      { path: '/documents/archive', label: 'Document archive', icon: 'note' },
-      { path: '/organizations', label: 'Organizations', icon: 'organization' },
-      { path: '/enrollments', label: 'Enrollments', icon: 'note' },
-      { path: '/issues', label: 'Issues & Appeals', icon: 'appeal' },
-      { path: '/follow-ups', label: 'Follow-ups', icon: 'task' },
-      { path: '/scheduling', label: 'Scheduling', icon: 'calendar' },
+      { path: '/clients', label: 'Clients', icon: 'clients', countKey: 'clients' },
+      { path: '/organizations', label: 'Organizations', icon: 'orgs' },
+      { path: '/enrollments', label: 'Enrollments', icon: 'enroll' },
+      { path: '/issues', label: 'Issues & Appeals', icon: 'issues' },
+      { path: '/documents/archive', label: 'Documents', icon: 'docs' },
+      { path: '/follow-ups', label: 'Follow-ups', icon: 'follow' },
+      { path: '/scheduling', label: 'Scheduling', icon: 'cal' },
     ],
   },
   {
     group: 'AI Tools',
     items: [
+      { path: '/ask', label: 'Ask HealthFlow', icon: 'ask' },
       { path: '/compare', label: 'Compare Plans', icon: 'compare' },
-      { path: '/calculator', label: 'Estimate Costs', icon: 'calculator' },
+      { path: '/calculator', label: 'Estimate Costs', icon: 'cost' },
       { path: '/network', label: 'Check Network', icon: 'network' },
-      { path: '/translator', label: 'Explain Coverage', icon: 'translate' },
+      { path: '/translator', label: 'Explain Coverage', icon: 'explain' },
       { path: '/appeals', label: 'Draft Appeal', icon: 'appeal' },
     ],
   },
@@ -41,66 +42,45 @@ const NAV = [
     group: 'Account',
     items: [
       { path: '/activity', label: 'Activity', icon: 'history' },
-      { path: '/history', label: 'Tool history', icon: 'history' },
-      { path: '/settings', label: 'Settings', icon: 'settings' },
-      { path: '/support', label: 'Support', icon: 'support' },
+      { path: '/history', label: 'Tool history', icon: 'today' },
     ],
   },
   {
     group: 'Administration',
-    adminOnly: true,
     items: [
-      { path: '/admin', label: 'Workspace admin', icon: 'settings' },
+      { path: '/admin', label: 'Team', icon: 'team' },
+    ],
+  },
+  {
+    group: 'Settings',
+    items: [
+      { path: '/connectors', label: 'Connectors', icon: 'connect' },
     ],
   },
 ];
 
+const initials = (name) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join('');
+
 /** Renders the primary workspace navigation and its responsive drawer state. */
 export default function Sidebar({ open, onClose }) {
   const { user, logout } = useAuth();
-  const brokerName = user?.email?.split('@')[0] || 'Broker';
-  const display = brokerName.charAt(0).toUpperCase() + brokerName.slice(1);
-
+  const [profileName, setProfileName] = useState('');
   const [counts, setCounts] = useState({});
   useEffect(() => {
     let alive = true;
     Promise.all([
       api.get('/clients').catch(() => []),
-    ]).then(([clients]) => {
+      api.get('/auth/profile').catch(() => null),
+    ]).then(([clients, profile]) => {
       if (!alive) return;
-      setCounts({
-        clients: Array.isArray(clients) ? clients.length : 0,
-      });
+      setCounts({ clients: Array.isArray(clients) ? clients.length : 0 });
+      setProfileName(profile?.full_name || '');
     });
     return () => { alive = false; };
   }, []);
 
-  // Lightweight backend liveness check — polls /health every 30s. A red dot
-  // makes "is the API up?" visible without opening DevTools.
-  const [apiHealth, setApiHealth] = useState('checking');
-  useEffect(() => {
-    let alive = true;
-    const check = async () => {
-      try {
-        const res = await fetch('/health');
-        if (alive) setApiHealth(res.ok ? 'healthy' : 'down');
-      } catch {
-        if (alive) setApiHealth('down');
-      }
-    };
-    check();
-    const handle = setInterval(check, 30_000);
-    return () => { alive = false; clearInterval(handle); };
-  }, []);
-
-  const healthColor =
-    apiHealth === 'healthy' ? 'var(--pos)' :
-    apiHealth === 'down' ? 'var(--neg)' :
-    'var(--ink-4)';
-  const healthLabel =
-    apiHealth === 'healthy' ? 'API up' :
-    apiHealth === 'down' ? 'API down' :
-    'Checking…';
+  const emailName = user?.email?.split('@')[0] || 'Broker';
+  const display = profileName || emailName.charAt(0).toUpperCase() + emailName.slice(1);
 
   return (
     <>
@@ -108,15 +88,13 @@ export default function Sidebar({ open, onClose }) {
       <aside className={`side ${open ? 'open' : ''}`}>
         <div className="brand">
           <BrandLogo size={28} />
-          <BrandWordmark className="brand-name" />
-          <span className="brand-tag">v3</span>
+          <span className="side-wordmark">Health<span>Flow</span></span>
         </div>
 
         {/* Scrollable nav region so the bottom user-chip (with Sign out) stays
-            in the viewport even when nav groups exceed 100vh — caught by an
-            e2e failure after the Tools group grew past 6 items. */}
-        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-          {NAV.filter((group) => !group.adminOnly || user?.role === 'admin').map((group) => (
+            in the viewport even when nav groups exceed 100vh. */}
+        <nav aria-label="Primary" style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+          {NAV.map((group) => (
             <div key={group.group} className="nav-group">
               <div className="nav-group-label">{group.group}</div>
               {group.items.map((item) => (
@@ -127,8 +105,7 @@ export default function Sidebar({ open, onClose }) {
                   onClick={onClose}
                   className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
                 >
-                  <span className="nav-dot" />
-                  <Icon name={item.icon} size={20} className="nav-ic" />
+                  <HfTile icon={item.icon} />
                   <span>{item.label}</span>
                   {item.countKey && counts[item.countKey] != null && (
                     <span className="nav-count">{counts[item.countKey]}</span>
@@ -137,34 +114,17 @@ export default function Sidebar({ open, onClose }) {
               ))}
             </div>
           ))}
-        </div>
+        </nav>
 
         <div className="bottom">
           <div className="user-chip">
-            <Avatar name={display} />
-            <div style={{ lineHeight: 1.2, minWidth: 0, flex: 1 }}>
-              <div style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {display}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--ink-3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {user?.email || 'broker@healthflow.work'}
-              </div>
+            <span className="avatar hf-avatar" aria-hidden="true">{initials(display)}</span>
+            <div className="hf-user">
+              <strong>{display}</strong>
+              <small>{user?.role === 'admin' ? 'Admin' : 'Broker'}</small>
             </div>
-            <span
-              aria-hidden="true"
-              title={`Backend ${healthLabel}`}
-              style={{
-                width: 8, height: 8, borderRadius: '50%',
-                background: healthColor, flex: '0 0 auto', marginRight: 4,
-              }}
-            />
-            <button
-              className="btn icon ghost sm"
-              onClick={logout}
-              title="Sign out"
-              aria-label="Sign out"
-            >
-              <Icon name="logout" size={14} />
+            <button className="btn icon ghost sm hf-logout" onClick={logout} title="Sign out" aria-label="Sign out">
+              <SignOut weight="duotone" size={18} />
             </button>
           </div>
         </div>

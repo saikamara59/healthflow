@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import NotificationPanel from './NotificationPanel';
-import Tweaks from './ui/Tweaks';
 import WorkspaceSearch from './workspace/WorkspaceSearch';
 
 export const LayoutContext = { sidebarOpen: false };
@@ -38,7 +37,6 @@ export default function Layout() {
       </div>
       {notificationsOpen && <NotificationPanel open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />}
       {searchOpen && <WorkspaceSearch onClose={closeSearch} />}
-      <Tweaks />
     </div>
   );
 }

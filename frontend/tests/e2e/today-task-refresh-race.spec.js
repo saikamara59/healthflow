@@ -42,6 +42,7 @@ test('Today discards a task page loaded before a task refresh', async ({ page })
   })
 
   await page.goto('/today')
+  await page.getByRole('button', { name: /other open tasks/ }).click()
   const otherTasks = page.getByRole('heading', { name: 'Other open tasks' }).locator('..').locator('..')
   await expect(otherTasks.getByRole('listitem')).toHaveCount(25)
   await page.getByRole('button', { name: 'Show more Tasks' }).click()

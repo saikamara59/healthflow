@@ -133,8 +133,7 @@ export default function SettingsPage() {
           <div className="card card-pad" style={{ marginTop: 28, maxWidth: 620 }}>
             <div className="eyebrow" style={{ marginBottom: 16 }}>Appearance</div>
             <p style={{ fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.6 }}>
-              Accent color, dark mode, and density are controlled from the <strong>Tweaks</strong> panel in the
-              bottom-right corner. Your choices are saved to this browser.
+              Switch between light and dark mode with the moon icon in the top bar. Your choice is saved to this browser.
             </p>
           </div>
         )}

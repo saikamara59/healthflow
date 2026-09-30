@@ -2,17 +2,32 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import api from '../api/client'
 import TopBar from '../components/TopBar'
-import Icon from '../components/ui/Icon'
+import { CalendarBlank, Plus } from '@phosphor-icons/react'
 import useLayout from '../components/ui/useLayout'
 import { workspaceApi } from '../api/workspace'
-import TaskList from '../components/workspace/TaskList'
 import MyMeetings from '../components/workspace/MyMeetings'
-import QuickTools from '../components/workspace/QuickTools'
 import MockInbox from '../components/workspace/MockInbox'
 import QuickCreateModal from '../components/workspace/QuickCreateModal'
+import TodayTasks from '../components/today/TodayTasks'
+import TodayTools from '../components/today/TodayTools'
+import WaitingForYou from '../components/today/WaitingForYou'
+import HfTile from '../components/ui/HfTile'
+import '../today-v2.css'
 
 const OTHER_TASK_PAGE_SIZE = 25
 const otherTaskQuery = (zone) => `status=open&schedule=other&timezone_name=${encodeURIComponent(zone)}`
+const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`
+
+function daySummary(today, overdueCount, dueTodayCount) {
+  const now = new Date()
+  const ahead = today.appointments_today.filter((item) => item.presentation_status === 'scheduled' && new Date(item.ends_at) > now).length
+  return `${overdueCount} overdue, ${dueTodayCount} due later today, and ${plural(ahead, 'meeting')} still ahead.`
+}
+
+function dayHeading(today) {
+  const day = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric' }).format(new Date(`${today.local_date}T12:00:00Z`))
+  return `${day} · Times in ${today.timezone_name}`
+}
 
 export default function TodayPage() {
   const { openMenu, openNotifications } = useLayout()
@@ -130,18 +145,15 @@ export default function TodayPage() {
       await refresh()
     } catch { setError('The task could not be updated. Try again.') }
   }
-  async function changeAppointment(item, action) {
-    try {
-      if (action === 'complete') await workspaceApi.completeAppointment(item.id)
-      else await workspaceApi.cancelAppointment(item.id)
-      await refresh()
-    } catch { setError('The meeting could not be updated. Try again.') }
+  async function completeAppointment(item) {
+    try { await workspaceApi.completeAppointment(item.id); await refresh() }
+    catch { setError('The meeting could not be updated. Try again.') }
   }
   function taskFromMail(message) {
-    openCreate('task', { title: message.subject, notes: `Sample email from ${message.sender} (${message.organization}): ${message.preview}`, is_follow_up: true, suggested_client_id: message.clientMatch?.id })
+    openCreate('task', { title: message.subject, notes: `Sample email from ${message.sender} (${message.organization}): ${message.preview}`, is_follow_up: true, client_id: message.linkedClientId || '', suggested_client_id: message.linkedClientId ? null : message.clientMatch?.id })
   }
   function appointmentFromMail(message) {
-    openCreate('appointment', { title: message.subject, notes: `Sample email from ${message.sender} (${message.organization}): ${message.preview}`, suggested_client_id: message.clientMatch?.id })
+    openCreate('appointment', { title: message.subject, notes: `Sample email from ${message.sender} (${message.organization}): ${message.preview}`, client_id: message.linkedClientId || '', suggested_client_id: message.linkedClientId ? null : message.clientMatch?.id })
   }
   const withoutStaleTarget = (tasks) => tasks.filter((task) => task.id !== targetTask?.id || task.status === targetTask.status)
   const overdueTasks = withoutStaleTarget(today?.overdue_tasks || [])
@@ -150,23 +162,35 @@ export default function TodayPage() {
   const targetInToday = targetTask && [...overdueTasks, ...dueTodayTasks, ...visibleOtherTasks].some((task) => task.id === targetTask.id)
   return <>
     <TopBar crumbs={['Daily', 'Today']} onMenuClick={openMenu} onNotificationsClick={openNotifications} />
-    <main className="page">
-      <div className="page-head"><div><div className="eyebrow">Your day at a glance</div><h1 className="page-title">Today</h1><p className="page-sub">The work and conversations that need your attention.</p></div>
-        <div className="quick-create-actions"><button className="btn accent" disabled={!today} onClick={(event) => openCreate('task', {}, event.currentTarget)}><Icon name="plus" size={16} /> New Task</button><button className="btn" disabled={!today} onClick={(event) => openCreate('appointment', {}, event.currentTarget)}><Icon name="calendar" size={16} /> New Appointment</button></div>
+    <main className="page today-v2">
+      <div className="page-head td-head"><div>
+        <div className="eyebrow">{today ? dayHeading(today) : 'Your day at a glance'}</div>
+        <div className="ws-title-row"><HfTile icon="today" large /><h1 className="page-title">Today</h1></div>
+        <p className="page-sub">{today ? daySummary(today, overdueTasks.length, dueTodayTasks.length) : 'The work and conversations that need your attention.'}</p>
+      </div>
+        <div className="quick-create-actions"><button className="btn" disabled={!today} onClick={(event) => openCreate('appointment', {}, event.currentTarget)}><CalendarBlank weight="duotone" size={16} aria-hidden="true" /> New appointment</button><button className="btn accent" disabled={!today} onClick={(event) => openCreate('task', {}, event.currentTarget)}><Plus weight="bold" size={15} aria-hidden="true" /> New task</button></div>
       </div>
       {error && <p role="alert" className="workspace-error">{error}</p>}
       {targetError && <p role="alert" className="workspace-error">{targetError}</p>}
       {!today && !error && <p role="status">Loading Today…</p>}
       {today && <div className="today-grid">
         <div className="today-main">
-          {targetTask && !targetInToday && <TaskList title="Search result" tasks={[targetTask]} onToggle={toggleTargetTask} timeZone={today.timezone_name} />}
-          <TaskList title="Overdue" tasks={overdueTasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="Nothing overdue. You're caught up." />
-          <TaskList title="Due today" tasks={dueTodayTasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="No tasks due today." />
-          <TaskList title="Other open tasks" tasks={visibleOtherTasks} onToggle={completeTask} timeZone={today.timezone_name} emptyText="No other open tasks." />
-          {hasMoreTasks && <button className="btn" disabled={loadingMoreTasks} onClick={loadMoreTasks}>{loadingMoreTasks ? 'Loading…' : 'Show more Tasks'}</button>}
-          <MockInbox clients={clients} onCreateTask={taskFromMail} onCreateAppointment={appointmentFromMail} />
+          <TodayTasks
+            searchResult={targetTask && !targetInToday ? targetTask : null}
+            overdue={overdueTasks}
+            dueToday={dueTodayTasks}
+            other={visibleOtherTasks}
+            hasMoreOther={hasMoreTasks}
+            revealOther={Boolean(targetTask && visibleOtherTasks.some((task) => task.id === targetTask.id))}
+            onToggle={completeTask}
+            onToggleSearchResult={toggleTargetTask}
+            timeZone={today.timezone_name}
+            localDate={today.local_date}
+            moreButton={hasMoreTasks && <button className="btn sm" disabled={loadingMoreTasks} onClick={loadMoreTasks}>{loadingMoreTasks ? 'Loading…' : 'Show more Tasks'}</button>}
+          />
+          <MyMeetings today={today.appointments_today} upcoming={today.appointments_next_seven_days} onComplete={completeAppointment} timeZone={today.timezone_name} />
         </div>
-        <aside className="today-rail"><MyMeetings today={today.appointments_today} upcoming={today.appointments_next_seven_days} onStatusChange={changeAppointment} timeZone={today.timezone_name} /><QuickTools /></aside>
+        <aside className="today-rail"><WaitingForYou /><MockInbox clients={clients} onCreateTask={taskFromMail} onCreateAppointment={appointmentFromMail} /><TodayTools /></aside>
       </div>}
       {modal && <QuickCreateModal key={`${modal.mode}-${modal.initialValues.title || ''}`} mode={modal.mode} initialValues={modal.initialValues} clients={clients} organizations={organizations} timeZone={today?.timezone_name} onClose={closeCreate} onCreated={created} />}
     </main>

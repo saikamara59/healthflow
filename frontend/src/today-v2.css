@@ -1,0 +1,64 @@
+/* Today page (Claude Design "HealthFlow Today"). Shared tokens, tiles, and the
+   shell live in shell.css. Reference: docs/designs/healthflow-today/ */
+
+/* ---- page head ---- */
+.today-v2 .td-head { align-items: flex-end; }
+.today-v2 .td-head .eyebrow { margin-bottom: 10px; text-transform: none; letter-spacing: 0.01em; }
+
+/* ---- sections ---- */
+.today-v2 .workspace-section h2.ws-h2 { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; margin: 0 0 14px; }
+.today-v2 .workspace-section .between > h2.ws-h2 { margin: 0; }
+.today-v2 .workspace-section > .between { margin-bottom: 14px; }
+.today-v2 .workspace-subheading { font-weight: 400; }
+.today-v2 .td-group:first-of-type .workspace-subheading { margin-top: 4px; }
+.today-v2 .workspace-subheading.td-neg { color: var(--neg); }
+.today-v2 .td-group > .btn { margin-top: 10px; }
+.today-v2 .td-link { border: 0; background: none; padding: 0; cursor: pointer; font: 500 13px var(--sans); color: var(--accent); text-decoration: none; white-space: nowrap; }
+.today-v2 .td-link:hover:not(:disabled) { color: var(--accent-2); text-decoration: underline; }
+.today-v2 .td-link:disabled { cursor: default; opacity: 0.6; }
+.today-v2 .td-foot { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line-2); }
+.today-v2 .td-foot .td-link { color: var(--ink); font-weight: 400; }
+
+/* ---- rows ---- */
+.today-v2 .workspace-row-copy { gap: 3px; }
+.today-v2 .workspace-row-copy strong { font-weight: 700; }
+.today-v2 .workspace-list-row input[type="checkbox"] { margin: 3px 3px 3px 4px; }
+.today-v2 .td-links { display: inline-flex; align-items: center; gap: 4px; }
+.today-v2 .td-links svg { color: var(--ink-4); flex-shrink: 0; }
+.today-v2 .td-row-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.today-v2 .td-when { font-size: 12px; color: var(--ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.today-v2 .td-when.neg { color: var(--neg); }
+.today-v2 .td-appt .td-time { width: 76px; flex-shrink: 0; display: grid; gap: 2px; }
+.today-v2 .td-appt .td-time strong { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.today-v2 .td-appt .td-time small { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+.today-v2 .td-appt.td-muted .workspace-row-copy { opacity: 0.6; }
+.today-v2 .td-now { background: var(--accent-soft); margin-inline: -12px; padding-inline: 12px; border-radius: var(--radius); border-top-color: transparent; }
+.today-v2 .td-now + .workspace-list-row { border-top-color: transparent; }
+.today-v2 .td-wait { align-items: flex-start; }
+.today-v2 .td-wait .btn { flex-shrink: 0; }
+
+/* ---- inbox ---- */
+.today-v2 .td-inbox-note { margin: -6px 0 8px; }
+.today-v2 .td-mail-avatar {
+  width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bg-2); color: var(--ink-2); font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
+  box-shadow: 0 1px 2px 0 oklch(0.3 0.03 240 / 0.08);
+}
+.today-v2 .workspace-mail .between { align-items: flex-start; gap: 10px; }
+.today-v2 .workspace-mail .between small { white-space: nowrap; }
+.today-v2 .td-preview { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.today-v2 .workspace-mail .workspace-link-suggestion { margin-top: 6px; }
+.today-v2 .workspace-mail .workspace-link-suggestion > div { display: block; }
+.today-v2 .workspace-mail .workspace-link-suggestion > div small { display: block; margin-bottom: 2px; }
+
+/* ---- tools: tile and label share the row, as in the design ---- */
+.today-v2 .workspace-tool .hf-tile { flex: 1; height: 30px; border-radius: 8px; }
+.today-v2 .workspace-tool > svg:last-child { color: var(--ink-2); }
+
+@media (max-width: 700px) {
+  .today-v2 .td-head { align-items: stretch; }
+  .today-v2 .td-row-meta { flex-wrap: wrap; justify-content: flex-end; }
+  .today-v2 .workspace-list-row { flex-wrap: wrap; }
+  .today-v2 .workspace-list-row .workspace-row-copy { flex-basis: 60%; }
+}

@@ -397,11 +397,6 @@ html[data-mode="dark"] .brand-mark {
   background-clip: text;
   color: transparent;
 }
-.brand-tag {
-  font-family: var(--sans); font-size: 10px; letter-spacing: 0.02em;
-  color: var(--ink-4); margin-left: auto;
-  align-self: center;
-}
 
 .nav-group { margin-top: 10px; }
 .nav-group-label {

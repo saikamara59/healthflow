@@ -32,6 +32,7 @@ import FeedbackDashboardPage from './pages/FeedbackDashboardPage'
 import AdminPage from './pages/AdminPage'
 import AdminRoute from './components/AdminRoute'
 import DocumentArchivePage from './pages/DocumentArchivePage'
+import ComingSoonPage from './pages/ComingSoonPage'
 
 // At `/`, show the public marketing page to logged-out visitors; redirect
 // authenticated users into their workspace so they don't see a sales pitch
@@ -80,6 +81,9 @@ export default function App() {
             <Route path="feedback" element={<FeedbackDashboardPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="activity" element={<ActivityPage />} />
+            <Route path="approvals" element={<ComingSoonPage group="Daily" title="Approvals" icon="approve" description="Every action that needs your sign-off before it happens." />} />
+            <Route path="ask" element={<ComingSoonPage group="AI Tools" title="Ask HealthFlow" icon="ask" description="Ask questions about a client's coverage in plain language." />} />
+            <Route path="connectors" element={<ComingSoonPage group="Settings" title="Connectors" icon="connect" description="Connect your email, calendar, and carrier portals." />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="support" element={<SupportPage />} />
             <Route
