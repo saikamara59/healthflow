@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 import './shell.css';
+import './workspace-pages.css';
 import { initTweaksFromStorage } from './components/ui/Tweaks';
 
 initTweaksFromStorage();
