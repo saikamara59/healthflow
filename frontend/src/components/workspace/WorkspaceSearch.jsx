@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { workspaceApi } from '../../api/workspace'
+import HfTile from '../ui/HfTile'
+import { OrgMark } from '../ui/OrgLogo'
+
+// Section icon per result kind; organizations show their own logo instead.
+const KIND_ICON = { client: 'clients', contact: 'team', task: 'follow', appointment: 'cal' }
 
 export default function WorkspaceSearch({ onClose }) {
   const navigate = useNavigate()
@@ -53,7 +58,7 @@ export default function WorkspaceSearch({ onClose }) {
     <div className="workspace-search-hint">Type at least two characters. Use ↑ ↓ to choose and Enter to open.</div>
     {state === 'error' && <p role="alert" className="workspace-error">Search could not load. Try again.</p>}
     {state === 'loading' && <p role="status">Searching…</p>}
-    <div id="workspace-search-results" role="listbox" aria-label="Workspace results">{results.map((item, index) => <button id={`workspace-result-${index}`} type="button" role="option" aria-selected={index === active} className={`workspace-search-result ${index === active ? 'active' : ''}`} key={`${item.kind}-${item.id}`} onMouseEnter={() => setActive(index)} onClick={() => select(item)}><span>{item.title}</span><small>{item.subtitle}</small></button>)}</div>
+    <div id="workspace-search-results" role="listbox" aria-label="Workspace results">{results.map((item, index) => <button id={`workspace-result-${index}`} type="button" role="option" aria-selected={index === active} className={`workspace-search-result ${index === active ? 'active' : ''}`} key={`${item.kind}-${item.id}`} onMouseEnter={() => setActive(index)} onClick={() => select(item)}>{item.kind === 'organization' ? <OrgMark name={item.title} size={26} /> : <HfTile icon={KIND_ICON[item.kind] || 'today'} />}<span className="workspace-search-copy"><span>{item.title}</span><small>{item.subtitle}</small></span></button>)}</div>
     {state === 'ready' && results.length === 0 && <p className="workspace-empty">No matches found.</p>}
   </dialog>
 }

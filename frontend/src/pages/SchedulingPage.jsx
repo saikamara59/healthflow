@@ -5,6 +5,7 @@ import { useLocation } from 'react-router-dom'
 import api from '../api/client'
 import TopBar from '../components/TopBar'
 import PageHead from '../components/ui/PageHead'
+import { OrgMark } from '../components/ui/OrgLogo'
 import useLayout from '../components/ui/useLayout'
 import { workspaceApi } from '../api/workspace'
 import { addCalendarDays, dateInZone, localToUtc } from '../api/workspaceTime'
@@ -115,7 +116,7 @@ export default function SchedulingPage() {
         >
           <small className="mono">{time(item.starts_at)} to {time(item.ends_at)}</small>
           <strong>{item.title}</strong>
-          {(item.client_name || item.organization_name) && <small>{[item.client_name, item.organization_name].filter(Boolean).join(' · ')}</small>}
+          {(item.client_name || item.organization_name) && <small className="ws-slot-who">{item.client_name}{item.client_name && item.organization_name && ' · '}{item.organization_name && <><OrgMark name={item.organization_name} size={14} />{item.organization_name}</>}</small>}
           {(statusChip(item) || item.client_archived) && <span className="ws-slot-chips">{statusChip(item)}{item.client_archived && <span className="status-label">Archived client</span>}</span>}
           {actions(item)}
         </motion.li>)}</AnimatePresence></ul> : <p className="workspace-empty">No meetings</p>}

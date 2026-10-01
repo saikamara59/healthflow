@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { Archive, ArrowCounterClockwise, ArrowSquareOut, CaretRight, PencilSimple, Plus, X } from '@phosphor-icons/react'
 import TopBar from '../components/TopBar'
 import OrgLogo, { COMMON_CARRIERS } from '../components/ui/OrgLogo'
+import { forgetOrganizationWebsites } from '../components/ui/useOrganizationWebsites'
 import PageHead from '../components/ui/PageHead'
 import useLayout from '../components/ui/useLayout'
 import { workspaceApi } from '../api/workspace'
@@ -175,7 +176,7 @@ export default function OrganizationsPage() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
-  const load = () => workspaceApi.listOrganizations(false, showArchived).then((data) => { setOrganizations(data); setError('') })
+  const load = () => { forgetOrganizationWebsites(); return workspaceApi.listOrganizations(false, showArchived).then((data) => { setOrganizations(data); setError('') }) }
   useEffect(() => {
     let alive = true
     setOrganizations(null)

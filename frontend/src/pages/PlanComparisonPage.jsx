@@ -6,19 +6,13 @@ import api from '../api/client';
 import TopBar from '../components/TopBar';
 import Stars from '../components/ui/Stars';
 import AgentMarkdown from '../components/ui/AgentMarkdown';
-import OrgLogo, { carrierForPlan } from '../components/ui/OrgLogo';
+import { PlanLogo, carrierForPlan } from '../components/ui/OrgLogo';
 import PageHead from '../components/ui/PageHead';
 import useLayout from '../components/ui/useLayout';
 import DecisionRecordPanel from '../components/DecisionRecordPanel';
 import { RunSteps, SourceRow, ToolResults } from '../components/tools/ToolRun';
 import { TOOL_FLOWS } from '../components/tools/toolFlows';
 import { useAuth } from '../contexts/AuthContext';
-
-// Carrier logo for a plan, falling back to the plan's initials.
-function PlanLogo({ planName, size = 40 }) {
-  const carrier = carrierForPlan(planName);
-  return <OrgLogo name={carrier?.name || planName} website={carrier?.website} size={size} />;
-}
 
 // Medication or procedure entry: type, press Enter or Add, remove with the x.
 function ChipInput({ label, placeholder, items, setItems }) {

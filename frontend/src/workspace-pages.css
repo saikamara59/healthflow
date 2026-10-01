@@ -325,3 +325,15 @@ html[data-mode="dark"] .doc-type { color: color-mix(in oklch, var(--t) 70%, whit
 .ws-activity-day { margin-bottom: 16px; }
 .ws-activity-day h2 { font-size: 16px !important; margin: 0; }
 @media (max-width: 560px) { .ws-activity-row { flex-wrap: wrap; } .ws-activity-row .chip { min-width: 0; } }
+
+/* ---- carrier and organization logos in lists ---- */
+.ws-enr { align-items: flex-start; gap: 14px; }
+.ws-enr > .org-logo { margin-top: 2px; }
+.ws-slot-who { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.ws-slot-who .org-logo { border-radius: 4px; box-shadow: none; }
+.doc-links .chip .org-logo, .ar-link .org-logo { border-radius: 4px; box-shadow: none; }
+.ar-link { display: inline-flex; align-items: center; gap: 6px; }
+.td-wait > .org-logo { border-radius: 7px; }
+.workspace-search-result { justify-content: flex-start; align-items: center; gap: 12px; }
+.workspace-search-copy { flex: 1; min-width: 0; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.workspace-search-copy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

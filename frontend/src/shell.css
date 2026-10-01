@@ -123,3 +123,6 @@ html[data-mode="dark"] .hf-tile { color: color-mix(in oklch, var(--c) 70%, white
   .ww { width: 100%; }
   .ww select { flex: 1; max-width: none; }
 }
+/* small organization logo inline in a "linked to" line */
+.td-links .td-link-part { display: inline-flex; align-items: center; gap: 4px; white-space: pre; }
+.td-links .org-logo { border-radius: 4px; box-shadow: none; }

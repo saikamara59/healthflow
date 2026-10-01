@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { workspaceApi } from '../../api/workspace'
 import HfTile from '../ui/HfTile'
+import { PlanLogo } from '../ui/OrgLogo'
 
 const SHOWN = 3
 
@@ -18,7 +19,7 @@ async function loadWaiting() {
     workspaceApi.listIssues('status=in_progress'),
   ])
   const enrollments = ready.map((item) => ({
-    key: `enrollment-${item.id}`, icon: 'enroll', to: '/enrollments',
+    key: `enrollment-${item.id}`, icon: 'enroll', plan: item.plan_name, to: '/enrollments',
     title: `Record ${item.plan_name} enrollment as submitted`, detail: item.client_name,
   }))
   const issues = [...open, ...inProgress].filter((item) => item.deadline).sort((a, b) => a.deadline.localeCompare(b.deadline)).map((item) => ({
@@ -44,7 +45,7 @@ export default function WaitingForYou() {
     {items === null && <p className="workspace-empty workspace-small" role="status">Loading…</p>}
     {items?.length === 0 && <p className="workspace-empty workspace-small">Nothing needs your sign-off.</p>}
     {items?.length > 0 && <ul className="workspace-list">{items.slice(0, SHOWN).map((item) => <li className="workspace-list-row td-wait" key={item.key}>
-      <HfTile icon={item.icon} />
+      {item.plan ? <PlanLogo planName={item.plan} size={26} /> : <HfTile icon={item.icon} />}
       <div className="workspace-row-copy"><strong>{item.title}</strong><small>{item.detail}</small></div>
       <Link className="btn sm" to={item.to} aria-label={`Review ${item.title}`}>Review</Link>
     </li>)}</ul>}

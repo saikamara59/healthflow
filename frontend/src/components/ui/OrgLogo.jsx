@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import useOrganizationWebsites from './useOrganizationWebsites'
 
 // Major Medicare carriers a broker can add in one click. Their names also map to
 // a logo before the broker fills in a website.
@@ -79,4 +80,17 @@ export default function OrgLogo({ name, website, size = 38 }) {
         : initials(name)}
     </span>
   )
+}
+
+// Logo for an organization known only by name (on a task, meeting, or search
+// result): known carriers by name, others by the website saved on the record.
+export function OrgMark({ name, size = 16 }) {
+  const websites = useOrganizationWebsites()
+  return <OrgLogo name={name} website={websites[(name || '').trim().toLowerCase()]} size={size} />
+}
+
+// Carrier logo for a plan name, falling back to the plan's initials.
+export function PlanLogo({ planName, size = 40 }) {
+  const carrier = carrierForPlan(planName)
+  return <OrgLogo name={carrier?.name || planName} website={carrier?.website} size={size} />
 }

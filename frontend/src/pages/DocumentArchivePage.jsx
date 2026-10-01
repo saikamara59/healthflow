@@ -6,6 +6,7 @@ import api from '../api/client'
 import { workspaceApi } from '../api/workspace'
 import TopBar from '../components/TopBar'
 import PageHead from '../components/ui/PageHead'
+import { PlanLogo } from '../components/ui/OrgLogo'
 import useLayout from '../components/ui/useLayout'
 import { DocTypeTile, TYPE_GROUPS, formatBytes, formatDay, isOpenable, linkLabel } from '../components/documents/documentFormat'
 
@@ -155,7 +156,7 @@ export default function DocumentArchivePage() {
                       {doc.links.length > 0 && (
                         <ul className="document-links">{doc.links.map((link) => (
                           <li key={link.id}>
-                            <span>{linkLabel(link, data.recordNames)}</span>
+                            <span className="ar-link">{link.target_type === 'enrollment' && data.recordNames[`enrollment:${link.target_id}`] && <PlanLogo planName={data.recordNames[`enrollment:${link.target_id}`]} size={14} />}{linkLabel(link, data.recordNames)}</span>
                             <button className="btn sm ghost" disabled={busy} onClick={() => run(() => api.del(`/documents/${doc.id}/links/${link.id}`))}>Unlink {link.target_type}</button>
                           </li>
                         ))}</ul>

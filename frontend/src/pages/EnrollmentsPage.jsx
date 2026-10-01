@@ -5,6 +5,7 @@ import { workspaceApi } from '../api/workspace'
 import TopBar from '../components/TopBar'
 import DocumentList from '../components/DocumentList'
 import PageHead from '../components/ui/PageHead'
+import { PlanLogo } from '../components/ui/OrgLogo'
 import useLayout from '../components/ui/useLayout'
 
 const EMPTY = { client_id: '', plan_name: '', effective_date: '', notes: '' }
@@ -153,6 +154,7 @@ export default function EnrollmentsPage() {
                     exit={{ opacity: 0, x: -12 }}
                     transition={{ duration: 0.28, ease: EASE }}
                   >
+                    <PlanLogo planName={item.plan_name} size={40} />
                     <div className="workspace-row-copy">
                       <div className="between ws-enr-head">
                         <strong>{item.client_name}</strong>

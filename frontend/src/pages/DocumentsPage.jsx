@@ -6,6 +6,7 @@ import api from '../api/client'
 import { workspaceApi } from '../api/workspace'
 import TopBar from '../components/TopBar'
 import PageHead from '../components/ui/PageHead'
+import { PlanLogo } from '../components/ui/OrgLogo'
 import useLayout from '../components/ui/useLayout'
 import { ACCEPTED, DocTypeTile, formatBytes, formatDay, isOpenable, linkLabel } from '../components/documents/documentFormat'
 
@@ -177,7 +178,7 @@ export default function DocumentsPage() {
                     {' · '}{doc.verified_type.toUpperCase()} · {formatBytes(doc.byte_length)} · Added {formatDay(doc.created_at)}
                   </small>
                   {doc.links.length > 0 && (
-                    <span className="doc-links">{doc.links.map((link) => <span key={link.id} className="chip"><LinkSimple size={11} weight="bold" aria-hidden="true" />{linkLabel(link, recordNames)}</span>)}</span>
+                    <span className="doc-links">{doc.links.map((link) => <span key={link.id} className="chip">{link.target_type === 'enrollment' && recordNames[`enrollment:${link.target_id}`] ? <PlanLogo planName={recordNames[`enrollment:${link.target_id}`]} size={14} /> : <LinkSimple size={11} weight="bold" aria-hidden="true" />}{linkLabel(link, recordNames)}</span>)}</span>
                   )}
                 </div>
                 <div className="workspace-row-actions">
