@@ -149,6 +149,35 @@ async def test_overview_counts_only_current_broker_records(client):
 
 
 @pytest.mark.asyncio
+async def test_overview_counts_open_case_work_and_workload(client):
+    owner = await _headers(client, "overview-work@example.com")
+    outsider = await _headers(client, "overview-work-outsider@example.com")
+    client_id = (await client.post("/clients", json={
+        "full_name": "Workload Client", "zip_code": "10001", "age": 67, "income_level": "medium",
+        "doctors": [], "prescriptions": [], "procedures": [],
+    }, headers=owner)).json()["id"]
+    enrollments = [(await client.post("/enrollments", json={
+        "client_id": client_id, "plan_name": f"Plan {index}"
+    }, headers=owner)).json()["id"] for index in range(3)]
+    await client.post(f"/enrollments/{enrollments[1]}/cancel", headers=owner)
+    issues = [(await client.post("/issues", json={
+        "client_id": client_id, "title": f"Issue {index}"
+    }, headers=owner)).json()["id"] for index in range(2)]
+    await client.put(f"/issues/{issues[0]}", json={"status": "resolved"}, headers=owner)
+    await client.post("/tasks", json={"title": "Call carrier", "is_follow_up": True}, headers=owner)
+    await client.post("/tasks", json={
+        "title": "Send packet", "due_at": "2030-01-15T15:00:00Z",
+    }, headers=owner)
+    await client.post("/tasks", json={"title": "Outsider follow-up", "is_follow_up": True}, headers=outsider)
+
+    body = (await client.get("/workspace/overview", headers=owner)).json()
+    assert body["active_enrollments"] == 2
+    assert body["open_issues"] == 1
+    assert body["open_follow_ups"] == 1
+    assert body["unscheduled_tasks"] == 1
+
+
+@pytest.mark.asyncio
 async def test_overview_shows_only_active_clients_and_restores_them(client):
     headers = await _headers(client, "overview-archive@example.com")
     client_ids = []
