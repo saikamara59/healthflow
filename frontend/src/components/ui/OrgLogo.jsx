@@ -13,6 +13,37 @@ export const COMMON_CARRIERS = [
   { name: 'Anthem', website: 'anthem.com' },
 ]
 
+// Plan-name prefixes in the plan catalog mapped to the carrier behind them.
+const PLAN_CARRIERS = [
+  [/^aetna\b/i, 'Aetna', 'aetna.com'],
+  [/^humana\b/i, 'Humana', 'humana.com'],
+  [/^(uhc|unitedhealthcare|aarp)\b/i, 'UnitedHealthcare', 'uhc.com'],
+  [/^cigna\b/i, 'Cigna', 'cigna.com'],
+  [/^(bcbs|blue ?cross|blue ?shield)\b/i, 'BlueCross BlueShield', 'bcbs.com'],
+  [/^wellcare\b/i, 'Wellcare', 'wellcare.com'],
+  [/^kaiser\b/i, 'Kaiser Permanente', 'kp.org'],
+  [/^anthem\b/i, 'Anthem', 'anthem.com'],
+  [/^molina\b/i, 'Molina Healthcare', 'molinahealthcare.com'],
+  [/^(centene|ambetter)\b/i, 'Centene', 'ambetterhealth.com'],
+  [/^devoted\b/i, 'Devoted Health', 'devoted.com'],
+  [/^clover\b/i, 'Clover Health', 'cloverhealth.com'],
+  [/^oscar\b/i, 'Oscar Health', 'hioscar.com'],
+  [/^alignment\b/i, 'Alignment Health', 'alignmenthealthplan.com'],
+  [/^scan\b/i, 'SCAN Health Plan', 'scanhealthplan.com'],
+  [/^mutual\b/i, 'Mutual of Omaha', 'mutualofomaha.com'],
+  [/^bright\b/i, 'Bright Health', 'brighthealthcare.com'],
+  [/^zing\b/i, 'Zing Health', 'zinghealth.com'],
+  [/^caresource\b/i, 'CareSource', 'caresource.com'],
+  [/^priority\b/i, 'Priority Health', 'priorityhealth.com'],
+  [/^regence\b/i, 'Regence', 'regence.com'],
+]
+
+/** The carrier behind a plan, e.g. "UHC Medicare Advantage Plus" -> UnitedHealthcare. */
+export function carrierForPlan(planName) {
+  const match = PLAN_CARRIERS.find(([pattern]) => pattern.test((planName || '').trim()))
+  return match ? { name: match[1], website: match[2] } : null
+}
+
 const KNOWN_DOMAINS = {
   ...Object.fromEntries(COMMON_CARRIERS.map((carrier) => [carrier.name.toLowerCase(), carrier.website])),
   'blue cross blue shield': 'bcbs.com', 'integrity marketing group': 'integritymarketing.com',
