@@ -84,3 +84,19 @@ export function ToolResults({ show, children }) {
     </AnimatePresence>
   )
 }
+
+/** One-line progress for a chat answer: the current step and "n of m". */
+export function RunStepsCompact({ steps }) {
+  const [index, setIndex] = useState(0)
+  useEffect(() => {
+    const timer = setInterval(() => setIndex((value) => Math.min(value + 1, steps.length - 1)), STEP_MS)
+    return () => clearInterval(timer)
+  }, [steps.length])
+  return (
+    <div className="fl-compact" role="status" aria-live="polite">
+      <StepIcon state="now" />
+      <span>{steps[index][0]}</span>
+      <small>{index + 1} of {steps.length}</small>
+    </div>
+  )
+}

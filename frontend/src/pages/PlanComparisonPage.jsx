@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { MotionConfig } from 'framer-motion';
-import { ArrowsLeftRight, CaretDown, Check, Info, PencilSimple, Plus, SealCheck, X } from '@phosphor-icons/react';
+import { ArrowsLeftRight, CaretDown, Check, Info, PencilSimple, SealCheck } from '@phosphor-icons/react';
 import api from '../api/client';
 import TopBar from '../components/TopBar';
 import Stars from '../components/ui/Stars';
@@ -11,30 +11,9 @@ import PageHead from '../components/ui/PageHead';
 import useLayout from '../components/ui/useLayout';
 import DecisionRecordPanel from '../components/DecisionRecordPanel';
 import { RunSteps, SourceRow, ToolResults } from '../components/tools/ToolRun';
+import { ChipInput } from '../components/tools/ToolInputs';
 import { TOOL_FLOWS } from '../components/tools/toolFlows';
 import { useAuth } from '../contexts/AuthContext';
-
-// Medication or procedure entry: type, press Enter or Add, remove with the x.
-function ChipInput({ label, placeholder, items, setItems }) {
-  const [value, setValue] = useState('');
-  const add = () => { if (value.trim()) { setItems([...items, value.trim()]); setValue(''); } };
-  return (
-    <div className="ws-listin">
-      <label className="ws-listin-label" htmlFor={`chip-${label}`}>{label}</label>
-      <div className="ws-listin-row">
-        <input id={`chip-${label}`} placeholder={placeholder} value={value} onChange={(e) => setValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }} />
-        <button type="button" className="btn" disabled={!value.trim()} onClick={add}><Plus size={14} weight="bold" /> Add</button>
-      </div>
-      {items.length > 0 && (
-        <div className="ws-chips">
-          {items.map((item, i) => (
-            <span key={`${item}-${i}`} className="chip">{item}<button type="button" aria-label={`Remove ${item}`} onClick={() => setItems(items.filter((_, j) => j !== i))}><X size={11} weight="bold" /></button></span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function currency(v) {
   if (v == null || Number.isNaN(v)) return '—';
