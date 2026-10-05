@@ -127,3 +127,10 @@ def test_pip_audit_allowlist_entries_have_a_reason_and_have_not_expired():
         assert date.fromisoformat(expires) >= date.today(), (
             f"{vulnerability_id} expired on {expires}; review it again or remove it"
         )
+
+
+def test_dependabot_keeps_pinned_actions_and_frontend_dependencies_current():
+    config = yaml.safe_load((REPO_ROOT / ".github" / "dependabot.yml").read_text())
+    ecosystems = {(update["package-ecosystem"], update["directory"]) for update in config["updates"]}
+    assert ("github-actions", "/") in ecosystems
+    assert ("npm", "/frontend") in ecosystems
