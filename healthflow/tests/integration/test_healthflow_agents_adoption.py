@@ -14,12 +14,14 @@ REPO_ROOT = Path(__file__).parents[3]
 
 
 class HealthflowAgentsDependencyTests(unittest.TestCase):
-    def test_runtime_dependency_uses_verified_v050_pydantic_ai_extra(self):
+    def test_runtime_dependency_pins_the_verified_v050_release_commit(self):
         requirements = (REPO_ROOT / "requirements.txt").read_text().splitlines()
 
+        # Pinned to the commit v0.5.0 points at: a tag can be moved, a commit cannot.
         self.assertIn(
             "healthflow-agents[pydantic-ai] @ "
-            "git+https://github.com/saikamara59/healthflow-agents.git@v0.5.0",
+            "git+https://github.com/saikamara59/healthflow-agents.git"
+            "@0a8390a79458609cd14db6cdf953bd98b55e49b3  # v0.5.0",
             requirements,
         )
 
@@ -30,13 +32,9 @@ class HealthflowAgentsDependencyTests(unittest.TestCase):
 
         self.assertIsNotNone(direct_url)
         metadata = json.loads(direct_url)
+        self.assertEqual(metadata["vcs_info"]["vcs"], "git")
         self.assertEqual(
-            metadata["vcs_info"],
-            {
-                "commit_id": "0a8390a79458609cd14db6cdf953bd98b55e49b3",
-                "requested_revision": "v0.5.0",
-                "vcs": "git",
-            },
+            metadata["vcs_info"]["commit_id"], "0a8390a79458609cd14db6cdf953bd98b55e49b3"
         )
 
     def test_fly_build_uses_ephemeral_github_credential_for_private_dependency(self):

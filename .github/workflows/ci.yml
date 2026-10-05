@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with:
           python-version: '3.12'
       - name: Install pinned Ruff
@@ -35,14 +35,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with:
           python-version: '3.12'
           cache: pip
-          cache-dependency-path: requirements.txt
+          cache-dependency-path: requirements.lock
       - name: Install backend dependencies
         env:
           HEALTHFLOW_AGENTS_TOKEN: ${{ secrets.HEALTHFLOW_AGENTS_TOKEN }}
@@ -54,7 +54,7 @@ jobs:
             echo 'HEALTHFLOW_AGENTS_TOKEN is required for the private dependency.' >&2
             exit 1
           fi
-          python -m pip install -r requirements.txt
+          python -m pip install -r requirements.lock
       - name: Test backend
         run: python -m pytest healthflow/tests/ healthflow/agents/temporal_awareness/tests/ healthflow/forensics/tests/ -q --tb=short
 
@@ -66,13 +66,79 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
         with:
           node-version: '20'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build
+
+  deployment-guards:
+    name: Deployment guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned CI tooling
+        run: python -m pip install -r requirements-ci.txt
+      - name: Check deploy configuration
+        run: python -m pytest tests/ci/test_deployment_guards.py -q
+
+  harness-scripts:
+    name: CI harness scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: '20'
+      - name: Install pinned CI tooling
+        run: python -m pip install -r requirements-ci.txt
+      - name: Test deploy and lockfile scripts
+        run: python -m pytest tests/ci/test_harness_scripts.py -q
+      - name: Test the e2e stack setup
+        working-directory: frontend
+        run: npm run test:harness
+
+  supply-chain:
+    name: Release supply chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: '20'
+      - name: Install pinned CI tooling
+        run: python -m pip install -r requirements-ci.txt
+      - name: Check pins and lockfiles
+        run: python -m pytest tests/ci/test_supply_chain.py -q
+      - name: Audit Python dependencies
+        # The private healthflow-agents package is pinned to a commit and audited in its own repo.
+        run: |
+          ignores=$(grep -v '^#' security/pip-audit-allowlist.txt | awk -F'|' 'NF >= 3 { gsub(/ /, "", $1); printf "--ignore-vuln %s ", $1 }')
+          grep -v 'git+' requirements.lock > "$RUNNER_TEMP/audit-requirements.txt"
+          pip-audit -r "$RUNNER_TEMP/audit-requirements.txt" --no-deps --disable-pip --progress-spinner off $ignores
+      - name: Audit shipped frontend dependencies
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high

@@ -4,6 +4,9 @@ set -euo pipefail
 
 base_url="${HEALTHFLOW_BASE_URL:-https://healthflow.work}"
 base_url="${base_url%/}"
+# Retries cover a deploy that is still warming up; tests shorten them.
+attempts="${SMOKE_ATTEMPTS:-12}"
+retry_delay="${SMOKE_RETRY_DELAY:-5}"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
@@ -12,7 +15,7 @@ check_path() {
   local path="$1" status content_type attempt accept
   accept="text/html"
   if [[ "$path" == /health ]]; then accept="application/json"; fi
-  for attempt in {1..12}; do
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
     if status="$(curl --silent --show-error --max-time 10 --header "Accept: $accept" --dump-header "$tmp_dir/headers" --output "$tmp_dir/body" --write-out '%{http_code}' "$base_url$path")"; then
       content_type="$(tr -d '\r' < "$tmp_dir/headers" | awk 'BEGIN { IGNORECASE = 1 } tolower($1) == "content-type:" { print tolower($2) }' | tail -1)"
       if [[ "$path" == /health ]]; then
@@ -29,13 +32,13 @@ check_path() {
       content_type="unavailable"
     fi
     echo "Attempt $attempt: $path returned $status ($content_type)" >&2
-    if (( attempt < 12 )); then sleep 5; fi
+    if (( attempt < attempts )); then sleep "$retry_delay"; fi
   done
   echo "Deployed route failed: $base_url$path" >&2
   return 1
 }
 
 check_path /health
-for path in / /today /overview /clients /enrollments /issues /documents/archive; do
+for path in / /today /overview /clients /enrollments /issues /documents /documents/archive; do
   check_path "$path"
 done

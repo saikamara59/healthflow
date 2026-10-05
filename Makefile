@@ -54,6 +54,13 @@ smoke-external: ## Run opt-in live smoke tests against RxNav + NPPES (needs inte
 
 # ─── Linting ──────────────────────────────────────────────────────────────────
 
+ci-checks: ## Run the deployment guard, CI harness, and supply-chain checks
+	.venv/bin/python -m pytest tests/ci -q
+	cd frontend && npm run test:harness
+
+lock: ## Regenerate requirements.lock for Python 3.12 (needs Docker and a GitHub token)
+	scripts/lock_requirements.sh
+
 lint: ## Run ruff linter
 	.venv/bin/ruff check healthflow/
 

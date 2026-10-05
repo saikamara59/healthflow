@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "test:harness": "node --test tests/harness/*.test.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
