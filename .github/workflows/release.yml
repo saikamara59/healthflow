@@ -1,0 +1,95 @@
+name: Release
+
+# Every push to main runs the full CI and e2e suites on that exact commit, and
+# deploys to Fly.io only if both pass. A deploy that fails its smoke check is
+# rolled back to the release that was serving before it.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# One release at a time. Not cancelled mid-run: stopping a deploy or a rollback
+# halfway is worse than waiting. GitHub keeps only the newest queued release.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  e2e:
+    uses: ./.github/workflows/e2e.yml
+    secrets: inherit
+
+  changes:
+    name: Deployable changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      deployable: ${{ steps.diff.outputs.deployable }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Skip the deploy when only docs or tests changed
+        id: diff
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          # An unknown range (first push, force push) deploys rather than guessing.
+          if ! changed="$(git diff --name-only "$BEFORE" "$GITHUB_SHA" 2>/dev/null)"; then
+            echo "deployable=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          not_shipped='(\.md$|^docs/|^frontend/tests/|^healthflow/tests/|^healthflow/forensics/tests/|^healthflow/agents/temporal_awareness/tests/|^tests/ci/)'
+          if grep -qvE "$not_shipped" <<< "$changed"; then
+            echo "deployable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "deployable=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    name: Deploy to Fly.io
+    needs: [ci, e2e, changes]
+    if: needs.changes.outputs.deployable == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      FLY_APP: healthflow-demo
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+
+      - uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be  # 1.5
+
+      - name: Record the release to roll back to
+        id: previous
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: echo "image=$(bash scripts/fly_release_image.sh)" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Fly.io
+        id: deploy
+        run: flyctl deploy --remote-only --app healthflow-demo --build-secret HEALTHFLOW_AGENTS_TOKEN=${{ secrets.HEALTHFLOW_AGENTS_TOKEN }}
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Check deployed health and direct routes
+        id: smoke
+        run: bash scripts/smoke_deployed_routes.sh
+
+      - name: Roll back to the previous release
+        id: rollback
+        # Only when this deploy went out and then failed its check. The job still
+        # fails afterwards, so the broken commit is visible and GitHub notifies.
+        if: failure() && steps.deploy.outcome == 'success' && steps.previous.outputs.image != ''
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          PREVIOUS_IMAGE: ${{ steps.previous.outputs.image }}
+        run: bash scripts/fly_rollback.sh "$PREVIOUS_IMAGE"

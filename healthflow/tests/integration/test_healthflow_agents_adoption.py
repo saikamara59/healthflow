@@ -40,7 +40,7 @@ class HealthflowAgentsDependencyTests(unittest.TestCase):
     def test_fly_build_uses_ephemeral_github_credential_for_private_dependency(self):
         dockerfile = (REPO_ROOT / "Dockerfile").read_text()
         deploy_workflow = (
-            REPO_ROOT / ".github" / "workflows" / "fly-deploy.yml"
+            REPO_ROOT / ".github" / "workflows" / "release.yml"
         ).read_text()
 
         self.assertIn(
