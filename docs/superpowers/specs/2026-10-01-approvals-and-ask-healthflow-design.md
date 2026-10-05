@@ -43,7 +43,7 @@ When Claude answers or proposes, the server replaces stand-ins with real Clients
 
 **Approvals service and API.** It creates pending Approvals for a proposer, lists them by state for the owning Broker, returns one with its proposal and audit details, and decides them. Approve validates the final values against the current state before writing:
 
-- the linked Client must still be active (unless the Broker added an archived Client deliberately)
+- the linked Client must still be active; new work for an archived Client requires restoring it first ([ADR 0002](../../adr/0002-archive-clients-to-preserve-work.md)), even if the Broker added that Client to an Ask Conversation to read it
 - a Task's due time and an Appointment's time must not be in the past
 - an Appointment must end after it starts
 - all references must belong to the Broker
