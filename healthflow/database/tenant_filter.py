@@ -36,6 +36,7 @@ from healthflow.database.models import (
     ActionHistory,
     Appeal,
     Appointment,
+    Approval,
     BrokerPreference,
     Client,
     Contact,
@@ -72,6 +73,7 @@ TENANT_SCOPED_MODELS: frozenset[type] = frozenset({
     Enrollment,
     Issue,
     Appeal,
+    Approval,
     WorkspaceActivity,
     WorkspaceSearchToken,
 })

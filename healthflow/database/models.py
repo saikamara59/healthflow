@@ -169,6 +169,7 @@ class Task(Base):
     )
     contact_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("contacts.id"), index=True)
     issue_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("issues.id"), index=True)
+    approval_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("approvals.id"), index=True)
     title: Mapped[str] = mapped_column(EncryptedString(4000), nullable=False)
     notes: Mapped[str | None] = mapped_column(EncryptedString(12000), nullable=True)
     priority: Mapped[str | None] = mapped_column(String(10), nullable=True)
@@ -195,6 +196,7 @@ class Appointment(Base):
     )
     contact_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("contacts.id"), index=True)
     issue_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("issues.id"), index=True)
+    approval_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("approvals.id"), index=True)
     title: Mapped[str] = mapped_column(EncryptedString(4000), nullable=False)
     notes: Mapped[str | None] = mapped_column(EncryptedString(12000), nullable=True)
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
@@ -410,6 +412,40 @@ class WorkspaceSearchToken(Base):
     record_id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True)
     key_version: Mapped[str] = mapped_column(String(10), primary_key=True)
     digest: Mapped[str] = mapped_column(String(64), primary_key=True)
+
+
+class Approval(Base):
+    """A change software proposed that waits for the owning Broker (ADR 0003).
+
+    Pending until decided; once approved or rejected the row is never changed
+    or deleted. Proposal and decision text are encrypted PHI.
+    """
+
+    __tablename__ = "approvals"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    broker_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("brokers.id"), index=True, nullable=False
+    )
+    client_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("clients.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    state: Mapped[str] = mapped_column(
+        String(20), default="pending", server_default="pending", index=True, nullable=False
+    )
+    proposer_agent: Mapped[str] = mapped_column(String(60), nullable=False)
+    proposer_model: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    source_type: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    source_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    excerpt: Mapped[str] = mapped_column(EncryptedString(8000), nullable=False)
+    note: Mapped[str | None] = mapped_column(EncryptedString(2000), nullable=True)
+    proposed_values: Mapped[dict] = mapped_column(EncryptedJSON(20000), nullable=False)
+    approved_values: Mapped[dict | None] = mapped_column(EncryptedJSON(20000), nullable=True)
+    rejection_reason: Mapped[str | None] = mapped_column(EncryptedString(4000), nullable=True)
+    decided_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("brokers.id"), nullable=True)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    decided_via: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    created_record_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
 
 class WorkspaceActivity(Base):

@@ -62,3 +62,23 @@ def ensure_phase2_issue_links(connection) -> None:
                 f"ON {table_name} (issue_id)"
             )
         )
+
+
+def ensure_approval_links(connection) -> None:
+    """Add the nullable Approval back-reference to existing Task and Appointment tables.
+
+    `create_all` creates the new approvals table but does not alter tables that
+    already exist, so bridge the one new column explicitly and idempotently.
+    """
+    for table_name in ("tasks", "appointments"):
+        if connection.dialect.name == "postgresql":
+            connection.execute(text(
+                f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS approval_id VARCHAR(36) "
+                "REFERENCES approvals(id)"
+            ))
+            continue
+        columns = {column["name"] for column in inspect(connection).get_columns(table_name)}
+        if "approval_id" not in columns:
+            connection.execute(text(
+                f"ALTER TABLE {table_name} ADD COLUMN approval_id VARCHAR(36) REFERENCES approvals(id)"
+            ))
