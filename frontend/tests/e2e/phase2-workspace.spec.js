@@ -118,7 +118,10 @@ test('Issue can resolve without an Appeal and Draft Appeal requires Issue contex
   await authedPage.getByLabel('Status').selectOption('resolved')
   await expect(authedPage.getByText('No Appeal is required unless the case needs a formal challenge.')).toBeVisible()
 
-  await authedPage.getByRole('link', { name: 'Draft Appeal' }).first().click()
+  // Opened directly: in Linux WebKit, clicking the sidebar link far down the
+  // scrolled nav right after two Quick Create dialogs intermittently never
+  // settles. Sidebar navigation to Draft Appeal is covered by the other tests.
+  await authedPage.goto('/appeals')
   await authedPage.getByRole('button', { name: 'Use sample' }).click()
   await authedPage.getByRole('button', { name: 'Analyze & draft' }).click()
   await expect(authedPage.getByRole('alert')).toContainText('Choose an existing Issue')
