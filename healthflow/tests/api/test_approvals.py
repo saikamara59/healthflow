@@ -307,3 +307,112 @@ async def test_reading_approvals_is_recorded_in_the_phi_access_log(client, db_se
     assert len(entries) == 1
     assert entries[0].broker_id == broker_id
     assert entries[0].row_ids == [str(approval.id)]
+
+
+@pytest.mark.asyncio
+async def test_approval_holds_the_client_lifecycle_lock_before_creating_the_record(client, db_session, monkeypatch):
+    # Archiving takes the same lock, so an archive cannot land between the
+    # archived-Client check and the new record (ADR 0002).
+    import healthflow.workspace.approvals as approvals_module
+    from healthflow.database.models import Task
+
+    headers, broker_id = await _broker(client, "approvals-lock@example.com")
+    client_id = await _client_record(client, headers)
+    approval = await _propose_task(db_session, broker_id, client_id)
+    locked = []
+    real_lock = approvals_module.lock_client
+
+    async def spy(db, lock_broker_id, lock_client_id):
+        tasks = (await db.execute(select(Task).where(Task.approval_id == approval.id))).scalars().all()
+        locked.append((lock_client_id, len(tasks)))
+        return await real_lock(db, lock_broker_id, lock_client_id)
+
+    monkeypatch.setattr(approvals_module, "lock_client", spy)
+    response = await client.post(f"/approvals/{approval.id}/approve", headers=headers,
+                                 json={"via": "approvals_page"})
+
+    assert response.status_code == 200
+    assert locked == [(UUID(client_id), 0)], "The Client is locked before any record exists"
+
+
+@pytest.mark.asyncio
+async def test_proposals_too_long_to_store_encrypted_are_refused(client, db_session):
+    # Encryption and JSON escaping expand text, so limits are checked on what is
+    # stored; PostgreSQL would otherwise reject the row mid-request.
+    from healthflow.database.models import Approval
+
+    headers, broker_id = await _broker(client, "approvals-too-long@example.com")
+    client_id = await _client_record(client, headers)
+
+    with pytest.raises(ValueError, match="excerpt is too long"):
+        await propose_approval(db_session, broker_id=broker_id, kind="task",
+                               values={"title": "Call Marjorie", "client_id": client_id},
+                               proposer_agent="ask_healthflow", excerpt="€" * 2700)
+    with pytest.raises(ValueError, match="note is too long"):
+        await propose_approval(db_session, broker_id=broker_id, kind="task",
+                               values={"title": "Call Marjorie", "client_id": client_id},
+                               proposer_agent="ask_healthflow", excerpt="Call her", note="€" * 600)
+    with pytest.raises(ValueError, match="proposed values are too long"):
+        await propose_approval(db_session, broker_id=broker_id, kind="task",
+                               values={"title": "Call Marjorie", "client_id": client_id, "notes": "€" * 4000},
+                               proposer_agent="ask_healthflow", excerpt="Call her")
+    with pytest.raises(ValueError, match="proposer agent is too long"):
+        await propose_approval(db_session, broker_id=broker_id, kind="task",
+                               values={"title": "Call Marjorie", "client_id": client_id},
+                               proposer_agent="a" * 61, excerpt="Call her")
+    await db_session.rollback()
+    assert (await db_session.execute(select(Approval).where(Approval.broker_id == broker_id))).scalars().all() == []
+
+
+@pytest.mark.asyncio
+async def test_rejection_reason_too_long_to_store_is_refused_and_stays_pending(client, db_session):
+    headers, broker_id = await _broker(client, "approvals-reason-long@example.com")
+    client_id = await _client_record(client, headers)
+    approval = await _propose_task(db_session, broker_id, client_id)
+
+    response = await client.post(f"/approvals/{approval.id}/reject", headers=headers,
+                                 json={"via": "approvals_page", "reason": "€" * 1500})
+
+    assert response.status_code == 422
+    assert "too long" in response.json()["detail"]
+    pending = (await client.get("/approvals?state=pending", headers=headers)).json()
+    assert [item["id"] for item in pending] == [str(approval.id)]
+
+
+@pytest.mark.asyncio
+async def test_decided_history_is_paged_newest_first(client, db_session):
+    headers, broker_id = await _broker(client, "approvals-paged@example.com")
+    client_id = await _client_record(client, headers)
+    decided = []
+    for index in range(3):
+        approval = await _propose_task(db_session, broker_id, client_id, title=f"Call {index}")
+        await client.post(f"/approvals/{approval.id}/reject", headers=headers,
+                          json={"via": "approvals_page", "reason": "Not needed"})
+        decided.append(str(approval.id))
+
+    first = (await client.get("/approvals?state=decided&limit=2", headers=headers)).json()
+    rest = (await client.get("/approvals?state=decided&limit=2&offset=2", headers=headers)).json()
+    too_many = await client.get("/approvals?state=decided&limit=201", headers=headers)
+
+    assert [item["id"] for item in first] == decided[::-1][:2]
+    assert [item["id"] for item in rest] == decided[::-1][2:]
+    assert too_many.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_rejection_appears_in_workspace_activity(client, db_session):
+    headers, broker_id = await _broker(client, "approvals-reject-activity@example.com")
+    client_id = await _client_record(client, headers)
+    approval = await _propose_task(db_session, broker_id, client_id)
+
+    await client.post(f"/approvals/{approval.id}/reject", headers=headers,
+                      json={"via": "ask_healthflow", "reason": "She already called back"})
+
+    activity = (await client.get("/workspace/activity", headers=headers)).json()
+    entry = next(item for item in activity if item["entity_id"] == str(approval.id))
+    assert entry["entity_type"] == "approval"
+    assert entry["action"] == "rejected"
+    assert entry["client_id"] == client_id
+    assert entry["summary"] == "Rejected task: Call Marjorie about the plan review"
+    assert entry["details"] == {"approval_id": str(approval.id), "via": "ask_healthflow"}
+    assert "She already called back" not in str(entry)
