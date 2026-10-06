@@ -107,18 +107,45 @@ def test_deploy_waits_for_ci_and_e2e_on_the_same_commit():
         assert "push" not in triggers, f"{name} on push would run separately from the release gate"
 
 
-def test_every_deploy_is_smoke_checked_and_rolled_back_when_the_check_fails():
+def test_every_deploy_is_smoke_checked_and_tagged_with_its_commit():
     steps = _workflow("release.yml")["jobs"]["deploy"]["steps"]
     by_id = {step.get("id"): index for index, step in enumerate(steps) if step.get("id")}
-    assert by_id["previous"] < by_id["deploy"] < by_id["smoke"] < by_id["rollback"]
-    assert "fly_release_image.sh" in steps[by_id["previous"]]["run"]
+    assert by_id["previous"] < by_id["deploy"] < by_id["smoke"]
+    deploy = steps[by_id["deploy"]]["run"]
+    assert '--image-label "git-$GITHUB_SHA"' in deploy, "Rollback and the deploy decision read the live commit"
+    assert 'echo "deployed=true" >> "$GITHUB_OUTPUT"' in deploy
     assert "smoke_deployed_routes.sh" in steps[by_id["smoke"]]["run"]
-    rollback = steps[by_id["rollback"]]
-    assert "fly_rollback.sh" in rollback["run"]
+
+
+def test_failed_lookups_stop_the_release_instead_of_writing_an_empty_value():
+    # `echo "x=$(cmd)"` succeeds even when cmd fails, so the value must be
+    # assigned on its own line, where the step's `bash -e` stops on failure.
+    jobs = _workflow("release.yml")["jobs"]
+    for job, step_id in (("deploy", "previous"), ("changes", "diff")):
+        run = next(step for step in jobs[job]["steps"] if step.get("id") == step_id)["run"]
+        assert not re.search(r'echo "[^"]*\$\(', run), f"{job}/{step_id} hides a failing lookup inside echo"
+
+
+def test_rollback_runs_in_its_own_job_with_its_own_time_budget():
+    jobs = _workflow("release.yml")["jobs"]
+    deploy, rollback = jobs["deploy"], jobs["rollback"]
+    assert rollback["needs"] == "deploy" or rollback["needs"] == ["deploy"]
     condition = rollback["if"].replace(" ", "")
-    assert "failure()" in condition and "steps.deploy.outcome=='success'" in condition, (
-        "Roll back only when a deploy went out and then failed its check"
+    assert "failure()" in condition and "needs.deploy.outputs.deployed=='true'" in condition, (
+        "Roll back only when this deploy went out and then failed"
     )
+    assert rollback["timeout-minutes"] >= 10
+    steps = {step.get("id"): step for step in deploy["steps"] if step.get("id")}
+    assert steps["deploy"]["timeout-minutes"] + steps["smoke"]["timeout-minutes"] < deploy["timeout-minutes"]
+    checkout = next(step for step in rollback["steps"] if "actions/checkout" in step.get("uses", ""))
+    assert checkout["with"]["fetch-depth"] == 0, "Rollback reads the live commit's fly.toml from history"
+    assert any("fly_rollback.sh" in step.get("run", "") for step in rollback["steps"])
+
+
+def test_deploy_decision_compares_with_the_live_commit_not_the_previous_push():
+    run = " ".join(step.get("run", "") for step in _workflow("release.yml")["jobs"]["changes"]["steps"])
+    assert "release_needs_deploy.sh" in run and "fly_release_image.sh" in run
+    assert "github.event.before" not in str(_workflow("release.yml")["jobs"]["changes"])
 
 
 def test_secret_scan_runs_on_every_pull_request_and_release():

@@ -139,3 +139,118 @@ def test_rollback_redeploys_the_previous_image_and_checks_it(tmp_path):
     deploy = calls.read_text()
     assert "deploy --app healthflow-demo --image registry.fly.io/healthflow-demo:deployment-GOOD" in deploy
     assert "OK /health: healthy JSON" in result.stdout
+
+
+NEEDS_DEPLOY = REPO_ROOT / "scripts" / "release_needs_deploy.sh"
+
+
+def _git(repo: Path, *args: str) -> str:
+    return subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True, text=True).stdout.strip()
+
+
+def _repo_with_two_fly_configs(tmp_path: Path) -> tuple[Path, str]:
+    """A repository whose fly.toml changed after the commit that is live on Fly."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "ci@example.com")
+    _git(repo, "config", "user.name", "CI")
+    (repo / "fly.toml").write_text("app = 'healthflow-demo'\n# known good\n")
+    (repo / "app.py").write_text("print('v1')\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-qm", "live")
+    live = _git(repo, "rev-parse", "HEAD")
+    (repo / "fly.toml").write_text("app = 'healthflow-demo'\n# broken config\n")
+    _git(repo, "commit", "-qam", "bad config")
+    return repo, live
+
+
+def _fake_flyctl_capturing_config(tmp_path: Path) -> tuple[dict, Path]:
+    env, calls = _fake_flyctl(tmp_path)
+    flyctl = Path(env["PATH"].split(":")[0]) / "flyctl"
+    flyctl.write_text(flyctl.read_text() + (
+        'while [ $# -gt 0 ]; do if [ "$1" = --config ]; then cat "$2" > '
+        f'"{tmp_path / "deployed-config.toml"}"; fi; shift; done\n'
+    ))
+    return env, calls
+
+
+def _rollback(repo: Path, env: dict, image: str):
+    server = _serve()
+    try:
+        env = env | {"HEALTHFLOW_BASE_URL": f"http://127.0.0.1:{server.server_port}",
+                     "SMOKE_ATTEMPTS": "2", "SMOKE_RETRY_DELAY": "0"}
+        return subprocess.run(["bash", str(ROLLBACK), image], cwd=repo, env=env,
+                              capture_output=True, text=True, timeout=60)
+    finally:
+        server.shutdown()
+
+
+def test_rollback_restores_the_fly_config_of_the_commit_that_was_live(tmp_path):
+    repo, live = _repo_with_two_fly_configs(tmp_path)
+    env, calls = _fake_flyctl_capturing_config(tmp_path)
+
+    result = _rollback(repo, env, f"registry.fly.io/healthflow-demo:git-{live}")
+
+    assert result.returncode == 0, result.stderr
+    assert f"--image registry.fly.io/healthflow-demo:git-{live}" in calls.read_text()
+    assert "known good" in (tmp_path / "deployed-config.toml").read_text()
+
+
+def test_rollback_of_an_unlabeled_image_warns_and_keeps_the_current_config(tmp_path):
+    repo, _ = _repo_with_two_fly_configs(tmp_path)
+    env, calls = _fake_flyctl_capturing_config(tmp_path)
+
+    result = _rollback(repo, env, "registry.fly.io/healthflow-demo:deployment-OLD")
+
+    assert result.returncode == 0, result.stderr
+    assert "no commit label" in result.stderr
+    assert "--config" not in calls.read_text()
+
+
+@pytest.mark.parametrize(("change", "expected"), [
+    ({"docs/notes.md": "updated"}, "false"),
+    ({"app.py": "print('v2')\n"}, "true"),
+])
+def test_deploy_decision_compares_with_the_commit_live_on_fly(tmp_path, change, expected):
+    repo, live = _repo_with_two_fly_configs(tmp_path)
+    _git(repo, "reset", "-q", "--hard", live)
+    # A shipped change already sits between the live commit and the docs-only push
+    # being released, as when a queued release is replaced by a newer one.
+    (repo / "app.py").write_text("print('queued')\n") if expected == "true" else None
+    for name, content in change.items():
+        (repo / name).parent.mkdir(parents=True, exist_ok=True)
+        (repo / name).write_text(content)
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-qm", "next")
+    target = _git(repo, "rev-parse", "HEAD")
+
+    result = subprocess.run(["bash", str(NEEDS_DEPLOY), f"registry.fly.io/healthflow-demo:git-{live}", target],
+                            cwd=repo, capture_output=True, text=True, timeout=30)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == expected
+
+
+def test_a_shipped_change_behind_a_docs_only_push_still_deploys(tmp_path):
+    repo, live = _repo_with_two_fly_configs(tmp_path)  # HEAD changed fly.toml after the live commit
+    (repo / "README.md").write_text("docs only\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-qm", "docs only")
+
+    result = subprocess.run(["bash", str(NEEDS_DEPLOY), f"registry.fly.io/healthflow-demo:git-{live}",
+                             _git(repo, "rev-parse", "HEAD")], cwd=repo, capture_output=True, text=True, timeout=30)
+
+    assert result.stdout.strip() == "true"
+
+
+@pytest.mark.parametrize("deployed_image", ["", "registry.fly.io/healthflow-demo:deployment-OLD",
+                                            "registry.fly.io/healthflow-demo:git-" + "0" * 40])
+def test_deploy_decision_deploys_when_the_live_commit_is_unknown(tmp_path, deployed_image):
+    repo, _ = _repo_with_two_fly_configs(tmp_path)
+
+    result = subprocess.run(["bash", str(NEEDS_DEPLOY), deployed_image, _git(repo, "rev-parse", "HEAD")],
+                            cwd=repo, capture_output=True, text=True, timeout=30)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "true"
