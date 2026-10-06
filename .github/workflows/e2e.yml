@@ -1,9 +1,9 @@
 name: E2E Tests
 
+# Pushes to main run this through release.yml, which deploys only if it passes.
 on:
   pull_request:
-  push:
-    branches: [main]
+  workflow_call:
 
 permissions:
   contents: read

@@ -134,3 +134,12 @@ def test_dependabot_keeps_pinned_actions_and_frontend_dependencies_current():
     ecosystems = {(update["package-ecosystem"], update["directory"]) for update in config["updates"]}
     assert ("github-actions", "/") in ecosystems
     assert ("npm", "/frontend") in ecosystems
+
+
+def test_secret_scanner_is_a_pinned_release_verified_by_checksum():
+    steps = yaml.safe_load((REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text())["jobs"]["secret-scan"]["steps"]
+    run = "\n".join(step.get("run", "") for step in steps)
+    assert re.search(r"GITLEAKS_VERSION=\d+\.\d+\.\d+", run), "Pin an exact gitleaks release"
+    assert re.search(r"GITLEAKS_SHA256=[0-9a-f]{64}", run) and "sha256sum -c" in run, (
+        "Verify the downloaded scanner before running it"
+    )

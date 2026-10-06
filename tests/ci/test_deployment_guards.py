@@ -70,7 +70,7 @@ def test_private_dependency_token_only_reaches_the_build_as_a_secret_mount():
     dockerfile = (REPO_ROOT / "Dockerfile").read_text()
     assert "--mount=type=secret,id=HEALTHFLOW_AGENTS_TOKEN,required=true" in dockerfile
     assert "ARG HEALTHFLOW_AGENTS_TOKEN" not in dockerfile
-    deploy_run = " ".join(step.get("run", "") for step in _workflow("fly-deploy.yml")["jobs"]["deploy"]["steps"])
+    deploy_run = " ".join(step.get("run", "") for step in _workflow("release.yml")["jobs"]["deploy"]["steps"])
     assert "--build-secret HEALTHFLOW_AGENTS_TOKEN=" in deploy_run
     assert "--build-arg" not in deploy_run
 
@@ -83,21 +83,106 @@ def test_shared_compose_requires_real_secrets_and_never_enables_test_mode():
         assert setting not in compose, f"docker-compose.yml sets {setting}; only the test override may"
 
 
-def test_fly_deploy_runs_only_from_main_and_smoke_checks_the_result():
-    workflow = _workflow("fly-deploy.yml")
-    triggers = workflow.get(True) or workflow.get("on")  # PyYAML reads the bare key `on` as True
+def _triggers(workflow: dict) -> dict:
+    return workflow.get(True) or workflow.get("on") or {}  # PyYAML reads the bare key `on` as True
+
+
+def test_release_runs_only_from_main():
+    triggers = _triggers(_workflow("release.yml"))
     assert set(triggers) == {"push"}
     assert triggers["push"]["branches"] == ["main"]
-    steps = workflow["jobs"]["deploy"]["steps"]
-    deploy_index = next(i for i, step in enumerate(steps) if "flyctl deploy" in step.get("run", ""))
-    assert any("smoke_deployed_routes.sh" in step.get("run", "") for step in steps[deploy_index + 1:]), (
-        "Every deploy must be followed by the deployed-route smoke check"
+    assert not (REPO_ROOT / ".github" / "workflows" / "fly-deploy.yml").exists(), (
+        "A second deploy workflow would bypass the release gates"
     )
+
+
+def test_deploy_waits_for_ci_and_e2e_on_the_same_commit():
+    jobs = _workflow("release.yml")["jobs"]
+    assert jobs["ci"]["uses"] == "./.github/workflows/ci.yml"
+    assert jobs["e2e"]["uses"] == "./.github/workflows/e2e.yml"
+    assert {"ci", "e2e"} <= set(jobs["deploy"]["needs"])
+    for name in ("ci.yml", "e2e.yml"):
+        triggers = _triggers(_workflow(name))
+        assert "workflow_call" in triggers, f"{name} must be callable by the release"
+        assert "push" not in triggers, f"{name} on push would run separately from the release gate"
+
+
+def test_every_deploy_is_smoke_checked_and_tagged_with_its_commit():
+    steps = _workflow("release.yml")["jobs"]["deploy"]["steps"]
+    by_id = {step.get("id"): index for index, step in enumerate(steps) if step.get("id")}
+    assert by_id["previous"] < by_id["deploy"] < by_id["smoke"]
+    deploy = steps[by_id["deploy"]]["run"]
+    assert '--image-label "git-$GITHUB_SHA"' in deploy, "Rollback and the deploy decision read the live commit"
+    assert 'echo "deployed=true" >> "$GITHUB_OUTPUT"' in deploy
+    assert "smoke_deployed_routes.sh" in steps[by_id["smoke"]]["run"]
+
+
+def test_failed_lookups_stop_the_release_instead_of_writing_an_empty_value():
+    # `echo "x=$(cmd)"` succeeds even when cmd fails, so the value must be
+    # assigned on its own line, where the step's `bash -e` stops on failure.
+    jobs = _workflow("release.yml")["jobs"]
+    for job, step_id in (("deploy", "previous"), ("changes", "diff")):
+        run = next(step for step in jobs[job]["steps"] if step.get("id") == step_id)["run"]
+        assert not re.search(r'echo "[^"]*\$\(', run), f"{job}/{step_id} hides a failing lookup inside echo"
+
+
+def test_rollback_runs_in_its_own_job_with_its_own_time_budget():
+    jobs = _workflow("release.yml")["jobs"]
+    deploy, rollback = jobs["deploy"], jobs["rollback"]
+    assert rollback["needs"] == "deploy" or rollback["needs"] == ["deploy"]
+    condition = rollback["if"].replace(" ", "")
+    assert "failure()" in condition and "needs.deploy.outputs.deployed=='true'" in condition, (
+        "Roll back only when this deploy went out and then failed"
+    )
+    assert rollback["timeout-minutes"] >= 10
+    steps = {step.get("id"): step for step in deploy["steps"] if step.get("id")}
+    assert steps["deploy"]["timeout-minutes"] + steps["smoke"]["timeout-minutes"] < deploy["timeout-minutes"]
+    checkout = next(step for step in rollback["steps"] if "actions/checkout" in step.get("uses", ""))
+    assert checkout["with"]["fetch-depth"] == 0, "Rollback reads the live commit's fly.toml from history"
+    assert any("fly_rollback.sh" in step.get("run", "") for step in rollback["steps"])
+
+
+def test_deploy_decision_compares_with_the_live_commit_not_the_previous_push():
+    run = " ".join(step.get("run", "") for step in _workflow("release.yml")["jobs"]["changes"]["steps"])
+    assert "release_needs_deploy.sh" in run and "fly_release_image.sh" in run
+    assert "github.event.before" not in str(_workflow("release.yml")["jobs"]["changes"])
+
+
+def test_secret_scan_runs_on_every_pull_request_and_release():
+    jobs = _workflow("ci.yml")["jobs"]
+    scan = jobs["secret-scan"]
+    checkout = next(step for step in scan["steps"] if "actions/checkout" in step.get("uses", ""))
+    assert checkout["with"]["fetch-depth"] == 0, "The scan must see the full history"
+    run = " ".join(step.get("run", "") for step in scan["steps"])
+    assert re.search(r'gitleaks"? git ', run), "Scan the git history, not only the checked-out files"
+    assert "--redact" in run, "Findings must never print the secret itself"
+
+
+def test_external_services_are_smoke_checked_nightly():
+    workflow = _workflow("nightly-external.yml")
+    triggers = _triggers(workflow)
+    assert triggers["schedule"], "The live check must run on a schedule"
+    assert "workflow_dispatch" in triggers
+    run = " ".join(step.get("run", "") for job in workflow["jobs"].values() for step in job["steps"])
+    assert "healthflow/tests/integration/" in run
+    env = {k: v for job in workflow["jobs"].values() for step in job["steps"] for k, v in (step.get("env") or {}).items()}
+    assert str(env.get("LIVE_SMOKE_TESTS")) == "1"
 
 
 def test_workflows_keep_read_only_tokens_and_avoid_pull_request_target():
     for path in sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml")):
         workflow = yaml.safe_load(path.read_text())
-        triggers = workflow.get(True) or workflow.get("on") or {}
+        triggers = _triggers(workflow)
         assert "pull_request_target" not in triggers, f"{path.name} runs untrusted code with secrets"
         assert workflow.get("permissions") == {"contents": "read"}, f"{path.name} must default to read-only"
+
+
+def test_each_browser_runs_e2e_on_its_own_runner():
+    # Splitting by browser gives each project its own 2-core runner instead of
+    # sharing one with the Docker stack, and the release still waits for all of them.
+    job = _workflow("e2e.yml")["jobs"]["e2e"]
+    assert job["strategy"]["fail-fast"] is False, "One browser failing must not cancel the others' results"
+    assert sorted(job["strategy"]["matrix"]["browser"]) == ["chromium", "firefox", "webkit"]
+    run = " ".join(step.get("run", "") for step in job["steps"])
+    assert "--project=${{ matrix.browser }}" in run
+    assert "playwright install --with-deps ${{ matrix.browser }}" in run

@@ -1,0 +1,120 @@
+name: Release
+
+# Every push to main runs the full CI and e2e suites on that exact commit, and
+# deploys to Fly.io only if both pass. A deploy that fails its smoke check is
+# rolled back to the release that was serving before it.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# One release at a time. Not cancelled mid-run: stopping a deploy or a rollback
+# halfway is worse than waiting. GitHub keeps only the newest queued release.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  e2e:
+    uses: ./.github/workflows/e2e.yml
+    secrets: inherit
+
+  changes:
+    name: Deployable changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      deployable: ${{ steps.diff.outputs.deployable }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be  # 1.5
+
+      - name: Skip the deploy when nothing shipped changed since the live commit
+        id: diff
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          FLY_APP: healthflow-demo
+        # Each value is assigned on its own line so a failed lookup stops the job.
+        run: |
+          live_image="$(bash scripts/fly_release_image.sh)"
+          deployable="$(bash scripts/release_needs_deploy.sh "$live_image" "$GITHUB_SHA")"
+          echo "deployable=$deployable" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Deploy to Fly.io
+    needs: [ci, e2e, changes]
+    if: needs.changes.outputs.deployable == 'true'
+    runs-on: ubuntu-latest
+    # Deploy and smoke are bounded below this limit; rollback runs in its own job.
+    timeout-minutes: 25
+    outputs:
+      previous_image: ${{ steps.previous.outputs.image }}
+      deployed: ${{ steps.deploy.outputs.deployed }}
+    env:
+      FLY_APP: healthflow-demo
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+
+      - uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be  # 1.5
+
+      - name: Record the release to roll back to
+        id: previous
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        # Assigned on its own line so a failed lookup stops the deploy.
+        run: |
+          image="$(bash scripts/fly_release_image.sh)"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Fly.io
+        id: deploy
+        timeout-minutes: 18
+        # The git-<commit> label lets a rollback restore this commit's fly.toml and
+        # lets the next release diff from what is actually live.
+        run: |
+          flyctl deploy --remote-only --app healthflow-demo --image-label "git-$GITHUB_SHA" --build-secret HEALTHFLOW_AGENTS_TOKEN=${{ secrets.HEALTHFLOW_AGENTS_TOKEN }}
+          echo "deployed=true" >> "$GITHUB_OUTPUT"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Check deployed health and direct routes
+        id: smoke
+        timeout-minutes: 5
+        run: bash scripts/smoke_deployed_routes.sh
+
+  rollback:
+    name: Roll back to the previous release
+    # Its own job and time budget: a slow deploy cannot use up the rollback's time.
+    # Runs only when this deploy went out and then failed. The release still shows
+    # as failed, so the broken commit is visible and GitHub notifies.
+    needs: deploy
+    if: failure() && needs.deploy.outputs.deployed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      FLY_APP: healthflow-demo
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be  # 1.5
+
+      - name: Redeploy the previous release and its fly.toml
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          PREVIOUS_IMAGE: ${{ needs.deploy.outputs.previous_image }}
+        run: bash scripts/fly_rollback.sh "$PREVIOUS_IMAGE"
