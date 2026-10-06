@@ -99,7 +99,12 @@ test('Enrollment filters clear a stale load error after a successful retry', asy
   await expect(authedPage.getByRole('alert')).toHaveCount(0)
 })
 
-test('Issue can resolve without an Appeal and Draft Appeal requires Issue context', async ({ authedPage }) => {
+test('Issue can resolve without an Appeal and Draft Appeal requires Issue context', async ({ authedPage, browserName }) => {
+  // OVE-156 / #95: in CI's Linux WebKit, Draft Appeal intermittently stops rendering
+  // after arriving from a resolved Issue (the DOM updates, frames do not), so a later
+  // click waits forever. Still flaky on Playwright 1.63 (2 of 3 runs passed), so the
+  // old WebKit build is not the cause. Chromium and Firefox run it; so does local WebKit.
+  test.fixme(browserName === 'webkit' && !!process.env.CI, 'OVE-156: Linux WebKit stops rendering on Draft Appeal after a resolved Issue')
   await authedPage.goto('/today')
   const client = await createClient(authedPage, 'Issue Context Client')
   await authedPage.getByRole('link', { name: 'Issues & Appeals' }).click()
