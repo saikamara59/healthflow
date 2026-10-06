@@ -14,9 +14,15 @@ concurrency:
 
 jobs:
   e2e:
+    name: e2e (${{ matrix.browser }})
+    # One runner per browser: a 2-core runner shared by three browsers and the
+    # Docker stack starved WebKit, which then timed out on still-moving elements.
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
     runs-on: ubuntu-latest
-    # Chromium, Firefox, and WebKit run the full suite; 15 minutes left too little headroom.
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,7 +40,7 @@ jobs:
 
       - name: Install Playwright browsers
         working-directory: frontend
-        run: npx playwright install --with-deps chromium firefox webkit
+        run: npx playwright install --with-deps ${{ matrix.browser }}
 
       - name: Run Playwright
         working-directory: frontend
@@ -47,13 +53,13 @@ jobs:
           EMAIL_PROVIDER: console
           FRONTEND_BASE_URL: https://test.example.com
           HEALTHFLOW_AGENTS_TOKEN: ${{ secrets.HEALTHFLOW_AGENTS_TOKEN }}
-        run: npm run test:e2e
+        run: npm run test:e2e -- --project=${{ matrix.browser }}
 
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-${{ github.run_id }}
+          name: playwright-report-${{ matrix.browser }}-${{ github.run_id }}
           path: frontend/playwright-report/
           retention-days: 14
 
@@ -61,6 +67,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-traces-${{ github.run_id }}
+          name: playwright-traces-${{ matrix.browser }}-${{ github.run_id }}
           path: frontend/test-results/
           retention-days: 14
