@@ -214,6 +214,7 @@ class OrganizationResponse(BaseModel):
 
 class TaskResponse(LinkedRecordFields):
     id: UUID
+    approval_id: UUID | None = None
     title: str
     notes: str | None
     priority: TaskPriority | None
@@ -234,6 +235,7 @@ class TaskResponse(LinkedRecordFields):
 
 class AppointmentResponse(LinkedRecordFields):
     id: UUID
+    approval_id: UUID | None = None
     title: str
     notes: str | None
     starts_at: datetime
@@ -358,3 +360,33 @@ class SearchResult(BaseModel):
     title: str
     subtitle: str
     href: str
+
+
+ApprovalKind = Literal["task", "appointment"]
+ApprovalState = Literal["pending", "approved", "rejected"]
+DecidedVia = Literal["ask_healthflow", "approvals_page"]
+
+
+class ApprovalProposer(BaseModel):
+    agent: str
+    model: str | None
+    source_type: str | None
+    source_id: UUID | None
+
+
+class ApprovalResponse(BaseModel):
+    id: UUID
+    kind: ApprovalKind
+    state: ApprovalState
+    client_id: UUID | None
+    proposer: ApprovalProposer
+    excerpt: str
+    note: str | None
+    proposed: dict
+    approved: dict | None
+    rejection_reason: str | None
+    decided_by: UUID | None
+    decided_at: datetime | None
+    decided_via: DecidedVia | None
+    created_record_id: UUID | None
+    created_at: datetime

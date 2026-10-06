@@ -115,7 +115,7 @@ async def test_non_access_token_does_not_set_context(session_factory):
     type should leave the ContextVar untouched."""
     from datetime import datetime, timedelta, timezone
 
-    from jose import jwt
+    import jwt
 
     from healthflow.auth.security import JWT_ALGORITHM, JWT_SECRET
 

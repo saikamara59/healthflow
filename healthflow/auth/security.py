@@ -3,7 +3,7 @@ import uuid as _uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from jose import JWTError, jwt
+import jwt
 from passlib.context import CryptContext
 
 _LEGACY_DEFAULT = "healthflow-dev-secret-change-in-production"
@@ -85,12 +85,12 @@ def decode_token(token: str) -> dict:
     """Decode and validate a JWT token.
 
     Raises:
-        JWTError: If the token is invalid, expired, or tampered with.
+        ValueError: If the token is invalid, expired, or tampered with.
     """
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         return payload
-    except JWTError as e:
+    except jwt.InvalidTokenError as e:
         raise ValueError(f"Invalid token: {e}") from e
 
 

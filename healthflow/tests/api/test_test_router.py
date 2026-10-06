@@ -28,6 +28,7 @@ from healthflow.auth.tenant_context import system_context
 from healthflow.database.models import (
     Appeal,
     Appointment,
+    Approval,
     Broker,
     BrokerPreference,
     Client,
@@ -201,6 +202,14 @@ async def test_reset_removes_workspace_records_before_reseeding_clients(monkeypa
                     client_id=seeded_client.id,
                     title="Reset Issue",
                 )
+                approval = Approval(
+                    broker_id=broker.id, client_id=seeded_client.id, kind="task",
+                    proposer_agent="ask_healthflow", excerpt="Reset proposal",
+                    proposed_values={"title": "Reset Task"}, state="approved",
+                )
+                session.add(approval)
+                await session.flush()
+                task.approval_id = approval.id
                 session.add_all([contact, task, appointment, preference, enrollment, issue])
                 await session.flush()
                 session.add(Appeal(broker_id=broker.id, issue_id=issue.id, title="Reset Appeal"))
@@ -224,6 +233,7 @@ async def test_reset_removes_workspace_records_before_reseeding_clients(monkeypa
                     Appeal,
                     Appointment,
                     Task,
+                    Approval,
                     Issue,
                     Enrollment,
                     Contact,

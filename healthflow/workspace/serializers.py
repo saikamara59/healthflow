@@ -80,6 +80,7 @@ def task_response(
     now = datetime.now(timezone.utc)
     return TaskResponse(
         id=task.id,
+        approval_id=task.approval_id,
         client_id=task.client_id,
         organization_id=task.organization_id,
         contact_id=task.contact_id,
@@ -116,6 +117,7 @@ def appointment_response(
         presentation_status = "needs_follow_up"
     return AppointmentResponse(
         id=appointment.id,
+        approval_id=appointment.approval_id,
         client_id=appointment.client_id,
         organization_id=appointment.organization_id,
         contact_id=appointment.contact_id,

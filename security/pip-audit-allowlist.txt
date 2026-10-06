@@ -1,0 +1,5 @@
+# Known vulnerabilities accepted after review. CI passes each ID to pip-audit
+# with --ignore-vuln. Every entry needs a reason and an expiry; an expired
+# entry fails the supply-chain tests so it is reviewed again.
+#
+# ID | expires (YYYY-MM-DD) | reason

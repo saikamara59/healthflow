@@ -65,6 +65,7 @@ def test_registry_lists_tenant_scoped_tables():
         "enrollments",
         "issues",
         "appeals",
+        "approvals",
         "workspace_activity",
         "workspace_search_tokens",
         "documents",

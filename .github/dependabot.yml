@@ -1,0 +1,31 @@
+# Keeps pinned dependencies current. Actions stay pinned to commit SHAs; Dependabot
+# updates the SHA and its version comment together. requirements.lock is produced
+# by `make lock` (uv, Python 3.12), so app Python dependencies are refreshed there.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      frontend-minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-name: pytest
+      - dependency-name: pyyaml
+      - dependency-name: pip-audit
+      - dependency-name: ruff

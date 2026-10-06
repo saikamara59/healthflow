@@ -15,12 +15,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Python deps. The private GitHub credential is a BuildKit secret: Git
 # reads it through an ephemeral helper and neither the token nor helper config
 # is persisted in the image layer.
-COPY requirements.txt .
+# requirements.lock pins every package for Python 3.12; see scripts/lock_requirements.sh.
+COPY requirements.lock .
 RUN --mount=type=secret,id=HEALTHFLOW_AGENTS_TOKEN,required=true \
     GIT_CONFIG_COUNT=1 \
     GIT_CONFIG_KEY_0=credential.helper \
     GIT_CONFIG_VALUE_0='!f() { echo "username=x-access-token"; echo "password=$(cat /run/secrets/HEALTHFLOW_AGENTS_TOKEN)"; }; f' \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.lock
 
 # Copy app code
 COPY healthflow/ healthflow/
@@ -44,8 +45,8 @@ FROM node:20-slim AS frontend-build
 WORKDIR /app/frontend
 
 # Install deps
-COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm install
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
 
 # Build
 COPY frontend/ .
@@ -53,7 +54,7 @@ RUN npm run build
 
 
 # ── Frontend Serve ───────────────────────────────────────────────────────────
-FROM nginx:alpine AS frontend
+FROM nginx:1.30-alpine AS frontend
 
 # Copy built assets
 COPY --from=frontend-build /app/frontend/dist /usr/share/nginx/html
