@@ -6,7 +6,7 @@ import uuid as _uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from jose import jwt as _jwt
+import jwt as _jwt
 from sqlalchemy import select
 
 import healthflow.auth.security as security

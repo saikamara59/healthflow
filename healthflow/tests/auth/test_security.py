@@ -79,3 +79,28 @@ def test_tampered_token_raises():
     tampered = head + ".AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
     with pytest.raises(Exception):
         decode_token(tampered)
+
+
+@pytest.mark.parametrize("algorithm", ["HS512", "none"])
+def test_tokens_signed_with_any_other_algorithm_are_rejected(algorithm):
+    # Algorithm confusion (GHSA-3qf3-8w2g-rqmx and CVE-2024-33663 in python-jose)
+    # works only when a service accepts an algorithm it did not choose.
+    import base64
+    import hashlib
+    import hmac
+    import json
+
+    from healthflow.auth.security import JWT_SECRET
+
+    def segment(data: bytes) -> str:
+        return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+    header = segment(json.dumps({"alg": algorithm, "typ": "JWT"}).encode())
+    body = segment(json.dumps({"sub": "broker-123", "type": "access", "exp": 4102444800}).encode())
+    signing_input = f"{header}.{body}".encode()
+    signature = (
+        segment(hmac.new(JWT_SECRET.encode(), signing_input, hashlib.sha512).digest())
+        if algorithm == "HS512" else ""
+    )
+    with pytest.raises(ValueError, match="Invalid token"):
+        decode_token(f"{header}.{body}.{signature}")

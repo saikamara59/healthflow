@@ -1,6 +1,6 @@
 import pytest
 from datetime import datetime, timedelta, timezone
-from jose import jwt
+import jwt
 
 from healthflow.auth.security import JWT_SECRET, JWT_ALGORITHM
 

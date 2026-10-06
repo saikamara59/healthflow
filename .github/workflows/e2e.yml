@@ -47,7 +47,7 @@ jobs:
         env:
           CI: true
           ANTHROPIC_API_KEY: test-key-not-used
-          JWT_SECRET: test-secret
+          JWT_SECRET: test-secret-for-e2e-only-not-production
           # All-zeros 32-byte test key (base64). Real prod uses a random key in secrets manager.
           PHI_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
           EMAIL_PROVIDER: console

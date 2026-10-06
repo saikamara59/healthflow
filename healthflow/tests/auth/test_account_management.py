@@ -120,7 +120,7 @@ async def test_password_reset_token_model_persists(db_session):
 def test_create_password_reset_token_embeds_jti_and_type():
     """create_password_reset_token returns a JWT with type='reset' and the given jti."""
     import uuid as _uuid
-    from jose import jwt
+    import jwt
     from healthflow.auth.security import (
         JWT_ALGORITHM,
         JWT_SECRET,

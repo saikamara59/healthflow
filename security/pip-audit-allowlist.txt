@@ -3,4 +3,3 @@
 # entry fails the supply-chain tests so it is reviewed again.
 #
 # ID | expires (YYYY-MM-DD) | reason
-PYSEC-2026-1325 | 2027-01-05 | ecdsa (via python-jose) has no fixed release; HealthFlow signs and verifies JWTs with HS256 only and decode pins algorithms=["HS256"], so ecdsa code paths are never reached.
