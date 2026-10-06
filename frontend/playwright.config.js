@@ -11,6 +11,10 @@ export default defineConfig({
   reporter: [['html', { open: 'never' }], ['list']],
   use: {
     baseURL: 'http://localhost:5173',
+    // The app honors prefers-reduced-motion (MotionConfig reducedMotion="user"), so
+    // tests act on settled elements instead of waiting out layout animations, which
+    // left WebKit clicks "not stable" on slow CI runners.
+    reducedMotion: 'reduce',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
