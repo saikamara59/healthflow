@@ -99,12 +99,7 @@ test('Enrollment filters clear a stale load error after a successful retry', asy
   await expect(authedPage.getByRole('alert')).toHaveCount(0)
 })
 
-test('Issue can resolve without an Appeal and Draft Appeal requires Issue context', async ({ authedPage, browserName }) => {
-  // OVE-156: in CI's Linux WebKit the page stops rendering after the Status change
-  // (the DOM moves on to Draft Appeal while the screen keeps the Issue), so every
-  // later click waits forever for a frame. Started 2026-10-06 regardless of commit;
-  // passes in the pinned Playwright image. Chromium and Firefox still run it.
-  test.fixme(browserName === 'webkit' && !!process.env.CI, 'OVE-156: Linux WebKit stops rendering after the Status change')
+test('Issue can resolve without an Appeal and Draft Appeal requires Issue context', async ({ authedPage }) => {
   await authedPage.goto('/today')
   const client = await createClient(authedPage, 'Issue Context Client')
   await authedPage.getByRole('link', { name: 'Issues & Appeals' }).click()
