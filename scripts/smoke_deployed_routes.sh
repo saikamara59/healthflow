@@ -39,6 +39,6 @@ check_path() {
 }
 
 check_path /health
-for path in / /today /overview /clients /enrollments /issues /documents /documents/archive; do
+for path in / /today /overview /clients /enrollments /issues /documents /documents/archive /approvals; do
   check_path "$path"
 done

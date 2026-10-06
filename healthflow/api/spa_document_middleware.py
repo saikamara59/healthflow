@@ -9,7 +9,8 @@ from starlette.responses import Response
 
 
 # These browser routes overlap API GET routes. Other browser routes reach the
-# existing catch-all fallback without special handling.
+# existing catch-all fallback without special handling. A test derives the pages
+# from App.jsx and fails when a page shares a path with an API route not listed here.
 SPA_DOCUMENT_PATHS = {
     "/clients",
     "/organizations",
@@ -19,6 +20,8 @@ SPA_DOCUMENT_PATHS = {
     "/activity",
     "/history",
     "/feedback",
+    "/documents",
+    "/approvals",
 }
 SPA_DOCUMENT_DETAIL_PREFIXES = ("/clients/", "/organizations/")
 
