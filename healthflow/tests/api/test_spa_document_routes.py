@@ -46,6 +46,8 @@ def test_combined_app_routes_documents_to_react_and_json_to_api(tmp_path):
                 ("POST", "/enrollments", "text/html"),
                 ("GET", "/enrollments/00000000-0000-0000-0000-000000000001", "text/html"),
                 ("GET", "/health", "text/html"),
+                ("GET", "/documents", "text/html"),
+                ("GET", "/approvals", "text/html"),
             ]
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
                 responses = []
@@ -87,6 +89,12 @@ def test_combined_app_routes_documents_to_react_and_json_to_api(tmp_path):
         if index:
             assert "accept" in vary.lower()
             assert "no-store" in cache_control.lower()
+    # Pages added after the original cases: Documents and Approvals share paths with APIs.
+    for index in (len(responses) - 2, len(responses) - 1):
+        status, content_type, body, _, _ = responses[index]
+        assert status == 200
+        assert content_type.startswith("text/html")
+        assert "HealthFlow app" in body
     for index in (6, 8, 10, 11, 12, 13, 14):
         status, content_type, _, vary, _ = responses[index]
         assert status == 401
@@ -99,3 +107,33 @@ def test_combined_app_routes_documents_to_react_and_json_to_api(tmp_path):
         entry["method"] == "GET" and entry["path"] == "/enrollments" and entry["status"] == 200
         for entry in output["logs"]
     )
+
+
+def test_every_app_page_that_shares_a_path_with_an_api_route_is_served_as_the_app():
+    """A browser opening any page must get the app, never a same-path API's JSON.
+
+    Pages come from App.jsx, so a new page or a new API route that collides
+    fails here instead of on a broker's refresh (as /documents and /approvals did).
+    """
+    import re
+    from pathlib import Path
+
+    from healthflow.api.spa_document_middleware import is_spa_path
+    from healthflow.main import app
+
+    repo = Path(__file__).resolve().parents[3]
+    pages = set(re.findall(r'path="([^"]+)"', (repo / "frontend" / "src" / "App.jsx").read_text()))
+    api_get_routes = [
+        route.path for route in app.routes
+        if "GET" in getattr(route, "methods", set()) and not route.path.startswith("/{")
+    ]
+    unhandled = []
+    for page in sorted(pages - {"/", "*"}):
+        concrete = re.sub(r":[A-Za-z]+", "00000000-0000-0000-0000-000000000001", "/" + page.lstrip("/"))
+        shadowing = [
+            route for route in api_get_routes
+            if re.fullmatch(re.sub(r"\{[^}]+\}", "[^/]+", route), concrete)
+        ]
+        if shadowing and not is_spa_path(concrete):
+            unhandled.append(f"{concrete} is shadowed by API {shadowing}")
+    assert unhandled == [], "Add these pages to SPA_DOCUMENT_PATHS: " + "; ".join(unhandled)
