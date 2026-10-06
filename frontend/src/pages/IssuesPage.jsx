@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
 import { CalendarPlus, CheckCircle, ListPlus, PencilSimpleLine } from '@phosphor-icons/react'
 import { workspaceApi } from '../api/workspace'
+import { dateInZone } from '../api/workspaceTime'
 import TopBar from '../components/TopBar'
 import DocumentList from '../components/DocumentList'
 import PageHead from '../components/ui/PageHead'
@@ -21,16 +22,17 @@ const EASE = [0.22, 1, 0.36, 1]
 
 const formatDate = (iso) => (iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set')
 
-// Days until an ISO date, in the broker's calendar (midday avoids DST edges).
-function daysUntil(iso) {
+// Days until an ISO date, counted from today in the workspace time zone rather
+// than the device's, so a broker travelling or working near midnight sees the
+// same countdown as their workspace calendar.
+function daysUntil(iso, timeZone) {
   if (!iso) return null
-  const today = new Date()
-  today.setHours(12, 0, 0, 0)
-  return Math.round((new Date(`${iso}T12:00:00`) - today) / 86400000)
+  const dayNumber = (date) => Date.UTC(...date.split('-').map((part, index) => Number(part) - (index === 1 ? 1 : 0)))
+  return Math.round((dayNumber(iso) - dayNumber(dateInZone(new Date(), timeZone))) / 86400000)
 }
 
-function DeadlineLabel({ iso, resolved }) {
-  const days = daysUntil(iso)
+function DeadlineLabel({ iso, resolved, timeZone }) {
+  const days = daysUntil(iso, timeZone)
   if (days === null) return <>No deadline</>
   if (resolved) return <>Due {formatDate(iso)}</>
   if (days < 0) return <span className="ws-due neg">Overdue · {formatDate(iso)}</span>
@@ -149,7 +151,7 @@ export default function IssuesPage() {
                     transition={{ duration: 0.28, ease: EASE }}
                   >
                     <button className="phase2-row-button" aria-current={selected?.id === item.id ? 'true' : undefined} onClick={() => open(item)}>
-                      <span><strong>{item.title}</strong><small>{item.client_name} · <DeadlineLabel iso={item.deadline} resolved={item.status === 'resolved'} /></small></span>
+                      <span><strong>{item.title}</strong><small>{item.client_name} · <DeadlineLabel iso={item.deadline} resolved={item.status === 'resolved'} timeZone={timeZone} /></small></span>
                     </button>
                     <span className={`chip ${TONE[item.status]}`}>{STATUS[item.status]}</span>
                   </motion.li>
@@ -166,7 +168,7 @@ export default function IssuesPage() {
               <h2 className="ws-detail-title">{selected.title}</h2>
               <div className="workspace-form-grid ws-detail-meta">
                 <label className="workspace-filter">Status<select value={selected.status} onChange={(event) => setStatus(event.target.value)}>{Object.entries(STATUS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-                <div className="ws-kv"><small>Deadline</small><strong><DeadlineLabel iso={selected.deadline} resolved={selected.status === 'resolved'} /></strong></div>
+                <div className="ws-kv"><small>Deadline</small><strong><DeadlineLabel iso={selected.deadline} resolved={selected.status === 'resolved'} timeZone={timeZone} /></strong></div>
               </div>
               {selected.description && <p className="ws-desc">{selected.description}</p>}
 

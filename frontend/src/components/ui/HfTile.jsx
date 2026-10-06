@@ -1,6 +1,6 @@
 import {
   ArrowsClockwise, ArrowsLeftRight, BookOpenText, Buildings, Calculator, CalendarBlank, ChatCircleDots,
-  ClipboardText, Clock, ClockCounterClockwise, EnvelopeSimple, FileText, IdentificationBadge, LinkSimple,
+  ClipboardText, Clock, ClockCounterClockwise, EnvelopeSimple, FileText, GearSix, IdentificationBadge, LinkSimple,
   PencilSimpleLine, PlugsConnected, SealCheck, SquaresFour, Stamp, UsersThree, WarningCircle,
 } from '@phosphor-icons/react'
 import { OrgMark } from './OrgLogo'
@@ -9,7 +9,7 @@ export const HF_ICONS = {
   today: Clock, approve: Stamp, overview: SquaresFour, clients: UsersThree, orgs: Buildings, enroll: ClipboardText,
   issues: WarningCircle, docs: FileText, follow: ArrowsClockwise, cal: CalendarBlank, ask: ChatCircleDots,
   compare: ArrowsLeftRight, cost: Calculator, network: SealCheck, explain: BookOpenText, appeal: PencilSimpleLine,
-  history: ClockCounterClockwise, team: IdentificationBadge, connect: PlugsConnected, mail: EnvelopeSimple,
+  history: ClockCounterClockwise, team: IdentificationBadge, connect: PlugsConnected, mail: EnvelopeSimple, settings: GearSix,
 }
 
 // Colored duotone icon tile. `color` picks the tint independently of the icon.

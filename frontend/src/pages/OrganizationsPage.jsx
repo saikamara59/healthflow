@@ -176,12 +176,14 @@ export default function OrganizationsPage() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const savingRef = useRef(false)
-  const load = () => { forgetOrganizationWebsites(); return workspaceApi.listOrganizations(false, showArchived).then((data) => { setOrganizations(data); setError('') }) }
+  // Archived records load on both tabs: the tab filter below picks what is shown, and
+  // the common-carrier check must see archived carriers so it never offers a duplicate.
+  const load = () => { forgetOrganizationWebsites(); return workspaceApi.listOrganizations(false, true).then((data) => { setOrganizations(data); setError('') }) }
   useEffect(() => {
     let alive = true
     setOrganizations(null)
     setOpen(null)
-    workspaceApi.listOrganizations(false, showArchived).then((data) => { if (alive) { setOrganizations(data); setError('') } }).catch(() => { if (alive) setError('Organizations could not be loaded.') })
+    workspaceApi.listOrganizations(false, true).then((data) => { if (alive) { setOrganizations(data); setError('') } }).catch(() => { if (alive) setError('Organizations could not be loaded.') })
     return () => { alive = false }
   }, [showArchived])
   function openForm(item = {}) {

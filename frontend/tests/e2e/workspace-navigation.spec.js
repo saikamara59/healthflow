@@ -108,7 +108,7 @@ test('archived organizations can be restored from the directory', async ({ authe
 test('a failed Organization list refresh does not report a failed save', async ({ authedPage }) => {
   await authedPage.goto('/organizations')
   await expect(authedPage.getByLabel('Filter Organizations')).toBeVisible()
-  await authedPage.route('**/organizations?include_contacts=false&include_archived=false', (route) =>
+  await authedPage.route('**/organizations?include_contacts=false&include_archived=true', (route) =>
     route.fulfill({ status: 503, contentType: 'application/json', body: '{"detail":"Unavailable"}' }))
   await authedPage.getByRole('button', { name: 'New Organization' }).click()
   await authedPage.getByLabel('Organization name').fill('Saved Harbor')

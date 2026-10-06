@@ -14,7 +14,7 @@ import { ActivityRow, activityFromTool, activityFromWorkspace } from '../compone
 const CARDS = [
   { key: 'clients', label: 'Clients', to: '/clients', target: 'Clients', icon: 'clients' },
   { key: 'organizations', label: 'Organizations', to: '/organizations', target: 'Organizations', icon: 'orgs' },
-  { key: 'open_tasks', label: 'Open tasks', to: '/follow-ups', target: 'Follow-ups', icon: 'follow' },
+  { key: 'open_tasks', label: 'Open tasks', to: '/today', target: 'Today', icon: 'follow' },
   { key: 'overdue_tasks', label: 'Overdue tasks', to: '/today', target: 'Today', icon: 'today', alert: true },
   { key: 'appointments_next_seven_days', label: 'Upcoming appointments', to: '/scheduling', target: 'Scheduling', icon: 'cal' },
   { key: 'active_enrollments', label: 'Active enrollments', to: '/enrollments', target: 'Enrollments', icon: 'enroll' },
@@ -31,6 +31,7 @@ export default function OverviewPage() {
   const [zone, setZone] = useState(undefined)
   const [error, setError] = useState('')
   const [historyWarning, setHistoryWarning] = useState('')
+  const [scheduleError, setScheduleError] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -50,6 +51,8 @@ export default function OverviewPage() {
           .filter((item) => item.status === 'scheduled' && new Date(item.starts_at) >= now)
           .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at))
           .slice(0, 4))
+      } else {
+        setScheduleError(true)
       }
       if (preferences.status === 'fulfilled') setZone(preferences.value.timezone_name)
     })
@@ -116,7 +119,7 @@ export default function OverviewPage() {
                 </div>
               ))}
               <h3 className="workspace-subheading">Next 7 days</h3>
-              {upcoming.length ? <ul className="workspace-list">{upcoming.map((item) => <li key={item.id} className="workspace-list-row"><div className="workspace-row-copy"><Link to={`/scheduling?appointment=${item.id}`}>{item.title}</Link><small>{when(item.starts_at)}{item.client_name ? ` · ${item.client_name}` : ''}</small></div></li>)}</ul> : <p className="workspace-empty">No meetings in the next week.</p>}
+              {upcoming.length ? <ul className="workspace-list">{upcoming.map((item) => <li key={item.id} className="workspace-list-row"><div className="workspace-row-copy"><Link to={`/scheduling?appointment=${item.id}`}>{item.title}</Link><small>{when(item.starts_at)}{item.client_name ? ` · ${item.client_name}` : ''}</small></div></li>)}</ul> : scheduleError ? <p role="alert" className="workspace-error">Upcoming meetings could not be loaded. Refresh to try again.</p> : <p className="workspace-empty">No meetings in the next week.</p>}
             </section>
             <section className="card workspace-section">
               <h2>More views</h2>

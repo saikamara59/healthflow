@@ -47,6 +47,7 @@ const NAV = [
   },
   {
     group: 'Administration',
+    adminOnly: true,
     items: [
       { path: '/admin', label: 'Team', icon: 'team' },
     ],
@@ -54,6 +55,7 @@ const NAV = [
   {
     group: 'Settings',
     items: [
+      { path: '/settings', label: 'Settings', icon: 'settings', end: true },
       { path: '/connectors', label: 'Connectors', icon: 'connect' },
     ],
   },
@@ -94,7 +96,7 @@ export default function Sidebar({ open, onClose }) {
         {/* Scrollable nav region so the bottom user-chip (with Sign out) stays
             in the viewport even when nav groups exceed 100vh. */}
         <nav aria-label="Primary" style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-          {NAV.map((group) => (
+          {NAV.filter((group) => !group.adminOnly || user?.role === 'admin').map((group) => (
             <div key={group.group} className="nav-group">
               <div className="nav-group-label">{group.group}</div>
               {group.items.map((item) => (

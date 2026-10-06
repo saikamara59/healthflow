@@ -88,18 +88,30 @@ export default function DocumentsPage() {
     if (!upload.client_id) { setUploadError('Choose a client before uploading.'); return }
     if (!upload.file) { setUploadError('Choose a file to upload.'); return }
     setBusy('upload'); setUploadError('')
+    let created
     try {
-      const created = await api.uploadDocument(upload.client_id, upload.file)
-      if (upload.related) {
-        const [target_type, target_id] = upload.related.split(':')
-        await api.post(`/documents/${created.id}/links`, { target_type, target_id })
-      }
-      setUpload({ client_id: upload.client_id, related: '', file: null })
-      if (fileRef.current) fileRef.current.value = ''
-      window.dispatchEvent(new Event('healthflow:documents-changed'))
+      created = await api.uploadDocument(upload.client_id, upload.file)
     } catch (err) {
       setUploadError(err.message || 'Document could not be uploaded.')
-    } finally { setBusy(null) }
+      setBusy(null)
+      return
+    }
+    // The Document exists from here on, so the form is cleared even if linking
+    // fails; retrying the upload would store a second copy.
+    const name = upload.file.name
+    const related = upload.related
+    setUpload({ client_id: upload.client_id, related: '', file: null })
+    if (fileRef.current) fileRef.current.value = ''
+    if (related) {
+      const [target_type, target_id] = related.split(':')
+      try {
+        await api.post(`/documents/${created.id}/links`, { target_type, target_id })
+      } catch (err) {
+        setUploadError(`${name} was uploaded, but it could not be linked to the selected record${err.message ? ` (${err.message})` : ''}. It is in the list below; do not upload it again.`)
+      }
+    }
+    window.dispatchEvent(new Event('healthflow:documents-changed'))
+    setBusy(null)
   }
 
   async function act(doc, action) {
