@@ -63,18 +63,38 @@ export default function EnrollmentsPage() {
   const [error, setError] = useState('')
   const [documentRecord, setDocumentRecord] = useState(null)
   const formRef = useRef(null)
+  // Only the newest list request may update the page: the Status filter is
+  // usable while the initial list loads, and a late response must not replace a
+  // newer filter's result or clear its error.
+  const listGeneration = useRef(0)
 
   async function refresh(nextFilter = filter) {
+    const generation = ++listGeneration.current
     const query = nextFilter ? `status=${encodeURIComponent(nextFilter)}` : ''
-    setEnrollments(await workspaceApi.listEnrollments(query))
+    const records = await workspaceApi.listEnrollments(query)
+    if (generation !== listGeneration.current) return
+    setEnrollments(records)
     setError('')
+  }
+
+  async function applyFilter(value) {
+    setFilter(value)
+    const generation = listGeneration.current + 1
+    try {
+      await refresh(value)
+    } catch {
+      if (generation === listGeneration.current) setError('Enrollments could not be filtered.')
+    }
   }
 
   useEffect(() => {
     let alive = true
+    const generation = ++listGeneration.current
     Promise.all([workspaceApi.listEnrollments(), workspaceApi.listLinkableClients()]).then(([records, clientData]) => {
-      if (alive) { setEnrollments(records); setClients(clientData); setError('') }
-    }).catch(() => { if (alive) setError('Enrollments could not be loaded.') })
+      if (!alive) return
+      setClients(clientData)
+      if (generation === listGeneration.current) { setEnrollments(records); setError('') }
+    }).catch(() => { if (alive && generation === listGeneration.current) setError('Enrollments could not be loaded.') })
     return () => { alive = false }
   }, [])
 
@@ -136,7 +156,7 @@ export default function EnrollmentsPage() {
         <section className="card workspace-section">
           <div className="between ws-sec-head">
             <h2>Enrollment work</h2>
-            <label className="workspace-filter ws-inline-filter">Status<select value={filter} onChange={async (event) => { const value = event.target.value; setFilter(value); try { await refresh(value) } catch { setError('Enrollments could not be filtered.') } }}><option value="">All</option>{Object.entries(LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            <label className="workspace-filter ws-inline-filter">Status<select value={filter} onChange={(event) => applyFilter(event.target.value)}><option value="">All</option>{Object.entries(LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           </div>
           {error && <p role="alert" className="workspace-error">{error}</p>}
           {!enrollments && !error && <p role="status" className="workspace-empty">Loading enrollments…</p>}
