@@ -182,6 +182,13 @@ async def list_documents(client_id: UUID, broker: Broker = Depends(get_current_b
     ).order_by(Document.created_at.desc()))).scalars().all()
 
 
+@documents_router.get("/documents/active", response_model=list[DocumentResponse])
+async def active_documents(broker: Broker = Depends(get_current_broker), db: AsyncSession = Depends(get_db)):
+    return (await db.execute(select(Document).where(
+        Document.broker_id == broker.id, Document.archived_at.is_(None),
+    ).order_by(Document.created_at.desc()))).scalars().all()
+
+
 @documents_router.get("/documents/archived", response_model=list[DocumentResponse])
 async def archived_documents(broker: Broker = Depends(get_current_broker), db: AsyncSession = Depends(get_db)):
     return (await db.execute(select(Document).where(

@@ -41,6 +41,16 @@ from healthflow.database.models import (
 from healthflow.seed_data import worker_email
 
 
+@pytest.fixture(autouse=True)
+def isolated_database_url(monkeypatch, tmp_path):
+    """Point the reloaded production config at a temporary database.
+
+    Without this, DATABASE_URL falls back to sqlite:///healthflow.db and every
+    reset seeds test-key-encrypted clients into the developer's local database.
+    """
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path / 'reset.sqlite'}")
+
+
 async def _build_client(db_session_factory):
     """Reload healthflow.main and return an AsyncClient against the fresh app.
 

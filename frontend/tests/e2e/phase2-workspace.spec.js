@@ -41,7 +41,7 @@ test('Enrollment selector offers only Clients the Broker can link', async ({ aut
   await selector.selectOption(ownClient.id)
   await authedPage.getByLabel('Plan name').fill('Harbor Gold PPO')
   await authedPage.getByRole('button', { name: 'Create Enrollment' }).click()
-  await expect(authedPage.getByText('Enrollment owner client · Harbor Gold PPO', { exact: true })).toBeVisible()
+  await expect(authedPage.locator('.ws-enr').filter({ hasText: 'Enrollment owner client' })).toContainText('Harbor Gold PPO')
   await expect(authedPage.getByRole('alert')).toHaveCount(0)
 })
 
@@ -69,19 +69,19 @@ test('Broker reviews an Enrollment before confirming an external submission', as
   await authedPage.getByLabel('Client').selectOption(client.id)
   await authedPage.getByLabel('Plan name').fill('Harbor Gold PPO')
   await authedPage.getByRole('button', { name: 'Create Enrollment' }).click()
-  await expect(authedPage.getByText('Enrollment Review Client · Harbor Gold PPO', { exact: true })).toBeVisible()
-  const enrollmentRow = authedPage.locator('.workspace-list-row').filter({ hasText: 'Enrollment Review Client · Harbor Gold PPO' })
+  const enrollmentRow = authedPage.locator('.ws-enr').filter({ hasText: 'Enrollment Review Client' })
+  await expect(enrollmentRow).toContainText('Harbor Gold PPO')
+  const status = enrollmentRow.locator('.ws-enr-head .chip')
 
-  await authedPage.getByRole('button', { name: 'Ready to submit' }).click()
-  await expect(enrollmentRow.locator('small')).toContainText('Ready to submit')
+  await enrollmentRow.getByRole('button', { name: 'Mark ready to submit' }).click()
+  await expect(status).toHaveText('Ready to submit')
 
-  authedPage.once('dialog', (dialog) => dialog.dismiss())
-  await authedPage.getByRole('button', { name: 'Mark Submitted' }).click()
-  await expect(enrollmentRow.locator('small')).toContainText('Ready to submit')
-
-  authedPage.once('dialog', (dialog) => dialog.accept())
-  await authedPage.getByRole('button', { name: 'Mark Submitted' }).click()
-  await expect(enrollmentRow.locator('small')).toContainText('Submitted')
+  // Recording the submission stays locked until the Broker attests to it.
+  const record = enrollmentRow.getByRole('button', { name: 'Record as submitted' })
+  await expect(record).toBeDisabled()
+  await enrollmentRow.getByLabel('I confirm the external submission succeeded').check()
+  await record.click()
+  await expect(status).toHaveText('Submitted')
 })
 
 test('Enrollment filters clear a stale load error after a successful retry', async ({ authedPage }) => {
@@ -99,7 +99,12 @@ test('Enrollment filters clear a stale load error after a successful retry', asy
   await expect(authedPage.getByRole('alert')).toHaveCount(0)
 })
 
-test('Issue can resolve without an Appeal and Draft Appeal requires Issue context', async ({ authedPage }) => {
+test('Issue can resolve without an Appeal and Draft Appeal requires Issue context', async ({ authedPage, browserName }) => {
+  // OVE-156: in CI's Linux WebKit the page stops rendering after the Status change
+  // (the DOM moves on to Draft Appeal while the screen keeps the Issue), so every
+  // later click waits forever for a frame. Started 2026-10-06 regardless of commit;
+  // passes in the pinned Playwright image. Chromium and Firefox still run it.
+  test.fixme(browserName === 'webkit' && !!process.env.CI, 'OVE-156: Linux WebKit stops rendering after the Status change')
   await authedPage.goto('/today')
   const client = await createClient(authedPage, 'Issue Context Client')
   await authedPage.getByRole('link', { name: 'Issues & Appeals' }).click()

@@ -15,6 +15,8 @@ from healthflow.database.models import (
     BrokerPreference,
     Client,
     Contact,
+    Enrollment,
+    Issue,
     Organization,
     Task,
     WorkspaceActivity,
@@ -180,6 +182,19 @@ async def get_overview(
         Appointment.broker_id == broker.id, Appointment.status == "scheduled",
         Appointment.starts_at >= day_start, Appointment.starts_at < week_end,
     ))
+    active_enrollments = await db.scalar(select(func.count(Enrollment.id)).where(
+        Enrollment.broker_id == broker.id,
+        Enrollment.status.in_(("preparing", "ready_to_submit", "submitted")),
+    ))
+    open_issues = await db.scalar(select(func.count(Issue.id)).where(
+        Issue.broker_id == broker.id, Issue.status != "resolved"
+    ))
+    open_follow_ups = await db.scalar(select(func.count(Task.id)).where(
+        Task.broker_id == broker.id, Task.status == "open", Task.is_follow_up.is_(True)
+    ))
+    unscheduled_tasks = await db.scalar(select(func.count(Task.id)).where(
+        Task.broker_id == broker.id, Task.status == "open", Task.due_at.is_(None)
+    ))
     activity = (
         await db.execute(
             select(WorkspaceActivity).order_by(WorkspaceActivity.created_at.desc()).limit(10)
@@ -195,6 +210,10 @@ async def get_overview(
         open_tasks=tasks,
         overdue_tasks=overdue_tasks,
         appointments_next_seven_days=upcoming_appointments,
+        active_enrollments=active_enrollments,
+        open_issues=open_issues,
+        open_follow_ups=open_follow_ups,
+        unscheduled_tasks=unscheduled_tasks,
         recent_activity=[activity_response(entry) for entry in activity],
         recent_clients=[RecentClientResponse(
             id=client.id, full_name=client.full_name, updated_at=client.updated_at

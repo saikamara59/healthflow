@@ -3,7 +3,7 @@ import { test, expect } from '../fixtures'
 test('authenticated root opens Today with Broker workspace navigation', async ({ authedPage }) => {
   await authedPage.goto('/')
   await expect(authedPage).toHaveURL(/\/today$/)
-  await expect(authedPage.getByRole('heading', { name: 'Today' })).toBeVisible()
+  await expect(authedPage.getByRole('heading', { name: 'Today', level: 1, exact: true })).toBeVisible()
 
   const nav = authedPage.locator('.side')
   await expect(nav.getByText('Daily', { exact: true })).toBeVisible()
@@ -97,18 +97,18 @@ test('archived organizations can be restored from the directory', async ({ authe
   authedPage.once('dialog', (dialog) => dialog.accept())
   await authedPage.getByRole('button', { name: 'Archive', exact: true }).click()
   await expect(authedPage.getByRole('link', { name: 'Restore Harbor' })).toHaveCount(0)
-  await authedPage.getByRole('button', { name: 'Show archived' }).click()
+  await authedPage.getByRole('button', { name: 'Archived', exact: true }).click()
   await expect(authedPage.getByRole('link', { name: 'Restore Harbor' })).toBeVisible()
-  await authedPage.getByRole('button', { name: 'Restore' }).click()
+  await authedPage.getByRole('button', { name: 'Restore', exact: true }).click()
   await expect(authedPage.getByRole('link', { name: 'Restore Harbor' })).toHaveCount(0)
-  await authedPage.getByRole('button', { name: 'Show active' }).click()
+  await authedPage.getByRole('button', { name: 'Active', exact: true }).click()
   await expect(authedPage.getByRole('link', { name: 'Restore Harbor' })).toBeVisible()
 })
 
 test('a failed Organization list refresh does not report a failed save', async ({ authedPage }) => {
   await authedPage.goto('/organizations')
   await expect(authedPage.getByLabel('Filter Organizations')).toBeVisible()
-  await authedPage.route('**/organizations?include_contacts=false&include_archived=false', (route) =>
+  await authedPage.route('**/organizations?include_contacts=false&include_archived=true', (route) =>
     route.fulfill({ status: 503, contentType: 'application/json', body: '{"detail":"Unavailable"}' }))
   await authedPage.getByRole('button', { name: 'New Organization' }).click()
   await authedPage.getByLabel('Organization name').fill('Saved Harbor')
@@ -142,6 +142,8 @@ test('keyboard search finds a Broker task', async ({ authedPage }) => {
   await authedPage.getByRole('button', { name: 'New Task' }).click()
   await authedPage.getByLabel('Task title').fill('Review Harbor renewal')
   await authedPage.getByRole('button', { name: 'Create Task', exact: true }).click()
+  // An unscheduled Task lands in the collapsed "other open tasks" group.
+  await authedPage.getByRole('button', { name: /other open task/ }).click()
   await expect(authedPage.getByRole('listitem', { name: 'Review Harbor renewal' })).toBeVisible()
   await authedPage.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K')
   await authedPage.getByRole('searchbox', { name: 'Search workspace' }).fill('Harbor')
@@ -163,6 +165,7 @@ test('search reveals a completed task outside the Today sections', async ({ auth
   expect(created.ok()).toBe(true)
   const taskId = (await created.json()).id
   await authedPage.goto('/today')
+  await authedPage.getByRole('button', { name: /other open task/ }).click()
   await expect(authedPage.getByRole('heading', { name: 'Other open tasks' }).locator('..').locator('..').getByRole('listitem', { name: 'Review archived renewal' })).toBeVisible()
   expect((await authedPage.request.post(`/tasks/${taskId}/complete`, { headers })).ok()).toBe(true)
   await authedPage.getByRole('button', { name: 'Search workspace' }).click()
@@ -239,6 +242,7 @@ test('Activity includes completed workspace tasks', async ({ authedPage }) => {
   await authedPage.getByRole('button', { name: 'New Task' }).click()
   await authedPage.getByLabel('Task title').fill('Send renewal packet')
   await authedPage.getByRole('button', { name: 'Create Task', exact: true }).click()
+  await authedPage.getByRole('button', { name: /other open task/ }).click()
   await authedPage.getByRole('listitem', { name: 'Send renewal packet' }).getByRole('checkbox').click()
   // Completion refreshes the open-task list only after the save succeeds.
   await expect(authedPage.getByRole('listitem', { name: 'Send renewal packet' })).toHaveCount(0)

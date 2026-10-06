@@ -1,11 +1,14 @@
 """Maintain a keyed, tenant-scoped search index without storing plaintext titles."""
 
+import logging
+
 from sqlalchemy import and_, event, select
 from sqlalchemy.dialects.postgresql import insert as postgres_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from healthflow.auth.phi_crypto import (
+    PhiDecryptionError,
     blind_index_digest,
     current_blind_index_version,
 )
@@ -18,6 +21,8 @@ from healthflow.database.models import (
     Task,
     WorkspaceSearchToken,
 )
+
+logger = logging.getLogger(__name__)
 
 
 SEARCHABLE_MODELS = (
@@ -97,28 +102,42 @@ def install_search_index() -> None:
 
 
 async def backfill_search_index(db: AsyncSession) -> None:
-    """Index pre-existing encrypted records in bounded startup batches."""
+    """Index pre-existing encrypted records in bounded startup batches.
+
+    A record whose title cannot be decrypted is logged and skipped, so one bad
+    row cannot keep every other record out of search.
+    """
     table = WorkspaceSearchToken.__table__
     with system_context("workspace search index backfill"):
         for kind, model, field in SEARCHABLE_MODELS:
+            skipped: set = set()
             while True:
-                records = (await db.execute(
-                    select(model).outerjoin(
-                        WorkspaceSearchToken,
-                        and_(
-                            WorkspaceSearchToken.broker_id == model.broker_id,
-                            WorkspaceSearchToken.kind == kind,
-                            WorkspaceSearchToken.record_id == model.id,
-                        ),
-                    ).where(WorkspaceSearchToken.record_id.is_(None)).limit(100)
-                )).scalars().all()
-                if not records:
+                # Select ids only: loading whole rows decrypts them, and one bad
+                # value would fail the entire batch.
+                query = select(model.id).outerjoin(
+                    WorkspaceSearchToken,
+                    and_(
+                        WorkspaceSearchToken.broker_id == model.broker_id,
+                        WorkspaceSearchToken.kind == kind,
+                        WorkspaceSearchToken.record_id == model.id,
+                    ),
+                ).where(WorkspaceSearchToken.record_id.is_(None))
+                if skipped:
+                    query = query.where(model.id.not_in(skipped))
+                record_ids = (await db.execute(query.limit(100))).scalars().all()
+                if not record_ids:
                     break
-                rows = [
-                    row
-                    for record in records
-                    for row in _token_rows(kind, record, getattr(record, field))
-                ]
+                rows = []
+                for record_id in record_ids:
+                    try:
+                        record = await db.get(model, record_id)
+                        rows.extend(_token_rows(kind, record, getattr(record, field)))
+                    except PhiDecryptionError:
+                        skipped.add(record_id)
+                        logger.warning(
+                            "Search backfill skipped %s %s: its title cannot be decrypted",
+                            kind, record_id,
+                        )
                 if rows:
                     dialect = db.get_bind().dialect.name
                     if dialect == "postgresql":

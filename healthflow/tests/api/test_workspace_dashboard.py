@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, text
 
 from healthflow.database.models import PhiAccessLog, WorkspaceSearchToken
 from healthflow.workspace.search_index import backfill_search_index
@@ -149,6 +149,35 @@ async def test_overview_counts_only_current_broker_records(client):
 
 
 @pytest.mark.asyncio
+async def test_overview_counts_open_case_work_and_workload(client):
+    owner = await _headers(client, "overview-work@example.com")
+    outsider = await _headers(client, "overview-work-outsider@example.com")
+    client_id = (await client.post("/clients", json={
+        "full_name": "Workload Client", "zip_code": "10001", "age": 67, "income_level": "medium",
+        "doctors": [], "prescriptions": [], "procedures": [],
+    }, headers=owner)).json()["id"]
+    enrollments = [(await client.post("/enrollments", json={
+        "client_id": client_id, "plan_name": f"Plan {index}"
+    }, headers=owner)).json()["id"] for index in range(3)]
+    await client.post(f"/enrollments/{enrollments[1]}/cancel", headers=owner)
+    issues = [(await client.post("/issues", json={
+        "client_id": client_id, "title": f"Issue {index}"
+    }, headers=owner)).json()["id"] for index in range(2)]
+    await client.put(f"/issues/{issues[0]}", json={"status": "resolved"}, headers=owner)
+    await client.post("/tasks", json={"title": "Call carrier", "is_follow_up": True}, headers=owner)
+    await client.post("/tasks", json={
+        "title": "Send packet", "due_at": "2030-01-15T15:00:00Z",
+    }, headers=owner)
+    await client.post("/tasks", json={"title": "Outsider follow-up", "is_follow_up": True}, headers=outsider)
+
+    body = (await client.get("/workspace/overview", headers=owner)).json()
+    assert body["active_enrollments"] == 2
+    assert body["open_issues"] == 1
+    assert body["open_follow_ups"] == 1
+    assert body["unscheduled_tasks"] == 1
+
+
+@pytest.mark.asyncio
 async def test_overview_shows_only_active_clients_and_restores_them(client):
     headers = await _headers(client, "overview-archive@example.com")
     client_ids = []
@@ -284,3 +313,31 @@ async def test_search_backfill_restores_existing_records(client, db_session):
     assert [item["id"] for item in (
         await client.get("/workspace/search?q=Legacy", headers=headers)
     ).json()] == [created.json()["id"]]
+
+
+@pytest.mark.asyncio
+async def test_search_backfill_skips_undecryptable_records(client, db_session):
+    headers = await _headers(client, "search-backfill-poison@example.com")
+    healthy = await client.post(
+        "/organizations", json={"name": "Harbor Health", "kind": "carrier"}, headers=headers
+    )
+    poisoned = await client.post(
+        "/organizations", json={"name": "Harbor Legacy", "kind": "carrier"}, headers=headers
+    )
+    await db_session.execute(delete(WorkspaceSearchToken).where(
+        WorkspaceSearchToken.kind == "organization",
+        WorkspaceSearchToken.record_id.in_([healthy.json()["id"], poisoned.json()["id"]]),
+    ))
+    # Raw SQL skips EncryptedString, leaving ciphertext this app's key cannot open.
+    await db_session.execute(
+        text("UPDATE organizations SET name = :name WHERE id = :id"),
+        {"name": "v1:AAAAAAAAAAAAAAAA:AAAAAAAAAAAAAAAAAAAAAAAA", "id": poisoned.json()["id"]},
+    )
+    await db_session.commit()
+    assert (await client.get("/workspace/search?q=Harbor", headers=headers)).json() == []
+
+    await backfill_search_index(db_session)
+
+    assert [item["id"] for item in (
+        await client.get("/workspace/search?q=Harbor", headers=headers)
+    ).json()] == [healthy.json()["id"]]

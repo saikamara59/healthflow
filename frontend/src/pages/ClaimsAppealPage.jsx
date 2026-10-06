@@ -3,11 +3,15 @@ import { useLocation } from 'react-router-dom';
 import api from '../api/client';
 import DocumentList from '../components/DocumentList';
 import { workspaceApi } from '../api/workspace';
+import { MotionConfig } from 'framer-motion';
+import { CheckCircle, ClipboardText, CopySimple, FileText, PencilSimpleLine, Scales } from '@phosphor-icons/react';
 import TopBar from '../components/TopBar';
-import Icon from '../components/ui/Icon';
 import Chip from '../components/ui/Chip';
 import AgentMarkdown from '../components/ui/AgentMarkdown';
+import PageHead from '../components/ui/PageHead';
 import useLayout from '../components/ui/useLayout';
+import { RunSteps, SourceRow, ToolResults } from '../components/tools/ToolRun';
+import { TOOL_FLOWS } from '../components/tools/toolFlows';
 
 const SAMPLE = `This letter is to inform you that your claim for MRI of the right shoulder
 performed on 03/14/2026 has been denied.
@@ -111,157 +115,118 @@ export default function ClaimsAppealPage() {
   const issueContextLength = selectedIssue ? `Issue context: ${selectedIssue.title}`.length : 0;
   const contextLimit = Math.max(0, MAX_ADDITIONAL_CONTEXT - issueContextLength - (selectedIssue ? 2 : 0));
 
+  const [copied, setCopied] = useState(false);
   function copyLetter() {
     if (!result?.appeal_letter) return;
-    navigator.clipboard?.writeText(result.appeal_letter);
+    navigator.clipboard?.writeText(result.appeal_letter).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
   }
+  const flow = TOOL_FLOWS.appeal;
 
   return (
-    <>
-      <TopBar crumbs={['Tools', 'Claim appeals']} onMenuClick={openMenu} onNotificationsClick={openNotifications} />
-      <div className="page wide">
-        <div className="page-head">
-          <div>
-            <div className="eyebrow" style={{ marginBottom: 14 }}>Denial analysis and letter drafting</div>
-            <h1 className="page-title">Turn a denial into<br /><em>an appeal.</em></h1>
-            <p className="page-sub">
-              Paste the denial letter. HealthFlow extracts the reason code, policy citation, and deadline, surfaces
-              relevant CMS guidance, and drafts a formal appeal letter you can edit.
-            </p>
-          </div>
-        </div>
+    <MotionConfig reducedMotion="user">
+      <TopBar crumbs={['AI Tools', 'Draft Appeal']} onMenuClick={openMenu} onNotificationsClick={openNotifications} />
+      <div className="page wide ws-page-in">
+        <PageHead
+          icon="appeal"
+          eyebrow="Denial analysis and letter drafting"
+          title="Draft an appeal"
+          sub="Paste the denial letter. HealthFlow pulls out the reason code, policy citation, and deadline, matches CMS guidance for that code, and drafts a formal appeal letter you can edit."
+        />
 
-        <section className="card workspace-section" style={{ marginBottom: 24 }}>
+        <section className="card workspace-section ap-issue">
           <h2>Issue context</h2>
-          <p>Every Appeal stays inside an Issue so its deadline, Follow-ups, and Appointments remain together.</p>
-          <div className="workspace-form-grid">
-            <label className="field"><span className="field-label">Existing Issue</span><select className="select" value={selectedIssue?.client_archived ? '' : issueId} onChange={(event) => { setIssueId(event.target.value); setError('') }}><option value="">Choose an Issue</option>{issues.filter((issue) => !issue.client_archived).map((issue) => <option key={issue.id} value={issue.id}>{issue.client_name} · {issue.title}</option>)}</select></label>
-            <form className="workspace-inline-form" onSubmit={createIssue} style={{ marginBottom: 0 }}><div className="workspace-form-grid"><label>Client<select required value={newIssue.client_id} onChange={(event) => setNewIssue({ ...newIssue, client_id: event.target.value })}><option value="">Choose a Client</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.full_name}</option>)}</select></label><label>New Issue title<input required value={newIssue.title} onChange={(event) => setNewIssue({ ...newIssue, title: event.target.value })} /></label></div><button className="btn sm" type="submit">Create and use Issue</button></form>
+          <p className="workspace-small">Every appeal stays inside an Issue so its deadline, follow-ups, and appointments remain together.</p>
+          <div className="workspace-form-grid ap-issue-grid">
+            <label className="workspace-filter ap-existing">Existing Issue
+              <select value={selectedIssue?.client_archived ? '' : issueId} onChange={(event) => { setIssueId(event.target.value); setError('') }}>
+                <option value="">Choose an Issue</option>
+                {issues.filter((issue) => !issue.client_archived).map((issue) => <option key={issue.id} value={issue.id}>{issue.client_name} · {issue.title}</option>)}
+              </select>
+            </label>
+            <form className="workspace-inline-form ap-new-issue" onSubmit={createIssue}>
+              <div className="workspace-form-grid">
+                <label>Client<select required value={newIssue.client_id} onChange={(event) => setNewIssue({ ...newIssue, client_id: event.target.value })}><option value="">Choose a Client</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.full_name}</option>)}</select></label>
+                <label>New Issue title<input required value={newIssue.title} onChange={(event) => setNewIssue({ ...newIssue, title: event.target.value })} /></label>
+              </div>
+              <div><button className="btn sm" type="submit">Create and use Issue</button></div>
+            </form>
           </div>
           {selectedIssue?.client_archived && <p className="notice">Restore the Client before drafting a new Appeal. Historical Issues and Appeals remain available in Issues &amp; Appeals.</p>}
         </section>
 
         {savedAppeal && <DocumentList clientId={savedAppeal.client_id} targetType="appeal" targetId={savedAppeal.id} />}
-        <div className="grid-12" style={{ gap: 24 }}>
-          <div style={{ gridColumn: 'span 5' }}>
-            <div className="section-head" style={{ marginTop: 0 }}>
-              <h2>Denial letter</h2>
-              <div className="after"><button className="btn sm" onClick={() => setDenialText(SAMPLE)}>Use sample</button></div>
-            </div>
-            <div className="card">
-              <textarea
-                className="textarea"
-                style={{ height: 340, border: 0, background: 'transparent', fontFamily: 'var(--mono)', fontSize: 12.5 }}
-                value={denialText}
-                onChange={(e) => setDenialText(e.target.value)}
-                placeholder="Paste the denial letter text…"
-              />
-            </div>
 
-            <div className="section-head"><h2>Additional context</h2><div className="after">optional</div></div>
-            <div className="card">
-              <textarea
-                className="textarea"
-                style={{ height: 140, border: 0, background: 'transparent', fontSize: 13 }}
-                value={context}
-                maxLength={contextLimit}
-                onChange={(e) => setContext(e.target.value.slice(0, contextLimit))}
-                placeholder="Add referring physician notes, symptom history, or prior failed treatments."
-              />
-            </div>
-
-            {error && <div role="alert" className="notice" style={{ marginTop: 16, color: 'var(--neg)', borderColor: 'var(--neg)' }}>{error}</div>}
-
-            <div className="row" style={{ justifyContent: 'flex-end', marginTop: 20 }}>
-              <button className="btn accent" onClick={run} disabled={running || !denialText.trim()}>
-                {running ? <><span className="loader" /> Drafting…</> : <><Icon name="appeal" size={14} /> Analyze &amp; draft</>}
-              </button>
-            </div>
+        <div className="ap-grid">
+          <div className="ap-inputs">
+            <section className="card workspace-section workspace-inline-form">
+              <div className="between"><h2>Denial letter</h2><button type="button" className="btn sm" onClick={() => setDenialText(SAMPLE)}>Use sample</button></div>
+              <textarea className="ec-doc ap-denial" value={denialText} onChange={(e) => setDenialText(e.target.value)} placeholder="Paste the denial letter text…" aria-label="Denial letter" />
+              <label>Additional context <span className="workspace-small">optional</span>
+                <textarea rows={5} value={context} maxLength={contextLimit} onChange={(e) => setContext(e.target.value.slice(0, contextLimit))} placeholder="Add referring physician notes, symptom history, or prior failed treatments." />
+              </label>
+              {error && <p role="alert" className="workspace-error">{error}</p>}
+              <div className="ws-submit">
+                <button className="btn accent lg" onClick={run} disabled={running || !denialText.trim()}>
+                  <PencilSimpleLine size={16} weight="duotone" /> {running ? 'Drafting…' : 'Analyze & draft'}
+                </button>
+              </div>
+            </section>
           </div>
 
-          <div style={{ gridColumn: 'span 7' }}>
+          <div className="ap-output">
             {!result && !running && (
-              <div className="card card-pad" style={{ padding: 40, textAlign: 'center' }}>
-                <div className="placeholder-img" style={{ height: 240, marginBottom: 20 }}>Appeal output</div>
-                <div className="muted" style={{ maxWidth: 440, margin: '0 auto' }}>
-                  The denial analysis, CMS grounds, and drafted letter will appear here once you run analysis.
-                </div>
+              <div className="card ap-empty">
+                <FileText size={40} weight="duotone" aria-hidden="true" />
+                <strong>The appeal appears here</strong>
+                <p>The denial analysis, CMS grounds for the denial code, and a drafted letter appear once you run the analysis. The draft is saved to the Issue.</p>
               </div>
             )}
 
-            {running && <div className="card card-pad" style={{ textAlign: 'center', padding: 60 }}><div className="loader" /></div>}
+            {running && <RunSteps steps={flow.steps()} running={running} title="Drafting the appeal" />}
 
-            {result && (
-              <>
-                <div className="section-head" style={{ marginTop: 0 }}>
-                  <h2>Denial analysis</h2>
-                </div>
-                <div className="card card-pad">
-                  <div className="kv-grid">
-                    <div className="kv"><span className="k">Reason code</span><span className="v">{result.denial_analysis.denial_reason_code || 'Unknown'}</span></div>
-                    <div className="kv"><span className="k">Treatment denied</span><span className="v">{result.denial_analysis.treatment_denied}</span></div>
-                    <div className="kv"><span className="k">Appeal deadline</span><span className="v">{result.denial_analysis.appeal_deadline || '—'}</span></div>
-                    <div className="kv"><span className="k">Policy cited</span><span className="v">{result.denial_analysis.policy_section_cited || '—'}</span></div>
-                    <div className="kv"><span className="k">Denial date</span><span className="v">{result.denial_analysis.denial_date || '—'}</span></div>
-                  </div>
-                  <div className="divider dashed" style={{ margin: '20px 0' }} />
-                  <div className="eyebrow" style={{ marginBottom: 8 }}>Stated reason</div>
-                  <div style={{ fontSize: 13.5, color: 'var(--ink-2)' }}>{result.denial_analysis.denial_reason}</div>
-                </div>
+            <ToolResults show={Boolean(result) && !running}>
+              {result && <>
+                <section className="card workspace-section">
+                  <div className="between"><h2><ClipboardText size={19} weight="duotone" aria-hidden="true" className="ap-h-ic" /> Denial analysis</h2>{savedAppeal && <span className="chip pos"><CheckCircle size={12} weight="bold" /> Saved to the Issue</span>}</div>
+                  <dl className="ap-kv">
+                    <div><dt>Reason code</dt><dd>{result.denial_analysis.denial_reason_code || 'Unknown'}</dd></div>
+                    <div><dt>Treatment denied</dt><dd>{result.denial_analysis.treatment_denied}</dd></div>
+                    <div className="ap-deadline"><dt>Appeal deadline</dt><dd>{result.denial_analysis.appeal_deadline || '—'}</dd></div>
+                    <div><dt>Policy cited</dt><dd>{result.denial_analysis.policy_section_cited || '—'}</dd></div>
+                    <div><dt>Denial date</dt><dd>{result.denial_analysis.denial_date || '—'}</dd></div>
+                  </dl>
+                  <div className="ap-reason"><small>Stated reason</small><p>{result.denial_analysis.denial_reason}</p></div>
+                </section>
 
-                <div className="section-head"><h2>Coverage grounds</h2></div>
-                <div className="card card-pad">
-                  <div className="eyebrow" style={{ marginBottom: 8 }}>CMS rule</div>
-                  <div style={{ fontSize: 14, fontFamily: 'var(--serif)', fontStyle: 'italic', color: 'var(--ink-2)' }}>
-                    {result.coverage_argument.cms_rule}
-                  </div>
+                <section className="card workspace-section">
+                  <h2><Scales size={19} weight="duotone" aria-hidden="true" className="ap-h-ic" /> Coverage grounds</h2>
+                  <div className="ap-rule"><small>CMS guidance for this denial code</small><p>{result.coverage_argument.cms_rule}</p></div>
                   {result.coverage_argument.common_appeal_grounds?.length > 0 && (
-                    <>
-                      <div className="divider dashed" style={{ margin: '20px 0' }} />
-                      <div className="eyebrow" style={{ marginBottom: 10 }}>Appeal grounds</div>
-                      <div className="col" style={{ gap: 8 }}>
-                        {result.coverage_argument.common_appeal_grounds.map((g, i) => (
-                          <div key={i} className="row" style={{ gap: 10, fontSize: 13 }}>
-                            <Icon name="check" size={14} style={{ color: 'var(--pos)' }} />
-                            <span>{g}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </>
+                    <div className="ap-grounds">
+                      <small>Appeal grounds</small>
+                      <ul>{result.coverage_argument.common_appeal_grounds.map((g, i) => <li key={i}><CheckCircle size={15} weight="duotone" aria-hidden="true" />{g}</li>)}</ul>
+                    </div>
                   )}
                   {result.coverage_argument.success_precedents?.length > 0 && (
-                    <>
-                      <div className="divider dashed" style={{ margin: '20px 0' }} />
-                      <div className="eyebrow" style={{ marginBottom: 10 }}>Success precedents</div>
-                      <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-                        {result.coverage_argument.success_precedents.map((p, i) => (
-                          <Chip key={i} tone="accent">{p}</Chip>
-                        ))}
-                      </div>
-                    </>
+                    <div className="ap-grounds"><small>Success precedents</small><div className="ws-chips">{result.coverage_argument.success_precedents.map((p, i) => <Chip key={i} tone="accent">{p}</Chip>)}</div></div>
                   )}
-                </div>
+                </section>
 
-                <div className="section-head">
-                  <h2>Drafted appeal letter</h2>
-                  <div className="after">
-                    <button className="btn sm" onClick={copyLetter}>
-                      <Icon name="download" size={12} /> Copy
-                    </button>
-                  </div>
-                </div>
-                <div className="card" style={{ padding: 24 }}>
-                  <AgentMarkdown style={{ fontSize: 14.5 }}>
-                    {result.appeal_letter}
-                  </AgentMarkdown>
-                </div>
+                <section className="card workspace-section">
+                  <div className="between"><h2><FileText size={19} weight="duotone" aria-hidden="true" className="ap-h-ic" /> Drafted appeal letter</h2><button className="btn sm" onClick={copyLetter}><CopySimple size={14} weight="duotone" /> {copied ? 'Copied' : 'Copy'}</button></div>
+                  <div className="ap-letter"><AgentMarkdown>{result.appeal_letter}</AgentMarkdown></div>
+                  <SourceRow items={flow.sources} />
+                </section>
 
-                {result.disclaimer && <div className="notice" style={{ marginTop: 20 }}>{result.disclaimer}</div>}
-              </>
-            )}
+                {result.disclaimer && <p className="ws-note">{result.disclaimer}</p>}
+              </>}
+            </ToolResults>
           </div>
         </div>
       </div>
-    </>
+    </MotionConfig>
   );
 }

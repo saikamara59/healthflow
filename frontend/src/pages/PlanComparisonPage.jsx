@@ -1,12 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { MotionConfig } from 'framer-motion';
+import { ArrowsLeftRight, CaretDown, Check, Info, PencilSimple, SealCheck } from '@phosphor-icons/react';
 import api from '../api/client';
 import TopBar from '../components/TopBar';
-import Icon from '../components/ui/Icon';
 import Stars from '../components/ui/Stars';
 import AgentMarkdown from '../components/ui/AgentMarkdown';
+import { PlanLogo, carrierForPlan } from '../components/ui/OrgLogo';
+import PageHead from '../components/ui/PageHead';
 import useLayout from '../components/ui/useLayout';
 import DecisionRecordPanel from '../components/DecisionRecordPanel';
+import { RunSteps, SourceRow, ToolResults } from '../components/tools/ToolRun';
+import { ChipInput } from '../components/tools/ToolInputs';
+import { TOOL_FLOWS } from '../components/tools/toolFlows';
 import { useAuth } from '../contexts/AuthContext';
 
 function currency(v) {
@@ -35,8 +41,6 @@ export default function PlanComparisonPage() {
   const [age, setAge] = useState(preset?.age || 67);
   const [income, setIncome] = useState(preset?.income_level || 'medium');
   const [rx, setRx] = useState(preset?.prescriptions || []);
-  const [rxInput, setRxInput] = useState('');
-  const [procInput, setProcInput] = useState('');
   const [procs, setProcs] = useState(preset?.procedures || []);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
@@ -127,49 +131,36 @@ export default function PlanComparisonPage() {
       ]
     : [];
 
+  const flow = TOOL_FLOWS.compare;
+  const flowInput = { zip, income, meds: rx.length, procs: procs.length };
+
   return (
-    <>
+    <MotionConfig reducedMotion="user">
       <TopBar
-        crumbs={['Tools', 'Plan comparison']}
+        crumbs={['AI Tools', 'Compare Plans']}
         onMenuClick={openMenu}
         onNotificationsClick={openNotifications}
         action={
           step === 'results' && (
             <button className="btn" onClick={() => setStep('input')}>
-              <Icon name="settings" size={14} /> Edit inputs
+              <PencilSimple size={14} weight="duotone" /> Edit inputs
             </button>
           )
         }
       />
-      <div className="page wide">
-        <div className="page-head">
-          <div>
-            <div className="eyebrow" style={{ marginBottom: 14 }}>
-              {selectedClient ? `For ${selectedClient.full_name}, ZIP ${zip}` : `ZIP ${zip}`}
-            </div>
-            <h1 className="page-title">
-              {step === 'results' && cheapestIdx >= 0
-                ? <>Comparison results</>
-                : <>Compare Medicare Advantage plans.</>}
-            </h1>
-            <p className="page-sub">
-              Plan data from the current CMS snapshot, ranked by estimated annual cost using the client's medications
-              and expected procedures. Star ratings come from the same snapshot.
-            </p>
-          </div>
-        </div>
+      <div className="page wide ws-page-in">
+        <PageHead
+          icon="compare"
+          eyebrow={`Medicare Advantage · ${selectedClient ? `${selectedClient.full_name}, ZIP ${zip}` : `ZIP ${zip}`}`}
+          title={step === 'results' && cheapestIdx >= 0 ? 'Comparison results' : 'Compare plans'}
+          sub="Rank the plans in a client's ZIP by estimated yearly cost, weighted to their medications and expected procedures."
+        />
 
         {step === 'input' && (
-          <form
-            className="card card-pad"
-            style={{ padding: 32, marginBottom: 32 }}
-            onSubmit={(e) => { e.preventDefault(); run(); }}
-          >
-            {clientOptions.length > 0 && (
-              <div className="field" style={{ marginBottom: 20 }}>
-                <label className="field-label">Prefill from client (optional)</label>
+          <form className="card workspace-section workspace-inline-form cp-form" onSubmit={(e) => { e.preventDefault(); run(); }}>
+            <div className="ws-grid4">
+              <label>Prefill from client
                 <select
-                  className="select"
                   value={clientId}
                   onChange={(e) => {
                     const c = clientOptions.find((x) => x.id === e.target.value);
@@ -178,154 +169,68 @@ export default function PlanComparisonPage() {
                   }}
                 >
                   <option value="">None</option>
-                  {clientOptions.map((c) => (
-                    <option key={c.id} value={c.id}>{c.full_name}, ZIP {c.zip_code}</option>
-                  ))}
+                  {clientOptions.map((c) => <option key={c.id} value={c.id}>{c.full_name}, ZIP {c.zip_code}</option>)}
                 </select>
-              </div>
-            )}
-
-            <div className="grid-12" style={{ gap: 20 }}>
-              <div className="field" style={{ gridColumn: 'span 3' }}>
-                <label className="field-label">ZIP code</label>
-                <input className="input" value={zip} onChange={(e) => setZip(e.target.value)} pattern="\d{5}" required />
-              </div>
-              <div className="field" style={{ gridColumn: 'span 3' }}>
-                <label className="field-label">Age</label>
-                <input className="input" type="number" value={age} onChange={(e) => setAge(e.target.value)} required />
-              </div>
-              <div className="field" style={{ gridColumn: 'span 3' }}>
-                <label className="field-label">Income level</label>
-                <select className="select" value={income} onChange={(e) => setIncome(e.target.value)}>
+              </label>
+              <label>ZIP code<input value={zip} onChange={(e) => setZip(e.target.value)} pattern="\d{5}" maxLength={5} inputMode="numeric" required /></label>
+              <label>Age<input type="number" value={age} onChange={(e) => setAge(e.target.value)} required /></label>
+              <label>Income level
+                <select value={income} onChange={(e) => setIncome(e.target.value)}>
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
                 </select>
-              </div>
-              <div className="field" style={{ gridColumn: 'span 6' }}>
-                <label className="field-label">Medications</label>
-                <div className="input-group">
-                  <input
-                    className="input"
-                    placeholder="e.g. Metformin 500mg"
-                    value={rxInput}
-                    onChange={(e) => setRxInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        if (rxInput.trim()) { setRx([...rx, rxInput.trim()]); setRxInput(''); }
-                      }
-                    }}
-                  />
-                  <button type="button" className="btn" onClick={() => {
-                    if (rxInput.trim()) { setRx([...rx, rxInput.trim()]); setRxInput(''); }
-                  }}>Add</button>
-                </div>
-                <div className="row" style={{ gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-                  {rx.map((r, i) => (
-                    <span key={i} className="chip">
-                      {r}
-                      <button type="button" onClick={() => setRx(rx.filter((_, j) => j !== i))} style={{ marginLeft: 4, color: 'var(--ink-4)' }}>
-                        <Icon name="x" size={10} />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div className="field" style={{ gridColumn: 'span 6' }}>
-                <label className="field-label">Expected procedures</label>
-                <div className="input-group">
-                  <input
-                    className="input"
-                    placeholder="e.g. Annual physical"
-                    value={procInput}
-                    onChange={(e) => setProcInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        if (procInput.trim()) { setProcs([...procs, procInput.trim()]); setProcInput(''); }
-                      }
-                    }}
-                  />
-                  <button type="button" className="btn" onClick={() => {
-                    if (procInput.trim()) { setProcs([...procs, procInput.trim()]); setProcInput(''); }
-                  }}>Add</button>
-                </div>
-                <div className="row" style={{ gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-                  {procs.map((p, i) => (
-                    <span key={i} className="chip">
-                      {p}
-                      <button type="button" onClick={() => setProcs(procs.filter((_, j) => j !== i))} style={{ marginLeft: 4, color: 'var(--ink-4)' }}>
-                        <Icon name="x" size={10} />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
+              </label>
             </div>
-
-            {error && (
-              <div className="notice" style={{ marginTop: 20, color: 'var(--neg)', borderColor: 'var(--neg)' }}>
-                {error}
-              </div>
-            )}
-
-            <div className="row" style={{ justifyContent: 'flex-end', marginTop: 20, gap: 10 }}>
-              <button type="submit" className="btn accent" disabled={running}>
-                {running ? <><span className="loader" /> Running…</> : <><Icon name="compare" size={14} /> Compare plans</>}
+            <div className="ws-grid2">
+              <ChipInput label="Medications" placeholder="e.g. Metformin 500mg" items={rx} setItems={setRx} />
+              <ChipInput label="Expected procedures" placeholder="e.g. Annual physical" items={procs} setItems={setProcs} />
+            </div>
+            {error && <p role="alert" className="workspace-error">{error}</p>}
+            <div className="ws-submit">
+              <button type="submit" className="btn accent lg" disabled={running}>
+                <ArrowsLeftRight size={16} weight="duotone" /> {running ? 'Comparing…' : 'Compare plans'}
               </button>
             </div>
           </form>
         )}
 
-        {step === 'results' && result && (
-          <>
+        {running && <RunSteps steps={flow.steps(flowInput)} running={running} title="Comparing plans" />}
+
+        <ToolResults show={step === 'results' && Boolean(result)}>
+          {result && <>
             {result.recommendation && (
-              <div className="card compare-rec-card" style={{ marginBottom: 28, overflow: 'hidden' }}>
-                <div className="compare-rec-grid">
-                  <div className="compare-rec-main">
-                    <div className="between" style={{ marginBottom: 14 }}>
-                      <div className="eyebrow">Recommendation</div>
-                      {result.decision_id && (
-                        <button className="why-trigger" onClick={() => setWhyOpen(true)}>
-                          <Icon name="info" size={13} /> Why this?
-                        </button>
-                      )}
-                    </div>
-                    <AgentMarkdown style={{ maxWidth: 760 }}>
-                      {result.recommendation}
-                    </AgentMarkdown>
-                  </div>
+              <section className="card workspace-section cp-rec-card">
+                <div className="between cp-rec-head">
+                  <h2><SealCheck size={20} weight="duotone" aria-hidden="true" /> Recommendation</h2>
+                  {result.decision_id && (
+                    <button className="btn sm" onClick={() => setWhyOpen(true)}>
+                      <Info size={14} weight="duotone" /> How this result was made
+                    </button>
+                  )}
+                </div>
+                <div className="cp-rec-grid">
+                  <AgentMarkdown className="cp-rec">{result.recommendation}</AgentMarkdown>
                   {cheapestIdx >= 0 && (
-                    <div className="compare-rec-aside">
-                      <div className="eyebrow" style={{ marginBottom: 14 }}>Cheapest estimate</div>
-                      <div style={{ fontFamily: 'var(--serif)', fontSize: 44, letterSpacing: '-0.02em', lineHeight: 1 }}>
-                        {currency(annuals[cheapestIdx])}
-                      </div>
-                      <div className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>{plans[cheapestIdx].plan_name}</div>
+                    <div className="cp-rec-aside">
+                      <PlanLogo planName={plans[cheapestIdx].plan_name} size={36} />
+                      <small>Lowest estimated yearly cost</small>
+                      <strong>{currency(annuals[cheapestIdx])}</strong>
+                      <span>{plans[cheapestIdx].plan_name}</span>
                     </div>
                   )}
                 </div>
-              </div>
+                <SourceRow items={flow.sources} />
+              </section>
             )}
 
             {selectToast && (
-              <div
-                className="notice"
-                role="status"
-                style={{
-                  marginBottom: 20,
-                  borderColor: 'var(--accent)',
-                  color: 'var(--ink)',
-                  background: 'var(--accent-soft)',
-                }}
-              >
-                <Icon name="check" size={14} /> {selectToast}
-                {clientId ? '. Saved to client history.' : ''}
+              <div className="notice cp-toast" role="status">
+                <Check size={14} weight="bold" /> {selectToast}{clientId ? '. Saved to client history.' : ''}
               </div>
             )}
 
-            <div className="grid-3">
+            <div className="cp-grid">
               {plans.map((p, i) => {
                 const isBest = i === cheapestIdx;
                 const isSelected = selectedPlanId && p.plan_id === selectedPlanId;
@@ -333,91 +238,37 @@ export default function PlanComparisonPage() {
                 const rxCosts = Object.entries(p.estimated_medication_costs || {});
                 const procCosts = Object.entries(p.estimated_procedure_costs || {});
                 return (
-                  <div
-                    key={p.plan_id || i}
-                    data-testid="plan-row"
-                    className={`plan-card ${isBest ? 'best' : ''}`}
-                    style={isSelected ? { boxShadow: '0 0 0 2px var(--accent)' } : undefined}
-                  >
-                    {isBest && <span className="best-tag">Lowest estimated annual cost</span>}
-                    <div>
-                      <div className="eyebrow">{p.plan_type}</div>
-                      <h3 style={{ fontFamily: 'var(--serif)', fontSize: 22, lineHeight: 1.2, marginTop: 6 }}>{p.plan_name}</h3>
-                      <div className="row" style={{ gap: 10, marginTop: 10 }}>
-                        <Stars value={p.star_rating} />
-                        <span className="muted mono" style={{ fontSize: 11 }}>
-                          {p.star_rating?.toFixed(1)}, {p.drug_coverage ? 'Rx included' : 'No Rx'}
-                        </span>
+                  <div key={p.plan_id || i} data-testid="plan-row" className={`cp-plan${isBest ? ' best' : ''}${isSelected ? ' selected' : ''}`}>
+                    <div className="cp-plan-top">
+                      <PlanLogo planName={p.plan_name} />
+                      <div className="cp-plan-tags">
+                        <span className="workspace-tag">{p.plan_type}</span>
+                        {isBest && <span className="chip pos">Lowest yearly cost</span>}
                       </div>
                     </div>
-
-                    <div className="plan-metrics">
-                      <div className="plan-metric"><div className="k">Premium</div><div className="v num">${p.monthly_premium}<small>/mo</small></div></div>
-                      <div className="plan-metric"><div className="k">Deductible</div><div className="v num">{currency(p.annual_deductible)}</div></div>
-                      <div className="plan-metric"><div className="k">OOP max</div><div className="v num">{currency(p.out_of_pocket_max)}</div></div>
-                      <div className="plan-metric"><div className="k">Est. annual</div><div className="v num">{currency(annuals[i])}</div></div>
-                    </div>
-
+                    <h3>{p.plan_name}</h3>
+                    {carrierForPlan(p.plan_name) && <small className="cp-carrier">{carrierForPlan(p.plan_name).name}</small>}
+                    <div className="cp-stars"><Stars value={p.star_rating} /><small>{p.star_rating?.toFixed(1)} · {p.drug_coverage ? 'Rx included' : 'No Rx'}</small></div>
+                    <dl>
+                      <div><dt>Premium</dt><dd>${p.monthly_premium}/mo</dd></div>
+                      <div><dt>Deductible</dt><dd>{currency(p.annual_deductible)}</dd></div>
+                      <div><dt>Out-of-pocket max</dt><dd>{currency(p.out_of_pocket_max)}</dd></div>
+                      <div><dt>Estimated per year</dt><dd className="cp-est">{currency(annuals[i])}</dd></div>
+                    </dl>
                     {isExpanded && (
-                      <div style={{ borderTop: '1px dashed var(--line)', paddingTop: 14, display: 'grid', gap: 14 }}>
-                        <div>
-                          <div className="eyebrow" style={{ marginBottom: 6 }}>Plan ID</div>
-                          <div className="mono" style={{ fontSize: 12, color: 'var(--ink-3)' }}>{p.plan_id || '—'}</div>
-                        </div>
-                        {rxCosts.length > 0 && (
-                          <div>
-                            <div className="eyebrow" style={{ marginBottom: 6 }}>Estimated Rx (annual)</div>
-                            {rxCosts.map(([name, cost]) => (
-                              <div key={name} className="between" style={{ fontSize: 12.5, padding: '3px 0' }}>
-                                <span style={{ color: 'var(--ink-2)' }}>{name}</span>
-                                <span className="mono num">{currency(cost)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {procCosts.length > 0 && (
-                          <div>
-                            <div className="eyebrow" style={{ marginBottom: 6 }}>Estimated procedures (annual)</div>
-                            {procCosts.map(([name, cost]) => (
-                              <div key={name} className="between" style={{ fontSize: 12.5, padding: '3px 0' }}>
-                                <span style={{ color: 'var(--ink-2)' }}>{name}</span>
-                                <span className="mono num">{currency(cost)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {rxCosts.length === 0 && procCosts.length === 0 && (
-                          <div className="muted" style={{ fontSize: 12 }}>
-                            No medication or procedure cost estimates for this plan.
-                          </div>
-                        )}
+                      <div className="cp-detail">
+                        <div><small>Plan ID</small><span className="mono">{p.plan_id || '—'}</span></div>
+                        {rxCosts.length > 0 && <div><small>Estimated drug costs (yearly)</small>{rxCosts.map(([name, cost]) => <div key={name} className="between"><span>{name}</span><span className="mono">{currency(cost)}</span></div>)}</div>}
+                        {procCosts.length > 0 && <div><small>Estimated procedures (yearly)</small>{procCosts.map(([name, cost]) => <div key={name} className="between"><span>{name}</span><span className="mono">{currency(cost)}</span></div>)}</div>}
+                        {rxCosts.length === 0 && procCosts.length === 0 && <small>No medication or procedure estimates for this plan.</small>}
                       </div>
                     )}
-
-                    <div className="row" style={{ gap: 8, marginTop: 'auto' }}>
-                      <button
-                        type="button"
-                        className={`btn ${isSelected ? 'primary' : (isBest ? 'accent' : '')}`}
-                        style={{ flex: 1 }}
-                        onClick={() => selectPlan(p, i)}
-                        aria-pressed={isSelected}
-                      >
-                        {isSelected
-                          ? <><Icon name="check" size={14} /> Selected</>
-                          : (isBest ? 'Recommend' : 'Select')}
+                    <div className="cp-actions">
+                      <button type="button" className={`btn ${isSelected ? 'primary' : isBest ? 'accent' : ''}`} onClick={() => selectPlan(p, i)} aria-pressed={Boolean(isSelected)}>
+                        {isSelected ? <><Check size={14} weight="bold" /> Selected</> : isBest ? 'Recommend' : 'Select'}
                       </button>
-                      <button
-                        type="button"
-                        className="btn ghost icon"
-                        aria-label={isExpanded ? 'Hide details' : 'Show details'}
-                        aria-expanded={!!isExpanded}
-                        onClick={() => setExpandedPlanId(isExpanded ? null : p.plan_id)}
-                      >
-                        <Icon
-                          name="chev_d"
-                          size={14}
-                          style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 120ms' }}
-                        />
+                      <button type="button" className="btn ghost icon" aria-label={isExpanded ? 'Hide details' : 'Show details'} aria-expanded={Boolean(isExpanded)} onClick={() => setExpandedPlanId(isExpanded ? null : p.plan_id)}>
+                        <CaretDown size={14} weight="bold" style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 140ms' }} />
                       </button>
                     </div>
                   </div>
@@ -426,45 +277,27 @@ export default function PlanComparisonPage() {
             </div>
 
             {rows.length > 0 && (
-              <>
-                <div className="section-head" style={{ marginTop: 40 }}>
-                  <h2>Side by side</h2>
-                  <div className="after">Lower bars are better</div>
-                </div>
-                <div className="card card-pad">
-                  {rows.map((row, ri) => {
-                    const max = Math.max(...row.vals.map((v) => v || 0));
-                    return (
-                      <div key={ri} style={{ padding: '16px 0', borderBottom: ri < rows.length - 1 ? '1px dashed var(--line)' : 0 }}>
-                        <div className="between" style={{ marginBottom: 10 }}>
-                          <div style={{ fontSize: 13 }}>{row.k}</div>
-                          <div className="muted mono" style={{ fontSize: 11 }}>{plans.length} plans</div>
+              <section className="card workspace-section">
+                <div className="between"><h2>Side by side</h2><span className="workspace-small">Shorter bars are better</span></div>
+                {rows.map((row, ri) => {
+                  const max = Math.max(...row.vals.map((v) => v || 0));
+                  return (
+                    <div key={ri} className="cp-bars">
+                      <div className="between cp-bars-head"><span>{row.k}</span><small>{plans.length} plans</small></div>
+                      {row.vals.map((v, i) => (
+                        <div key={i} className="cbar-row">
+                          <span className="cp-bar-name"><PlanLogo planName={plans[i].plan_name} size={20} />{plans[i].plan_name}</span>
+                          <div className="cbar-track"><div className={`cbar-fill ${i === cheapestIdx ? '' : 'muted'}`} style={{ width: max === 0 ? '2%' : `${Math.max(2, ((v || 0) / max) * 100)}%` }} /></div>
+                          <div className="num mono">{row.fmt(v)}</div>
                         </div>
-                        {row.vals.map((v, i) => (
-                          <div key={i} className="cbar-row">
-                            <div className="row" style={{ gap: 8, minWidth: 0 }}>
-                              <span className={`risk-dot ${i === cheapestIdx ? '' : 'med'}`} style={i === cheapestIdx ? { background: 'var(--accent)' } : {}} />
-                              <span style={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {plans[i].plan_name}
-                              </span>
-                            </div>
-                            <div className="cbar-track">
-                              <div
-                                className={`cbar-fill ${i === cheapestIdx ? '' : 'muted'}`}
-                                style={{ width: max === 0 ? '2%' : `${Math.max(2, ((v || 0) / max) * 100)}%` }}
-                              />
-                            </div>
-                            <div className="num mono" style={{ fontSize: 13, textAlign: 'right' }}>{row.fmt(v)}</div>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
+                      ))}
+                    </div>
+                  );
+                })}
+              </section>
             )}
 
-            {result.disclaimer && <div className="notice" style={{ marginTop: 24 }}>{result.disclaimer}</div>}
+            {result.disclaimer && <p className="ws-note">{result.disclaimer}</p>}
 
             <DecisionRecordPanel
               decisionId={result.decision_id}
@@ -472,9 +305,9 @@ export default function PlanComparisonPage() {
               onClose={() => setWhyOpen(false)}
               recordedBy={user?.email ? `You, ${user.email}` : 'You'}
             />
-          </>
-        )}
+          </>}
+        </ToolResults>
       </div>
-    </>
+    </MotionConfig>
   );
 }

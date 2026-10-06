@@ -2,17 +2,20 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import TopBar from '../components/TopBar';
-import Icon from '../components/ui/Icon';
+import {
+  ArrowDown, ArrowUp, CaretRight, ClockCounterClockwise, DownloadSimple, MagnifyingGlass, Plus,
+} from '@phosphor-icons/react';
 import Chip from '../components/ui/Chip';
 import Avatar from '../components/ui/Avatar';
+import PageHead from '../components/ui/PageHead';
 import useLayout from '../components/ui/useLayout';
 
 function sinceLabel(iso) {
   if (!iso) return '—';
   const diff = Date.now() - new Date(iso).getTime();
   const days = Math.max(0, Math.floor(diff / 86400000));
-  if (days === 0) return 'today';
-  if (days === 1) return 'yesterday';
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
   if (days < 7) return `${days}d ago`;
   if (days < 30) return `${Math.floor(days / 7)}w ago`;
   return `${Math.floor(days / 30)}mo ago`;
@@ -45,39 +48,6 @@ function nextAction(c) {
     return { label: 'Complete profile', tone: 'warn' };
   }
   return { label: 'No action', tone: 'ghost' };
-}
-
-const RISK_WEIGHT = { low: 0, med: 1, high: 2 };
-
-function compareClients(a, b, key, dir) {
-  const m = dir === 'asc' ? 1 : -1;
-  if (key === 'name') return (a.full_name || '').localeCompare(b.full_name || '') * m;
-  if (key === 'age') return ((a.age || 0) - (b.age || 0)) * m;
-  if (key === 'risk') return (RISK_WEIGHT[riskLevel(a)] - RISK_WEIGHT[riskLevel(b)]) * m;
-  if (key === 'touch') {
-    const ta = new Date(a.updated_at || a.created_at || 0).getTime();
-    const tb = new Date(b.updated_at || b.created_at || 0).getTime();
-    return (ta - tb) * m;
-  }
-  return 0;
-}
-
-function Th({ k, sort, setSort, children, style }) {
-  const active = sort.key === k;
-  const handleClick = k
-    ? () => setSort((s) => ({ key: k, dir: s.key === k && s.dir === 'asc' ? 'desc' : 'asc' }))
-    : undefined;
-  return (
-    <th
-      onClick={handleClick}
-      style={{ cursor: k ? 'pointer' : 'default', userSelect: 'none', ...(style || {}) }}
-    >
-      <span className="row" style={{ gap: 4 }}>
-        {children}
-        {active && <Icon name={sort.dir === 'asc' ? 'arrow_u' : 'arrow_d'} size={11} />}
-      </span>
-    </th>
-  );
 }
 
 function toCsv(rows) {
@@ -114,6 +84,19 @@ function downloadCsv(filename, csv) {
   URL.revokeObjectURL(url);
 }
 
+const touchTime = (c) => new Date(c.updated_at || c.created_at || 0).getTime();
+const RISK_LABEL = { high: 'High', med: 'Med', low: 'Low' };
+
+const FILTERS = [
+  { key: 'all', label: 'All', test: () => true },
+  { key: 'action', label: 'Needs action', test: (c) => nextAction(c).tone !== 'ghost' },
+  { key: 'senior', label: 'Age 65+', test: (c) => (c.age || 0) >= 65 },
+  { key: 'complex', label: 'Complex Rx', test: (c) => (c.prescriptions?.length || 0) >= 3 },
+  { key: 'high', label: 'High income', test: (c) => c.income_level === 'high' },
+  { key: 'medium', label: 'Medium', test: (c) => c.income_level === 'medium' },
+  { key: 'low', label: 'Low income', test: (c) => c.income_level === 'low' },
+];
+
 /** Displays searchable client records and the actions available for each client. */
 export default function ClientListPage() {
   const navigate = useNavigate();
@@ -124,7 +107,7 @@ export default function ClientListPage() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
-  const [sort, setSort] = useState({ key: 'touch', dir: 'desc' });
+  const [dir, setDir] = useState('desc');
   const [selected, setSelected] = useState(() => new Set());
 
   useEffect(() => {
@@ -139,39 +122,15 @@ export default function ClientListPage() {
     return () => { current = false; };
   }, [archived]);
 
-  const filtered = useMemo(() => {
-    let out = [...clients];
-    if (filter === 'action') {
-      out = out.filter((c) => nextAction(c).tone !== 'ghost');
-    } else if (filter === 'low' || filter === 'medium' || filter === 'high') {
-      out = out.filter((c) => (c.income_level || '').toLowerCase() === filter);
-    } else if (filter === 'complex') {
-      out = out.filter((c) => (c.prescriptions?.length || 0) >= 3);
-    } else if (filter === 'senior') {
-      out = out.filter((c) => (c.age || 0) >= 65);
-    }
-    if (query.trim()) {
-      const q = query.toLowerCase();
-      out = out.filter(
-        (c) =>
-          c.full_name?.toLowerCase().includes(q) ||
-          c.zip_code?.includes(q) ||
-          c.id?.toLowerCase().includes(q),
-      );
-    }
-    out.sort((a, b) => compareClients(a, b, sort.key, sort.dir));
-    return out;
-  }, [clients, query, filter, sort]);
 
-  const filters = [
-    { key: 'all', label: 'All', count: clients.length },
-    { key: 'action', label: 'Needs action', count: clients.filter((c) => nextAction(c).tone !== 'ghost').length },
-    { key: 'senior', label: 'Age 65+', count: clients.filter((c) => (c.age || 0) >= 65).length },
-    { key: 'complex', label: 'Complex Rx', count: clients.filter((c) => (c.prescriptions?.length || 0) >= 3).length },
-    { key: 'high', label: 'High income', count: clients.filter((c) => c.income_level === 'high').length },
-    { key: 'medium', label: 'Medium', count: clients.filter((c) => c.income_level === 'medium').length },
-    { key: 'low', label: 'Low income', count: clients.filter((c) => c.income_level === 'low').length },
-  ];
+  const filtered = useMemo(() => {
+    const test = FILTERS.find((f) => f.key === filter)?.test || (() => true);
+    const q = query.trim().toLowerCase();
+    return clients
+      .filter(test)
+      .filter((c) => !q || c.full_name?.toLowerCase().includes(q) || c.zip_code?.includes(q) || c.id?.toLowerCase().includes(q))
+      .sort((a, b) => (touchTime(a) - touchTime(b)) * (dir === 'asc' ? 1 : -1));
+  }, [clients, query, filter, dir]);
 
   const toggleSelect = (id) => {
     setSelected((prev) => {
@@ -181,10 +140,9 @@ export default function ClientListPage() {
       return next;
     });
   };
-  const selectAll = () => {
-    if (selected.size === filtered.length) setSelected(new Set());
-    else setSelected(new Set(filtered.map((c) => c.id)));
-  };
+  const allOn = filtered.length > 0 && filtered.every((c) => selected.has(c.id));
+  const someOn = !allOn && filtered.some((c) => selected.has(c.id));
+  const selectAll = () => setSelected(allOn ? new Set() : new Set(filtered.map((c) => c.id)));
   const clearSelection = () => setSelected(new Set());
 
   const selectedClients = filtered.filter((c) => selected.has(c.id));
@@ -200,9 +158,6 @@ export default function ClientListPage() {
     }
   };
 
-  const headerChecked = selected.size > 0 && selected.size === filtered.length;
-  const headerIndeterminate = selected.size > 0 && selected.size < filtered.length;
-
   return (
     <>
       <TopBar
@@ -211,216 +166,145 @@ export default function ClientListPage() {
         onNotificationsClick={openNotifications}
         action={
           !archived && <button className="btn accent" onClick={() => navigate('/clients/new')}>
-            <Icon name="plus" size={14} /> Add client
+            <Plus size={15} weight="bold" /> Add client
           </button>
         }
       />
-      <div className="page wide">
-        <div className="page-head">
-          <div>
-            <div className="eyebrow" style={{ marginBottom: 14 }}>{clients.length} {archived ? 'archived' : 'active'} clients</div>
-            <h1 className="page-title"><em>Clients</em></h1>
-            <p className="page-sub">
-              Sorted by most-recent touch. Click a row to open the profile, or select rows to act in bulk.
-            </p>
-          </div>
-          <div className="row">
-            <button className="btn" onClick={() => exportSelected()}>
-              <Icon name="download" size={14} /> Export CSV
-            </button>
-          </div>
-        </div>
+      <div className="page wide ws-page-in">
+        <PageHead
+          icon="clients"
+          eyebrow={`${clients.length} ${archived ? 'archived' : 'active'} clients`}
+          title="Clients"
+          sub="Sorted by most recent touch. Click a row to open the profile, or select rows to act in bulk."
+          actions={<button className="btn" onClick={exportSelected}><DownloadSimple size={15} weight="duotone" /> Export CSV</button>}
+        />
 
-        <nav className="client-archive-nav" aria-label="Client status">
+        <nav className="ws-tabs" aria-label="Client status">
           <Link to="/clients" aria-current={!archived ? 'page' : undefined}>Active clients</Link>
           <Link to="/clients?archived=true" aria-current={archived ? 'page' : undefined}>Archived clients</Link>
         </nav>
 
-        <div className="between" style={{ marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
-          <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-            {!archived && filters.map((f) => (
+        <div className="ws-toolbar">
+          <div className="ws-pills" role="tablist" aria-label="Filter clients">
+            {!archived && FILTERS.map((f) => (
               <button
                 key={f.key}
+                role="tab"
+                aria-selected={filter === f.key}
+                className={`ws-pill ${filter === f.key ? 'on' : ''}`}
                 onClick={() => setFilter(f.key)}
-                className={`btn sm ${filter === f.key ? 'primary' : ''}`}
               >
-                {f.label}
-                <span className="mono" style={{ fontSize: 10, opacity: 0.7, marginLeft: 4 }}>{f.count}</span>
+                {f.label}<span>{clients.filter(f.test).length}</span>
               </button>
             ))}
           </div>
-          <div className="search" style={{ width: 260 }}>
-            <Icon name="search" size={14} />
-            <input placeholder="Search name, ZIP, or ID…" value={query} onChange={(e) => setQuery(e.target.value)} />
-          </div>
+          <label className="search ws-search">
+            <MagnifyingGlass size={14} weight="duotone" />
+            <input placeholder="Search name, ZIP, or ID" aria-label="Search clients" value={query} onChange={(e) => setQuery(e.target.value)} />
+          </label>
         </div>
 
         {selected.size > 0 && (
-          <div
-            className="between"
-            style={{
-              padding: '12px 16px',
-              marginBottom: 16,
-              background: 'var(--panel-2, var(--panel))',
-              border: '1px solid var(--line)',
-              borderRadius: 8,
-              flexWrap: 'wrap',
-              gap: 12,
-            }}
-          >
-            <div className="row" style={{ gap: 12 }}>
-              <span style={{ fontSize: 14, fontWeight: 500 }}>{selected.size} selected</span>
-              <button className="btn ghost sm" onClick={clearSelection}>Clear</button>
-            </div>
-            <div className="row" style={{ gap: 6 }}>
-              <button className="btn sm" onClick={compareSelected}>
-                <Icon name="compare" size={12} /> {selected.size === 1 ? 'Open profile' : 'Compare'}
-              </button>
-              <button className="btn sm" onClick={exportSelected}>
-                <Icon name="download" size={12} /> Export {selected.size}
-              </button>
+          <div className="ws-bulk">
+            <strong>{selected.size} selected</strong>
+            <div className="quick-create-actions">
+              <button className="btn sm" onClick={compareSelected}>{selected.size === 1 ? 'Open profile' : 'Compare plans'}</button>
+              <button className="btn sm" onClick={exportSelected}>Export {selected.size}</button>
+              <button className="btn sm ghost" onClick={clearSelection}>Clear</button>
             </div>
           </div>
         )}
 
-        <div className="card" style={{ overflow: 'hidden' }}>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th style={{ width: 36, paddingRight: 0 }}>
+        {!loading && filtered.length > 0 && (
+          <div className="cl-bar">
+            <label className="cl-all">
+              <input
+                type="checkbox"
+                aria-label="Select all clients"
+                checked={allOn}
+                ref={(el) => { if (el) el.indeterminate = someOn; }}
+                onChange={selectAll}
+              />
+              Select all
+            </label>
+            <button className="ws-sort" onClick={() => setDir((d) => (d === 'asc' ? 'desc' : 'asc'))} aria-label={`Sort by last touch, ${dir === 'desc' ? 'newest' : 'oldest'} first`}>
+              Last touch {dir === 'desc' ? <ArrowDown size={12} weight="bold" /> : <ArrowUp size={12} weight="bold" />}
+            </button>
+          </div>
+        )}
+
+        {loading && <div className="card cl-empty"><div className="loader" /></div>}
+
+        {!loading && filtered.length === 0 && (
+          <div className="card cl-empty">
+            <div className="empty-title">
+              {clients.length === 0 ? (archived ? 'No archived clients' : 'No clients yet') : 'No clients match this view.'}
+            </div>
+            <div>
+              {clients.length === 0
+                ? (archived ? 'Clients you archive will appear here for history and restoration.' : 'Add your first client to start tracking renewals and running comparisons.')
+                : 'Try clearing the filter or searching a different name.'}
+            </div>
+            {clients.length === 0 && !archived && (
+              <div style={{ marginTop: 18 }}>
+                <button className="btn accent" onClick={() => navigate('/clients/new')}>
+                  <Plus size={15} weight="bold" /> Add client
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {!loading && filtered.length > 0 && (
+          <ul className="cl-list">
+            {filtered.map((c) => {
+              const risk = riskLevel(c);
+              const na = nextAction(c);
+              const isSel = selected.has(c.id);
+              const rx = c.prescriptions?.length || 0;
+              const dr = c.doctors?.length || 0;
+              return (
+                <li
+                  key={c.id}
+                  data-testid="client-row"
+                  className={`card cl-card ${isSel ? 'on' : ''}`}
+                  onClick={() => navigate(`/clients/${c.id}`)}
+                >
                   <input
                     type="checkbox"
-                    aria-label="Select all clients"
-                    checked={headerChecked}
-                    ref={(el) => { if (el) el.indeterminate = headerIndeterminate; }}
-                    onChange={selectAll}
+                    className="cl-cb"
+                    aria-label={`Select ${c.full_name}`}
+                    checked={isSel}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => toggleSelect(c.id)}
                   />
-                </th>
-                <Th k="name" sort={sort} setSort={setSort} style={{ width: '24%' }}>Client</Th>
-                <Th k="age" sort={sort} setSort={setSort}>ZIP and age</Th>
-                <th>Income</th>
-                <Th k="risk" sort={sort} setSort={setSort}>Risk</Th>
-                <th>Rx / Providers</th>
-                <th>Next action</th>
-                <Th k="touch" sort={sort} setSort={setSort}>Last touch</Th>
-                <th style={{ width: 80 }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={9} style={{ padding: 40, textAlign: 'center' }}>
-                    <div className="loader" />
-                  </td>
-                </tr>
-              )}
-              {!loading && filtered.map((c) => {
-                const risk = riskLevel(c);
-                const tone = c.income_level === 'high' ? 'accent' : c.income_level === 'medium' ? 'pos' : 'warn';
-                const na = nextAction(c);
-                const isSel = selected.has(c.id);
-                return (
-                  <tr
-                    key={c.id}
-                    data-testid="client-row"
-                    className={`row ${isSel ? 'selected' : ''}`}
-                    onClick={() => navigate(`/clients/${c.id}`)}
-                  >
-                    <td style={{ paddingRight: 0 }} onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        aria-label={`Select ${c.full_name}`}
-                        checked={isSel}
-                        onChange={() => toggleSelect(c.id)}
-                      />
-                    </td>
-                    <td>
-                      <div className="row" style={{ gap: 12 }}>
-                        <Avatar name={c.full_name} />
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.full_name}</div>
-                          <div className="sub">#{c.id.slice(0, 8)}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <div>{c.zip_code}</div>
-                      <div className="sub">Age {c.age}</div>
-                    </td>
-                    <td>
-                      <Chip tone={tone} dot>{c.income_level}</Chip>
-                    </td>
-                    <td>
-                      <div className="row" style={{ gap: 8 }}>
-                        <span className={`risk-dot ${risk}`} />
-                        <span style={{ textTransform: 'capitalize' }}>{risk}</span>
-                      </div>
-                    </td>
-                    <td className="num">
-                      <span>{c.prescriptions?.length || 0} Rx</span>
-                      <span className="muted">, {c.doctors?.length || 0} doctors</span>
-                    </td>
-                    <td>
-                      {na.tone === 'ghost' ? (
-                        <span className="muted" style={{ fontSize: 13 }}>—</span>
-                      ) : (
-                        <Chip tone={na.tone} dot>{na.label}</Chip>
-                      )}
-                    </td>
-                    <td className="muted">{sinceLabel(c.updated_at || c.created_at)}</td>
-                    <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                      <button
-                        className="btn ghost icon sm"
-                        onClick={() => navigate('/plan')}
-                        title="Plan timeline"
-                        aria-label="Plan timeline"
-                      >
-                        <Icon name="history" size={13} />
-                      </button>
-                      <button
-                        className="btn ghost icon sm"
-                        onClick={() => navigate(`/clients/${c.id}`)}
-                        aria-label="Open client"
-                        title="Open profile"
-                      >
-                        <Icon name="chev_r" size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-              {!loading && filtered.length === 0 && (
-                <tr>
-                  <td colSpan={9}>
-                    <div className="empty">
-                      <div className="empty-title">
-                        {clients.length === 0 ? (archived ? 'No archived clients' : 'No clients yet') : 'No matches'}
-                      </div>
-                      <div>
-                        {clients.length === 0
-                          ? (archived ? 'Clients you archive will appear here for history and restoration.' : 'Add your first client to start tracking renewals and running comparisons.')
-                          : 'Try clearing the filter or searching a different name.'}
-                      </div>
-                      {clients.length === 0 && !archived && (
-                        <div style={{ marginTop: 18 }}>
-                          <button className="btn accent" onClick={() => navigate('/clients/new')}>
-                            <Icon name="plus" size={14} /> Add client
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {!loading && clients.length > 0 && (
-          <div className="between" style={{ marginTop: 16, color: 'var(--ink-3)', fontSize: 12.5 }}>
-            <span>Showing {filtered.length} of {clients.length}</span>
-          </div>
+                  <div className="cl-who">
+                    <Avatar name={c.full_name} size="md" />
+                    <div><strong>{c.full_name}</strong><small className="mono">#{c.id.slice(0, 8)}</small></div>
+                  </div>
+                  <div className="cl-fields">
+                    <div className="cl-f"><small>ZIP and age</small><span><span className="mono">{c.zip_code || '—'}</span> · Age {c.age ?? '—'}</span></div>
+                    <div className="cl-f"><small>Income</small>{c.income_level ? <Chip tone={c.income_level === 'low' ? 'warn' : 'pos'}>{c.income_level}</Chip> : <span className="muted">—</span>}</div>
+                    <div className="cl-f"><small>Risk</small><span className={`cl-risk ${risk}`}>{RISK_LABEL[risk]}</span></div>
+                    <div className="cl-f"><small>Rx / Providers</small><span>{rx} Rx, {dr} doctor{dr === 1 ? '' : 's'}</span></div>
+                    <div className="cl-f"><small>Next action</small>{na.tone === 'ghost' ? <span className="muted">None</span> : <Chip tone={na.tone}>{na.label}</Chip>}</div>
+                    <div className="cl-f"><small>Last touch</small><span>{sinceLabel(c.updated_at || c.created_at)}</span></div>
+                  </div>
+                  <div className="cl-act" onClick={(e) => e.stopPropagation()}>
+                    <button className="btn ghost icon sm" onClick={() => navigate('/plan')} title="Plan timeline" aria-label={`Plan timeline for ${c.full_name}`}>
+                      <ClockCounterClockwise size={16} weight="duotone" />
+                    </button>
+                    <button className="btn ghost icon sm" onClick={() => navigate(`/clients/${c.id}`)} title="Open profile" aria-label={`Open ${c.full_name}`}>
+                      <CaretRight size={16} weight="bold" />
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         )}
+
+        {!loading && clients.length > 0 && <div className="cl-count">Showing {filtered.length} of {clients.length}</div>}
       </div>
     </>
   );

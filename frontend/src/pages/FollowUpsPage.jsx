@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { MotionConfig } from 'framer-motion'
+import { Plus } from '@phosphor-icons/react'
 import api from '../api/client'
 import TopBar from '../components/TopBar'
+import PageHead from '../components/ui/PageHead'
 import useLayout from '../components/ui/useLayout'
 import { workspaceApi } from '../api/workspace'
 import TaskList from '../components/workspace/TaskList'
@@ -43,9 +46,17 @@ export default function FollowUpsPage() {
     else if (dateKey(new Date(task.due_at)) === todayKey) groups.today.push(task)
     else groups.upcoming.push(task)
   }
-  return <><TopBar crumbs={['Workspace', 'Follow-ups']} onMenuClick={openMenu} onNotificationsClick={openNotifications} /><main className="page"><div className="page-head"><div><h1 className="page-title">Follow-ups</h1><p className="page-sub">Promises and next steps to keep moving.</p></div><button className="btn accent" onClick={() => setCreating(true)}>New Follow-up</button></div>
-    {error && <p role="alert" className="workspace-error">{error}</p>}{!tasks && !error && <p role="status">Loading follow-ups…</p>}
-    {tasks && <div className="workspace-stack"><TaskList title="Overdue" tasks={groups.overdue} onToggle={complete} timeZone={zone} /><TaskList title="Today" tasks={groups.today} onToggle={complete} timeZone={zone} /><TaskList title="Upcoming" tasks={groups.upcoming} onToggle={complete} timeZone={zone} /><TaskList title="Unscheduled" tasks={groups.unscheduled} onToggle={complete} timeZone={zone} /></div>}
+  const open = tasks ? tasks.length : 0
+  return <MotionConfig reducedMotion="user"><TopBar crumbs={['Workspace', 'Follow-ups']} onMenuClick={openMenu} onNotificationsClick={openNotifications} /><main className="page ws-page-in">
+    <PageHead
+      icon="follow"
+      eyebrow={tasks ? `${open} open · ${groups.overdue.length} overdue` : null}
+      title="Follow-ups"
+      sub="Promises and next steps to keep moving."
+      actions={<button className="btn accent" onClick={() => setCreating(true)}><Plus size={15} weight="bold" /> New Follow-up</button>}
+    />
+    {error && <p role="alert" className="workspace-error">{error}</p>}{!tasks && !error && <p role="status" className="workspace-empty">Loading follow-ups…</p>}
+    {tasks && <div className="workspace-stack"><TaskList title="Overdue" tone="neg" tasks={groups.overdue} onToggle={complete} timeZone={zone} /><TaskList title="Today" tasks={groups.today} onToggle={complete} timeZone={zone} /><TaskList title="Upcoming" tasks={groups.upcoming} onToggle={complete} timeZone={zone} /><TaskList title="Unscheduled" tasks={groups.unscheduled} onToggle={complete} timeZone={zone} /></div>}
     {creating && <QuickCreateModal mode="task" initialValues={{ is_follow_up: true }} clients={clients} organizations={organizations} timeZone={zone} onClose={() => setCreating(false)} onCreated={async () => { setCreating(false); try { await refresh() } catch { setError('Saved, but Follow-ups could not refresh. Reload to see the update.') } }} />}
-  </main></>
+  </main></MotionConfig>
 }

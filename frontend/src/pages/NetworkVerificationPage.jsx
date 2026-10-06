@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react';
+import { MotionConfig } from 'framer-motion';
+import { Pill, SealCheck, Stethoscope, Warning } from '@phosphor-icons/react';
 import api from '../api/client';
 import TopBar from '../components/TopBar';
-import Icon from '../components/ui/Icon';
-import Chip from '../components/ui/Chip';
 import AgentMarkdown from '../components/ui/AgentMarkdown';
-import useLayout from '../components/ui/useLayout';
 import DrugAutocomplete from '../components/ui/DrugAutocomplete';
+import { PlanLogo } from '../components/ui/OrgLogo';
+import PageHead from '../components/ui/PageHead';
+import useLayout from '../components/ui/useLayout';
+import { RunSteps, SourceRow, ToolResults } from '../components/tools/ToolRun';
+import { ClientPrefill, PairListInput } from '../components/tools/ToolInputs';
+import { TOOL_FLOWS } from '../components/tools/toolFlows';
 
 /** Checks provider-network and formulary data for a client's selected plans. */
 export default function NetworkVerificationPage() {
@@ -15,8 +20,6 @@ export default function NetworkVerificationPage() {
   const [zip, setZip] = useState('10001');
   const [income, setIncome] = useState('medium');
   const [providers, setProviders] = useState([]);
-  const [pName, setPName] = useState('');
-  const [pNpi, setPNpi] = useState('');
   const [rx, setRx] = useState([]);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
@@ -31,13 +34,14 @@ export default function NetworkVerificationPage() {
     setClientId(c.id);
     setZip(c.zip_code);
     setIncome(c.income_level);
-    setProviders(c.doctors || []);
+    setProviders((c.doctors || []).map((doctor) => ({ name: doctor.name, npi: doctor.npi || '' })));
     setRx(c.prescriptions || []);
   }
 
   async function run() {
     setError('');
     setRunning(true);
+    setResult(null);
     try {
       const res = await api.post('/verify', {
         zip_code: zip,
@@ -61,193 +65,137 @@ export default function NetworkVerificationPage() {
     }
   }
 
+  const flow = TOOL_FLOWS.network;
+  const plans = result?.plans || [];
+  const ready = /^\d{5}$/.test(zip) && (providers.length > 0 || rx.length > 0);
+  const coverage = (plan) => {
+    const providersIn = plan.provider_results.filter((r) => r.in_network).length;
+    const drugsCovered = plan.formulary_results.filter((r) => r.on_formulary).length;
+    return { providersIn, drugsCovered, complete: providersIn === plan.provider_results.length && drugsCovered === plan.formulary_results.length };
+  };
+  const providerRows = plans[0]?.provider_results.map((item, index) => ({ item, index })) || [];
+  const drugRows = plans[0]?.formulary_results.map((item, index) => ({ item, index })) || [];
+
   return (
-    <>
-      <TopBar
-        crumbs={['Tools', 'Network check']}
-        onMenuClick={openMenu}
-        onNotificationsClick={openNotifications}
-      />
-      <div className="page wide">
-        <div className="page-head">
-          <div>
-            <div className="eyebrow" style={{ marginBottom: 14 }}>Provider and formulary check</div>
-            <h1 className="page-title">Check coverage before enrollment.</h1>
-            <p className="page-sub">
-              Check available provider and formulary data for a client's plans. Confirm network and drug coverage
-              directly with the plan before enrollment.
-            </p>
-          </div>
-        </div>
+    <MotionConfig reducedMotion="user">
+      <TopBar crumbs={['AI Tools', 'Check Network']} onMenuClick={openMenu} onNotificationsClick={openNotifications} />
+      <div className="page wide ws-page-in">
+        <PageHead
+          icon="network"
+          eyebrow="Provider and formulary check"
+          title="Check coverage before enrollment"
+          sub="See which plans in a client's ZIP list their doctors and cover their prescriptions. Confirm network and drug coverage directly with the plan before enrollment."
+        />
 
-        <form className="card card-pad" style={{ padding: 32, marginBottom: 28 }} onSubmit={(e) => { e.preventDefault(); run(); }}>
-          {clients.length > 0 && (
-            <div className="field" style={{ marginBottom: 20 }}>
-              <label className="field-label">Prefill from client</label>
-              <select
-                className="select"
-                value={clientId}
-                onChange={(e) => applyClient(clients.find((x) => x.id === e.target.value))}
-              >
-                <option value="">None</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>{c.full_name}, ZIP {c.zip_code}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div className="grid-12" style={{ gap: 20 }}>
-            <div className="field" style={{ gridColumn: 'span 3' }}>
-              <label className="field-label">ZIP code</label>
-              <input className="input" value={zip} onChange={(e) => setZip(e.target.value)} pattern="\d{5}" required />
-            </div>
-            <div className="field" style={{ gridColumn: 'span 3' }}>
-              <label className="field-label">Income</label>
-              <select className="select" value={income} onChange={(e) => setIncome(e.target.value)}>
+        <form className="card workspace-section workspace-inline-form cp-form" onSubmit={(e) => { e.preventDefault(); if (ready) run(); }} noValidate>
+          <div className="ws-grid4">
+            <ClientPrefill clients={clients} value={clientId} onPick={applyClient} />
+            <label>ZIP code<input value={zip} onChange={(e) => setZip(e.target.value)} inputMode="numeric" maxLength={5} /></label>
+            <label>Income
+              <select value={income} onChange={(e) => setIncome(e.target.value)}>
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
               </select>
-            </div>
+            </label>
           </div>
-
-          <div className="divider" />
-
-          <div className="grid-2">
-            <div>
-              <div className="eyebrow" style={{ marginBottom: 12 }}>Providers</div>
-              <div className="input-group">
-                <input className="input" placeholder="Dr. name" value={pName} onChange={(e) => setPName(e.target.value)} />
-                <input className="input" placeholder="NPI (optional)" value={pNpi} onChange={(e) => setPNpi(e.target.value)} style={{ maxWidth: 180 }} />
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => {
-                    if (!pName.trim()) return;
-                    setProviders([...providers, { name: pName.trim(), npi: pNpi.trim() || null }]);
-                    setPName('');
-                    setPNpi('');
-                  }}
-                >
-                  Add
-                </button>
-              </div>
-              <div className="col" style={{ gap: 6, marginTop: 12 }}>
-                {providers.map((p, i) => (
-                  <div key={i} className="between" style={{ padding: '8px 12px', border: '1px solid var(--line)', borderRadius: 6 }}>
-                    <div className="row" style={{ gap: 10 }}>
-                      <Icon name="stethoscope" size={14} className="ink-4" />
-                      <span style={{ fontSize: 13.5 }}>{p.name}</span>
-                      {p.npi && <span className="muted mono" style={{ fontSize: 11.5 }}>NPI {p.npi}</span>}
-                    </div>
-                    <button type="button" className="btn ghost icon sm" onClick={() => setProviders(providers.filter((_, j) => j !== i))}>
-                      <Icon name="x" size={12} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div className="eyebrow" style={{ marginBottom: 12 }}>Prescriptions</div>
+          <div className="ws-grid2">
+            <PairListInput
+              label="Providers"
+              fields={[{ key: 'name', placeholder: 'Doctor name' }, { key: 'npi', placeholder: 'NPI (optional)', narrow: true }]}
+              items={providers}
+              setItems={setProviders}
+              format={(item) => (item.npi ? `${item.name} · NPI ${item.npi}` : item.name)}
+            />
+            <div className="ws-listin">
+              <div className="ws-listin-label">Prescriptions</div>
               <DrugAutocomplete values={rx} onChange={setRx} placeholder="Medication name" />
             </div>
           </div>
-
-          {error && <div className="notice" style={{ marginTop: 20, color: 'var(--neg)', borderColor: 'var(--neg)' }}>{error}</div>}
-
-          <div className="row" style={{ justifyContent: 'flex-end', marginTop: 20, gap: 10 }}>
-            <button type="submit" className="btn accent" disabled={running || (providers.length === 0 && rx.length === 0)}>
-              {running ? <><span className="loader" /> Checking…</> : <><Icon name="network" size={14} /> Check coverage</>}
+          {error && <p role="alert" className="workspace-error">{error}</p>}
+          <div className="ws-submit">
+            {!ready && <span className="workspace-small">Add at least one provider or prescription.</span>}
+            <button type="submit" className="btn accent lg" disabled={running || !ready}>
+              <SealCheck size={16} weight="duotone" /> {running ? 'Checking…' : 'Check coverage'}
             </button>
           </div>
         </form>
 
-        {result && (
-          <>
+        {running && <RunSteps steps={flow.steps({ zip, providers: providers.length, drugs: rx.length })} running={running} title="Checking coverage" />}
+
+        <ToolResults show={Boolean(result) && !running}>
+          {result && <>
             {result.recommendation && (
-              <div className="card card-pad" style={{ marginBottom: 28 }}>
-                <div className="eyebrow" style={{ marginBottom: 10 }}>Recommendation</div>
-                <AgentMarkdown style={{ fontSize: 15 }}>
-                  {result.recommendation}
-                </AgentMarkdown>
-              </div>
+              <section className="card workspace-section cp-rec-card">
+                <div className="between cp-rec-head"><h2><SealCheck size={20} weight="duotone" aria-hidden="true" /> Recommendation</h2></div>
+                <AgentMarkdown className="cp-rec">{result.recommendation}</AgentMarkdown>
+                <SourceRow items={flow.sources} />
+              </section>
             )}
 
-            <div className="section-head" style={{ marginTop: 0 }}>
-              <h2>Plan-by-plan</h2>
-              <div className="after">{result.plans?.length || 0} plans checked</div>
-            </div>
+            {plans.length > 0 && (
+              <section className="card workspace-section">
+                <div className="between"><h2>Coverage by plan</h2><span className="workspace-small">ZIP {zip} · {plans.length} plans checked</span></div>
+                <div className="cost-table-wrap">
+                  <table className="tbl net-table">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        {plans.map((plan) => {
+                          const summary = coverage(plan);
+                          return (
+                            <th key={plan.plan_id}>
+                              <span className="net-plan"><PlanLogo planName={plan.plan_name} size={24} /><span>{plan.plan_name}</span></span>
+                              <span className={`chip ${summary.complete ? 'pos' : 'warn'}`}>{summary.complete ? 'Covers everything' : 'Has gaps'}</span>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {providerRows.map(({ item, index }) => (
+                        <tr key={`provider-${index}`}>
+                          <td>
+                            <span className="net-item"><Stethoscope size={15} weight="duotone" aria-hidden="true" /><span><strong>{item.name}</strong><small>{[item.specialty, item.npi && `NPI ${item.npi}`].filter(Boolean).join(' · ') || 'Provider'}</small>{item.npi_verified ? <small className="net-ok">Verified in NPPES</small> : <small className="net-warn">Not found in NPPES</small>}</span></span>
+                          </td>
+                          {plans.map((plan) => {
+                            const cell = plan.provider_results[index];
+                            return (
+                              <td key={plan.plan_id}>
+                                <span className={`chip ${cell?.in_network ? 'pos' : 'neg'}`}>{cell?.in_network ? 'Listed in network' : 'Not listed'}</span>
+                                {cell?.warning && <small className="net-warn"><Warning size={12} weight="duotone" aria-hidden="true" />{cell.warning}</small>}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                      {drugRows.map(({ item, index }) => (
+                        <tr key={`drug-${index}`}>
+                          <td><span className="net-item"><Pill size={15} weight="duotone" aria-hidden="true" /><span><strong>{item.drug_name}</strong><small>Prescription</small></span></span></td>
+                          {plans.map((plan) => {
+                            const cell = plan.formulary_results[index];
+                            if (!cell?.on_formulary) return <td key={plan.plan_id}><span className="chip neg">Not on formulary</span></td>;
+                            const tierNumber = Number(String(cell.tier || '').match(/\d+/)?.[0] || 0);
+                            return (
+                              <td key={plan.plan_id}>
+                                <span className={`chip ${tierNumber >= 3 ? 'warn' : 'pos'}`}>{cell.tier ? `Tier ${tierNumber || cell.tier}` : 'Covered'}{cell.copay != null ? ` · $${cell.copay}` : ''}</span>
+                                {cell.prior_auth_required && <small className="net-warn"><Warning size={12} weight="duotone" aria-hidden="true" />Prior authorization</small>}
+                                {cell.warning && <small className="net-warn"><Warning size={12} weight="duotone" aria-hidden="true" />{cell.warning}</small>}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
 
-            <div className="col" style={{ gap: 16 }}>
-              {(result.plans || []).map((plan) => {
-                const providersIn = plan.provider_results.filter((r) => r.in_network).length;
-                const providersTotal = plan.provider_results.length;
-                const formularyCovered = plan.formulary_results.filter((r) => r.on_formulary).length;
-                const formularyTotal = plan.formulary_results.length;
-                const allClean = providersIn === providersTotal && formularyCovered === formularyTotal;
-                return (
-                  <div key={plan.plan_id} className="card card-pad">
-                    <div className="between" style={{ marginBottom: 16 }}>
-                      <div>
-                        <div style={{ fontFamily: 'var(--serif)', fontSize: 20, letterSpacing: '-0.01em' }}>{plan.plan_name}</div>
-                        <div className="muted mono" style={{ fontSize: 11, marginTop: 2 }}>{plan.plan_id}</div>
-                      </div>
-                      <Chip tone={allClean ? 'pos' : 'warn'} dot>
-                        {allClean ? 'Full coverage' : 'Has gaps'}
-                      </Chip>
-                    </div>
-                    <div className="grid-2">
-                      <div>
-                        <div className="eyebrow" style={{ marginBottom: 10 }}>Providers: {providersIn}/{providersTotal} listed in network</div>
-                        {plan.provider_results.length === 0 && <div className="muted" style={{ fontSize: 13 }}>No providers entered.</div>}
-                        {plan.provider_results.map((p, i, a) => (
-                          <div key={i} className="between" style={{ padding: '8px 0', borderBottom: i < a.length - 1 ? '1px dashed var(--line)' : 0 }}>
-                            <div className="row" style={{ gap: 10 }}>
-                              <Icon name="stethoscope" size={14} className="ink-4" />
-                              <div>
-                                <div style={{ fontSize: 13 }}>{p.name}</div>
-                                {p.specialty && <div className="muted" style={{ fontSize: 11 }}>{p.specialty}</div>}
-                                {p.warning && <div style={{ color: 'var(--warn)', fontSize: 11, marginTop: 2 }}>{p.warning}</div>}
-                              </div>
-                            </div>
-                            <Chip tone={p.in_network ? 'pos' : 'neg'} dot>
-                              {p.in_network ? 'In-network' : 'Out'}
-                            </Chip>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div>
-                        <div className="eyebrow" style={{ marginBottom: 10 }}>Formulary: {formularyCovered}/{formularyTotal} covered</div>
-                        {plan.formulary_results.length === 0 && <div className="muted" style={{ fontSize: 13 }}>No prescriptions entered.</div>}
-                        {plan.formulary_results.map((f, i, a) => (
-                          <div key={i} className="between" style={{ padding: '8px 0', borderBottom: i < a.length - 1 ? '1px dashed var(--line)' : 0 }}>
-                            <div className="row" style={{ gap: 10 }}>
-                              <Icon name="pill" size={14} className="ink-4" />
-                              <div>
-                                <div style={{ fontSize: 13 }}>{f.drug_name}</div>
-                                {f.tier && <div className="muted mono" style={{ fontSize: 11 }}>Tier {f.tier}</div>}
-                                {f.prior_auth_required && <div style={{ color: 'var(--warn)', fontSize: 11, marginTop: 2 }}>Prior auth required</div>}
-                              </div>
-                            </div>
-                            <Chip tone={f.on_formulary ? 'pos' : 'neg'} dot>
-                              {f.on_formulary ? (f.copay != null ? `$${f.copay}` : 'Covered') : 'Not covered'}
-                            </Chip>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {result.disclaimer && <div className="notice" style={{ marginTop: 24 }}>{result.disclaimer}</div>}
-          </>
-        )}
+            <p className="ws-note">{result.disclaimer || 'Networks change during the year.'} Network results come from a sample table, not the plans' own directories, so confirm with the plan before enrollment.</p>
+          </>}
+        </ToolResults>
       </div>
-    </>
+    </MotionConfig>
   );
 }

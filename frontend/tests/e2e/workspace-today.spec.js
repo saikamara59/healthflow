@@ -18,7 +18,8 @@ test('broker creates and completes a task without leaving Today', async ({ authe
 
 test('mock inbox prefills a follow-up task and is labeled as mock data', async ({ authedPage }) => {
   await authedPage.goto('/today')
-  await expect(authedPage.getByText('Mock inbox')).toBeVisible()
+  await expect(authedPage.getByRole('heading', { name: 'Inbox' })).toBeVisible()
+  await expect(authedPage.getByText('Sample data', { exact: true })).toBeVisible()
   await authedPage.getByRole('button', { name: /create task from renewal documents/i }).click()
   await expect(authedPage.getByLabel('Task title')).toHaveValue(/renewal documents/i)
   await expect(authedPage.getByLabel('Follow-up')).toBeChecked()
@@ -26,7 +27,9 @@ test('mock inbox prefills a follow-up task and is labeled as mock data', async (
 
 test('mock inbox requires Broker confirmation before linking its suggested Client', async ({ authedPage }) => {
   await authedPage.goto('/today')
-  await expect(authedPage.getByText(/Suggested client: Eleanor Rigby/)).toBeVisible()
+  const renewalMessage = authedPage.getByRole('listitem').filter({ hasText: 'Renewal documents are ready' })
+  await expect(renewalMessage).toContainText('Possible client match')
+  await expect(renewalMessage).toContainText('Eleanor Rigby')
   await authedPage.getByRole('button', { name: /create task from renewal documents/i }).click()
 
   const clientSelect = authedPage.getByRole('combobox', { name: 'Client' })
@@ -36,6 +39,7 @@ test('mock inbox requires Broker confirmation before linking its suggested Clien
   await expect(authedPage.getByText('Client link confirmed: Eleanor Rigby')).toBeVisible()
 
   await authedPage.getByRole('button', { name: 'Create Task', exact: true }).click()
+  await authedPage.getByRole('button', { name: /other open task/ }).click()
   const row = authedPage.getByRole('listitem', { name: /Renewal documents are ready/i })
   await expect(row).toContainText('Eleanor Rigby')
 })
@@ -53,7 +57,7 @@ test('mock inbox does not substitute another Client when its suggestion is unava
 
   await authedPage.reload()
   const denialMessage = authedPage.getByRole('listitem').filter({ hasText: 'Denial notice received' })
-  await expect(denialMessage).not.toContainText('Suggested client')
+  await expect(denialMessage).not.toContainText('Possible client match')
   await denialMessage.getByRole('button', { name: /create task/i }).click()
   await expect(authedPage.getByRole('button', { name: /Confirm Client link/ })).toHaveCount(0)
 })
@@ -63,6 +67,7 @@ test('unscheduled Task stays visible under Other open tasks', async ({ authedPag
   await authedPage.getByRole('button', { name: 'New Task' }).click()
   await authedPage.getByLabel('Task title').fill('Prepare case notes')
   await authedPage.getByRole('button', { name: 'Create Task', exact: true }).click()
+  await authedPage.getByRole('button', { name: /other open task/ }).click()
   const section = authedPage.getByRole('heading', { name: 'Other open tasks' }).locator('..').locator('..')
   await expect(section.getByText('Prepare case notes')).toBeVisible()
 })
@@ -74,8 +79,8 @@ test('Today and Scheduling fit a phone without horizontal overflow', async ({ au
   const overflow = () => authedPage.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)
   expect(await overflow()).toBe(false)
   await authedPage.getByRole('button', { name: 'Open menu' }).click()
-  await expect(authedPage.getByRole('link', { name: 'Scheduling' })).toBeVisible()
-  await authedPage.getByRole('link', { name: 'Scheduling' }).click()
+  await expect(authedPage.getByRole('link', { name: 'Scheduling', exact: true })).toBeVisible()
+  await authedPage.getByRole('link', { name: 'Scheduling', exact: true }).click()
   await expect(authedPage.getByRole('heading', { name: 'Scheduling' })).toBeVisible()
   expect(await overflow()).toBe(false)
   await authedPage.getByRole('button', { name: 'New Appointment' }).click()

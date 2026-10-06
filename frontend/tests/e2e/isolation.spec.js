@@ -13,7 +13,7 @@ async function addClient(page, name) {
   await page.getByPlaceholder('10025').fill('10001')
   // Use exact match: '67' is a substring of the insurance-ID placeholder '1356789012'.
   await page.getByPlaceholder('67', { exact: true }).fill('67')
-  await page.getByRole('combobox').first().selectOption('low')
+  await page.getByLabel('Income').selectOption('low')
   await page.getByRole('button', { name: /create client/i }).click()
   // Wait for the form to complete and navigate to the success page.
   await page.waitForURL(/\/clients\/success/, { timeout: 10_000 })
@@ -22,13 +22,17 @@ async function addClient(page, name) {
 test('isolation canary A: adds Probe-A and never sees Probe-B', async ({ authedPage }) => {
   await addClient(authedPage, 'Isolation-Probe-A')
   await authedPage.goto('/clients')
-  await expect(authedPage.getByText('Isolation-Probe-A')).toBeVisible()
+  const rows = authedPage.getByTestId('client-row')
+  await expect(rows.getByText('Isolation-Probe-A')).toBeVisible()
+  // The whole page, not just the list: the other broker's client must appear nowhere.
   await expect(authedPage.getByText('Isolation-Probe-B')).toHaveCount(0)
 })
 
 test('isolation canary B: adds Probe-B and never sees Probe-A', async ({ authedPage }) => {
   await addClient(authedPage, 'Isolation-Probe-B')
   await authedPage.goto('/clients')
-  await expect(authedPage.getByText('Isolation-Probe-B')).toBeVisible()
+  const rows = authedPage.getByTestId('client-row')
+  await expect(rows.getByText('Isolation-Probe-B')).toBeVisible()
+  // The whole page, not just the list: the other broker's client must appear nowhere.
   await expect(authedPage.getByText('Isolation-Probe-A')).toHaveCount(0)
 })

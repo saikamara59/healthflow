@@ -344,6 +344,10 @@ class OverviewResponse(BaseModel):
     open_tasks: int
     overdue_tasks: int
     appointments_next_seven_days: int
+    active_enrollments: int
+    open_issues: int
+    open_follow_ups: int
+    unscheduled_tasks: int
     recent_activity: list[WorkspaceActivityResponse]
     recent_clients: list[RecentClientResponse]
 

@@ -112,8 +112,9 @@ export default function AddClientPage() {
               />
             </div>
             <div className="field" style={{ gridColumn: 'span 2' }}>
-              <label className="field-label">Income</label>
+              <label className="field-label" htmlFor="add-client-income">Income</label>
               <select
+                id="add-client-income"
                 className="select"
                 value={form.income_level}
                 onChange={(e) => setForm({ ...form, income_level: e.target.value })}
