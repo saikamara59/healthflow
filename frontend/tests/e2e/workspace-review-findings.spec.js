@@ -96,9 +96,10 @@ test.describe('Issue deadlines on a device in another time zone', () => {
   // calendar dates always differ by one day, whatever time the test runs.
   test.use({ timezoneId: 'Pacific/Pago_Pago' })
 
-  test('count days from today in the workspace time zone', async ({ authedPage: page }) => {
-    await page.goto('/today')
-    const headers = await authHeaders(page)
+  test('count days from today in the workspace time zone', async ({ authedPage: page, authedSession }) => {
+    // Save the workspace zone before any page loads: Today saves the device's zone
+    // on a first visit, which would race this setup.
+    const headers = { Authorization: `Bearer ${authedSession.access_token}` }
     expect((await page.request.put('/workspace/preferences', { headers, data: { timezone_name: 'Pacific/Kiritimati' } })).ok()).toBe(true)
     const workspaceToday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Pacific/Kiritimati' }).format(new Date())
     const tomorrow = new Date(`${workspaceToday}T12:00:00Z`)
