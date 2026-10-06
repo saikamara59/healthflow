@@ -148,3 +148,14 @@ def test_workflows_keep_read_only_tokens_and_avoid_pull_request_target():
         triggers = _triggers(workflow)
         assert "pull_request_target" not in triggers, f"{path.name} runs untrusted code with secrets"
         assert workflow.get("permissions") == {"contents": "read"}, f"{path.name} must default to read-only"
+
+
+def test_each_browser_runs_e2e_on_its_own_runner():
+    # Splitting by browser gives each project its own 2-core runner instead of
+    # sharing one with the Docker stack, and the release still waits for all of them.
+    job = _workflow("e2e.yml")["jobs"]["e2e"]
+    assert job["strategy"]["fail-fast"] is False, "One browser failing must not cancel the others' results"
+    assert sorted(job["strategy"]["matrix"]["browser"]) == ["chromium", "firefox", "webkit"]
+    run = " ".join(step.get("run", "") for step in job["steps"])
+    assert "--project=${{ matrix.browser }}" in run
+    assert "playwright install --with-deps ${{ matrix.browser }}" in run
