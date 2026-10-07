@@ -17,13 +17,14 @@ Governing decisions: [ADR 0006](../../adr/0006-production-on-fly-with-aws-for-do
 Facts about the repository when this design was written:
 
 - One Fly app, `healthflow-demo`, on a single 512 MB machine with SQLite on a volume.
-- `fly-deploy.yml` deploys every push to `main` and does not wait for `ci.yml` or `e2e.yml`.
+- `release.yml` runs CI and all three end-to-end browsers on every push to `main`, deploys to the Demo only if both pass, and rolls back to the previous release when the post-deploy smoke check fails. Each deploy builds its own image.
 - `main` has no branch protection; the repository is private on GitHub's free plan, which does not offer it.
-- Tables are created by `create_all` at startup, followed by three `ensure_*` functions in `schema_migrations.py`. Nothing records which changes a database has received.
+- Tables are created by `create_all` at startup, followed by four `ensure_*` functions in `schema_migrations.py`. Nothing records which changes a database has received.
 - No Postgres driver is installed, and every test runs on in-memory SQLite.
 - Session data lives in an in-process `InMemoryStore`; the request limiter is in-process; a backfill task starts inside the web process.
 - Logfire receives allowlisted agent invocation metadata only. Nothing traces web requests, collects exceptions, or alerts.
-- There is no dependency, secret, or image scanning.
+- CI scans the full history for secrets and audits Python and shipped npm dependencies, with an allowlist for accepted findings. The built image is not scanned.
+- CI guards (`tests/ci/`) check the deploy configuration, the harness scripts, and dependency pins.
 - Already in place: PHI column encryption with key versions, the PHI access audit log, tenant isolation, auth hardening (password rules, lockout, refresh tokens), and the forensics replay tool.
 
 ## Environments
@@ -100,11 +101,13 @@ Required checks on a pull request:
 - frontend build
 - end-to-end tests in Chromium. Firefox and WebKit run and report but do not block.
 - a migration check that applies the new migrations to a database at the previous release's schema
-- dependency audits for Python and npm, secret scanning, and a scan of the built image. Critical findings block; others are reported.
+- dependency audits for Python and npm and secret scanning, which exist today, plus a scan of the built image, which is new. Critical findings block; others are reported.
 
 `main` is protected: no direct pushes, with a documented override for emergencies. This requires a paid GitHub plan.
 
-Rolling back means promoting the previous image. The migration compatibility rule is what makes that safe.
+Rolling back means promoting the previous image. The Demo already rolls back automatically when its smoke check fails (`scripts/fly_rollback.sh`); Staging and Production get the same behaviour. The migration compatibility rule is what makes rollback safe.
+
+The release workflow today gates on all three browsers. Changing it to gate on Chromium alone is part of this work, and the deployment guards in `tests/ci/` are updated alongside any change to the workflows or `fly.toml`.
 
 ## Backups and recovery
 
@@ -175,9 +178,9 @@ Each phase leaves the Demo working and deployable.
 
 | Phase | Work |
 |---|---|
-| 0. Start the clocks | Anthropic BAA inquiry; find a healthcare lawyer; confirm the Fly Compliance Package. Make deploys wait for passing checks; protect `main`. |
+| 0. Start the clocks | Anthropic BAA inquiry; find a healthcare lawyer; confirm the Fly Compliance Package. Protect `main`. |
 | 1. One database, stateless application | Postgres everywhere; Alembic with the baseline migration; sessions and limiter in Postgres; backfill as a release job; Redis removed; CI on Postgres. All on the Demo. |
-| 2. Staging and the pipeline | Staging app and database; build once and promote; S3 and SES; security scans; the migration check. |
+| 2. Staging and the pipeline | Staging app and database; build once and promote; S3 and SES; image scanning; the migration check. |
 | 3. Product changes for real data | Invitations; two-factor sign-in; Offboarding export and deletion; the redaction gaps; the per-environment agent switch; the telemetry allowlist. |
 | 4. Operations | Backups and the off-platform copy; key backup; alerts; runbooks; break-glass log; per-environment credentials. |
 | 5. Production and launch | Create Production with no real data; rehearse a full release and a restore drill; finish the risk analysis and policies; sign the contracts; complete the launch checklist; invite the first Design Partner. |
