@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../api/client';
+import { useWorkingWith } from '../contexts/WorkingWithContext';
 import DocumentList from '../components/DocumentList';
 import { workspaceApi } from '../api/workspace';
 import { MotionConfig } from 'framer-motion';
@@ -37,8 +38,24 @@ export default function ClaimsAppealPage() {
   const [error, setError] = useState('');
   const [issues, setIssues] = useState([]);
   const [clients, setClients] = useState([]);
-  const [issueId, setIssueId] = useState(new URLSearchParams(location.search).get('issue') || '');
+  const [linkedIssueId] = useState(() => new URLSearchParams(location.search).get('issue') || '');
+  const [issueId, setIssueId] = useState(linkedIssueId);
   const [newIssue, setNewIssue] = useState({ client_id: '', title: '' });
+  // Working With narrows the Issues to that Client, unless a link chose an Issue.
+  const { client: focus } = useWorkingWith();
+  const narrowTo = linkedIssueId ? null : focus;
+  const shownIssues = issues.filter((issue) => !issue.client_archived && (!narrowTo || issue.client_id === narrowTo.id));
+
+  // Preselect the focused Client's Issue only when exactly one is open; never guess between several.
+  useEffect(() => {
+    if (!narrowTo) return;
+    const open = shownIssues.filter((issue) => issue.status !== 'resolved');
+    setIssueId((current) => (shownIssues.some((issue) => issue.id === current) ? current : (open.length === 1 ? open[0].id : '')));
+  }, [narrowTo?.id, issues]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (focus) setNewIssue((current) => ({ ...current, client_id: focus.id }));
+  }, [focus?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let alive = true;
@@ -143,9 +160,10 @@ export default function ClaimsAppealPage() {
             <label className="workspace-filter ap-existing">Existing Issue
               <select value={selectedIssue?.client_archived ? '' : issueId} onChange={(event) => { setIssueId(event.target.value); setError('') }}>
                 <option value="">Choose an Issue</option>
-                {issues.filter((issue) => !issue.client_archived).map((issue) => <option key={issue.id} value={issue.id}>{issue.client_name} · {issue.title}</option>)}
+                {shownIssues.map((issue) => <option key={issue.id} value={issue.id}>{issue.client_name} · {issue.title}</option>)}
               </select>
             </label>
+            {narrowTo && <p className="workspace-small ap-narrowed">Showing {narrowTo.full_name}'s Issues</p>}
             <form className="workspace-inline-form ap-new-issue" onSubmit={createIssue}>
               <div className="workspace-form-grid">
                 <label>Client<select required value={newIssue.client_id} onChange={(event) => setNewIssue({ ...newIssue, client_id: event.target.value })}><option value="">Choose a Client</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.full_name}</option>)}</select></label>

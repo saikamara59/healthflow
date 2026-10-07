@@ -11,6 +11,7 @@ import useLayout from '../components/ui/useLayout';
 import { RunSteps, SourceRow, ToolResults } from '../components/tools/ToolRun';
 import { ClientPrefill, PairListInput } from '../components/tools/ToolInputs';
 import { TOOL_FLOWS } from '../components/tools/toolFlows';
+import { useWorkingWithPrefill } from '../contexts/WorkingWithContext';
 
 /** Checks provider-network and formulary data for a client's selected plans. */
 export default function NetworkVerificationPage() {
@@ -37,6 +38,8 @@ export default function NetworkVerificationPage() {
     setProviders((c.doctors || []).map((doctor) => ({ name: doctor.name, npi: doctor.npi || '' })));
     setRx(c.prescriptions || []);
   }
+  // Working With prefills this Tool; its own Prefill from client overrides it here only.
+  useWorkingWithPrefill(applyClient, () => setClientId(''));
 
   async function run() {
     setError('');

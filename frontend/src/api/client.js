@@ -19,6 +19,8 @@ export function getRefreshToken() {
 export function clearTokens() {
   sessionStorage.removeItem('hf_token')
   sessionStorage.removeItem('hf_refresh')
+  // Signing out ends the Broker's Working With focus for this tab.
+  sessionStorage.removeItem('hf_working_with')
 }
 
 let refreshInFlight = null

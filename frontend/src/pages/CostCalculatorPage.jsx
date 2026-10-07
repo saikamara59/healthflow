@@ -10,6 +10,7 @@ import useLayout from '../components/ui/useLayout';
 import { RunSteps, SourceRow, ToolResults } from '../components/tools/ToolRun';
 import { ClientPrefill, PairListInput } from '../components/tools/ToolInputs';
 import { TOOL_FLOWS } from '../components/tools/toolFlows';
+import { useWorkingWithPrefill } from '../contexts/WorkingWithContext';
 
 function currency(v) {
   if (v == null || Number.isNaN(v)) return '—';
@@ -42,6 +43,8 @@ export default function CostCalculatorPage() {
     setRx((c.prescriptions || []).map((name) => ({ name, fills_per_year: 12 })));
     setProcs((c.procedures || []).map((name) => ({ name, count: 1 })));
   }
+  // Working With prefills this Tool; its own Prefill from client overrides it here only.
+  useWorkingWithPrefill(applyClient, () => setClientId(''));
 
   async function run() {
     setError('');

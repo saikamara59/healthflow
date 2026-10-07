@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Bell, CaretDown, MagnifyingGlass, UserFocus } from '@phosphor-icons/react';
 import api from '../api/client';
 import { useAuth } from '../contexts/AuthContext';
+import { useWorkingWith } from '../contexts/WorkingWithContext';
 import Icon from './ui/Icon';
 import HfTile from './ui/HfTile';
 import { ThemeToggle } from './ui/Tweaks';
@@ -35,23 +36,18 @@ function TeamBlock() {
   );
 }
 
-// "Working with" client picker. Display only: choosing a client does not change anything yet.
+// "Working with" picker: the Broker's single Client focus (see WorkingWithContext).
 function WorkingWith() {
-  const [clients, setClients] = useState([]);
-  const [value, setValue] = useState('');
-  useEffect(() => {
-    let alive = true;
-    api.get('/clients').then((rows) => { if (alive && Array.isArray(rows)) setClients(rows); }).catch(() => {});
-    return () => { alive = false; };
-  }, []);
+  const { clientId, clients, setClientId, notice } = useWorkingWith();
   return (
-    <div className={`ww${value ? ' on' : ''}`}>
+    <div className={`ww${clientId ? ' on' : ''}`}>
       <UserFocus weight="duotone" size={16} aria-hidden="true" />
       <label className="ww-label" htmlFor="ww-sel">Working with</label>
-      <select id="ww-sel" value={value} onChange={(event) => setValue(event.target.value)}>
+      <select id="ww-sel" value={clientId} onChange={(event) => setClientId(event.target.value)}>
         <option value="">No client selected</option>
         {clients.map((client) => <option key={client.id} value={client.id}>{client.full_name}</option>)}
       </select>
+      {notice && <span className="ww-note" role="status">{notice}</span>}
     </div>
   );
 }

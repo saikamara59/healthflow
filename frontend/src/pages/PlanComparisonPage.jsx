@@ -14,6 +14,7 @@ import { RunSteps, SourceRow, ToolResults } from '../components/tools/ToolRun';
 import { ChipInput } from '../components/tools/ToolInputs';
 import { TOOL_FLOWS } from '../components/tools/toolFlows';
 import { useAuth } from '../contexts/AuthContext';
+import { useWorkingWithPrefill } from '../contexts/WorkingWithContext';
 
 function currency(v) {
   if (v == null || Number.isNaN(v)) return '—';
@@ -63,6 +64,8 @@ export default function PlanComparisonPage() {
     setRx(c.prescriptions || []);
     setProcs(c.procedures || []);
   }
+  // Working With prefills this Tool; its own Prefill from client overrides it here only.
+  useWorkingWithPrefill(applyClient, () => setClientId(''));
 
   function selectPlan(plan, idx) {
     setSelectedPlanId(plan.plan_id);
