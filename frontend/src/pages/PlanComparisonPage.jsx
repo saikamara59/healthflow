@@ -14,6 +14,7 @@ import { RunSteps, SourceRow, ToolResults } from '../components/tools/ToolRun';
 import { ChipInput } from '../components/tools/ToolInputs';
 import { TOOL_FLOWS } from '../components/tools/toolFlows';
 import { useAuth } from '../contexts/AuthContext';
+import { useWorkingWithPrefill } from '../contexts/WorkingWithContext';
 
 function currency(v) {
   if (v == null || Number.isNaN(v)) return '—';
@@ -44,6 +45,9 @@ export default function PlanComparisonPage() {
   const [procs, setProcs] = useState(preset?.procedures || []);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
+  // The Client and inputs a result was run for. Results outlive input changes
+  // (Working With can re-prefill them), so labels and history use this, not the form.
+  const [resultFor, setResultFor] = useState(null);
   const [error, setError] = useState('');
   const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [expandedPlanId, setExpandedPlanId] = useState(null);
@@ -63,13 +67,15 @@ export default function PlanComparisonPage() {
     setRx(c.prescriptions || []);
     setProcs(c.procedures || []);
   }
+  // Working With prefills this Tool; its own Prefill from client overrides it here only.
+  useWorkingWithPrefill(applyClient, () => setClientId(''));
 
   function selectPlan(plan, idx) {
     setSelectedPlanId(plan.plan_id);
     setSelectToast(`${plan.plan_name} selected`);
-    if (clientId) {
+    if (resultFor?.clientId) {
       api.post('/history', {
-        client_id: clientId,
+        client_id: resultFor.clientId,
         action_type: 'plan_selected',
         request_data: {
           plan_id: plan.plan_id,
@@ -97,6 +103,8 @@ export default function PlanComparisonPage() {
         procedures: procs,
       });
       setResult(data);
+      const runClient = clientOptions.find((c) => c.id === clientId);
+      setResultFor({ clientId, label: runClient ? `${runClient.full_name}, ZIP ${zip}` : `ZIP ${zip}` });
       setStep('results');
       setSelectedPlanId(null);
       setExpandedPlanId(null);
@@ -151,7 +159,7 @@ export default function PlanComparisonPage() {
       <div className="page wide ws-page-in">
         <PageHead
           icon="compare"
-          eyebrow={`Medicare Advantage · ${selectedClient ? `${selectedClient.full_name}, ZIP ${zip}` : `ZIP ${zip}`}`}
+          eyebrow={`Medicare Advantage · ${step === 'results' && resultFor ? resultFor.label : selectedClient ? `${selectedClient.full_name}, ZIP ${zip}` : `ZIP ${zip}`}`}
           title={step === 'results' && cheapestIdx >= 0 ? 'Comparison results' : 'Compare plans'}
           sub="Rank the plans in a client's ZIP by estimated yearly cost, weighted to their medications and expected procedures."
         />
@@ -226,7 +234,7 @@ export default function PlanComparisonPage() {
 
             {selectToast && (
               <div className="notice cp-toast" role="status">
-                <Check size={14} weight="bold" /> {selectToast}{clientId ? '. Saved to client history.' : ''}
+                <Check size={14} weight="bold" /> {selectToast}{resultFor?.clientId ? '. Saved to client history.' : ''}
               </div>
             )}
 

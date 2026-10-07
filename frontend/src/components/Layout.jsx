@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import NotificationPanel from './NotificationPanel';
 import WorkspaceSearch from './workspace/WorkspaceSearch';
+import { WorkingWithProvider } from '../contexts/WorkingWithContext';
 
 export const LayoutContext = { sidebarOpen: false };
 
@@ -26,6 +27,7 @@ export default function Layout() {
   }, []);
 
   return (
+    <WorkingWithProvider>
     <div className="app">
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="main">
@@ -38,5 +40,6 @@ export default function Layout() {
       {notificationsOpen && <NotificationPanel open={notificationsOpen} onClose={() => setNotificationsOpen(false)} />}
       {searchOpen && <WorkspaceSearch onClose={closeSearch} />}
     </div>
+    </WorkingWithProvider>
   );
 }
