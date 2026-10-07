@@ -11,3 +11,4 @@ We rejected using the Demo as the rehearsal for Production. The Demo disables up
 - A Production problem that cannot be reproduced with invented data is investigated inside Production under the break-glass procedure, not by copying data down.
 - Backup restore drills run against a temporary database inside Production's boundary, which is deleted afterwards. They never run on Staging.
 - Staging needs its own realistic invented data set, large enough to rehearse migrations.
+- The Demo is public and accepts free text, so this rule cannot be fully enforced there by software. The Demo tells visitors to enter invented information only and is reset to its seeded state every night. We rejected limiting the Demo to fixed examples with no free entry, which would remove most of its value for showing the product. The remaining risk is recorded in the risk analysis.

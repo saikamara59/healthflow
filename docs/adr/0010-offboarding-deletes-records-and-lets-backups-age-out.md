@@ -12,6 +12,8 @@ This differs deliberately from archiving a Client ([ADR 0002](0002-archive-clien
 
 ## Consequences
 
+- The Production document bucket keeps versions, so an ordinary delete only hides a Document. Offboarding removes every version explicitly, and superseded versions otherwise expire within the backup retention window.
+- The export and the deletion are both defined from the full list of Broker-owned tables, checked against the schema, so neither can silently miss a kind of record.
 - Offboarding is the only thing that deletes a decided Approval. While a Broker uses HealthFlow, their Approvals remain permanent and unchangeable.
 
 - After any restore from backup, Brokers offboarded since that backup was taken must be deleted again before the restored data is put into service. The record of completed Offboardings therefore has to survive a restore.

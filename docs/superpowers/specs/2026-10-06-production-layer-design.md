@@ -38,9 +38,11 @@ Facts about the repository when this design was written:
 | Email | Logged, not sent | SES | SES |
 | Two-factor sign-in for Brokers | Off | Required | Required |
 | Document store | Tigris | AWS S3 | AWS S3 |
-| Machines | One | One, may stop when idle | Two |
+| Machines | One | Two while a release is verified; may scale down or stop when idle | Two |
 
-Staging is configured the same way as Production in every respect that affects behaviour, so that a release verified on Staging has exercised the paths that carry PHI.
+Staging is configured the same way as Production in every respect that affects behaviour, so that a release verified on Staging has exercised the paths that carry PHI. That includes running two machines during verification, so a change that leaves state inside one process fails on Staging and not first in Production.
+
+The Demo accepts free text, so software cannot guarantee that a visitor enters only invented information. Two measures reduce that risk without removing it: the Demo states "invented information only, never real client details" at sign-up and on every form that accepts Client details or free text, and its data is reset to the seeded state every night. The risk analysis records what remains.
 
 Each environment has its own Fly app, database, bucket, deploy token, `JWT_SECRET`, `PHI_ENCRYPTION_KEY`, and AWS credentials. Nothing is shared. Real PHI never leaves Production ([ADR 0008](../../adr/0008-real-phi-never-leaves-production.md)).
 
@@ -78,7 +80,7 @@ The Demo's existing SQLite data is invented, so the Demo is reseeded on Postgres
 
 Production runs two machines, and no state lives inside one process ([ADR 0009](../../adr/0009-request-state-lives-in-postgres-not-redis.md)):
 
-- Session data moves from `InMemoryStore` to Postgres, encrypted like other PHI fields where it can contain PHI.
+- Session data moves from `InMemoryStore` to Postgres, encrypted like other PHI fields where it can contain PHI. Each session records the Broker it belongs to and when it expires. Expired sessions are removed automatically, and Offboarding deletes the Broker's sessions.
 - Request-limiter counts move to Postgres.
 - The startup backfill becomes a job run once per release.
 - Redis is removed: the `RedisStore` class, the `redis` dependency, and the `redis` service in `docker-compose.yml`.
@@ -101,7 +103,8 @@ Required checks on a pull request:
 - frontend build
 - end-to-end tests in Chromium. Firefox and WebKit run and report but do not block.
 - a migration check that applies the new migrations to a database at the previous release's schema
-- dependency audits for Python and npm and secret scanning, which exist today, plus a scan of the built image, which is new. Critical findings block; others are reported.
+- secret scanning and dependency audits for Python and npm, which exist today and keep their current thresholds: any Python finding outside the allowlist fails, and npm findings of high severity or above fail.
+- a scan of the built image, which is new. Critical findings block; others are reported.
 
 `main` is protected: no direct pushes, with a documented override for emergencies. This requires a paid GitHub plan.
 
@@ -114,9 +117,9 @@ The release workflow today gates on all three browsers. Changing it to gate on C
 Targets: lose at most 24 hours of data, and be back in service within 4 hours.
 
 - **Database.** Fly's managed backups are the first line. A nightly encrypted dump also goes to an S3 bucket in the AWS account, so recovery does not depend on Fly.
-- **Documents.** The Production bucket has versioning on, so an overwritten or deleted Document can be recovered.
+- **Documents.** The Production bucket has versioning on, so an overwritten or deleted Document can be recovered. Versioning means an ordinary delete only hides a Document, so two rules make deletion real: superseded and deleted versions expire automatically after the backup retention window, and Offboarding removes every version of a Broker's Documents explicitly.
 - **Keys.** `PHI_ENCRYPTION_KEY` (every version) and `JWT_SECRET` are stored in a second place outside Fly, apart from the data they protect. Without the encryption key every backup is unreadable.
-- **Restore drill.** On a schedule, the latest backup is restored to a temporary database inside Production's boundary, the application is pointed at it to confirm it can read and decrypt, and the temporary database is deleted. The first drill happens before launch.
+- **Restore drill.** On a schedule, the latest backup is restored to a temporary database inside Production's boundary, an isolated copy of the application is pointed at it, and the temporary database is deleted. The drill uses the keys retrieved from their second place outside Fly, not the live secrets, and confirms that rows encrypted under every key version decrypt. A drill that reads the keys from Fly proves nothing about the disaster the key backup exists for. The first drill happens before launch.
 - **After any restore,** Brokers offboarded since the backup was taken are deleted again before the data is put into service ([ADR 0010](../../adr/0010-offboarding-deletes-records-and-lets-backups-age-out.md)).
 
 The backup retention window is a stated number, because Offboarding promises that copies in backups disappear within it.
@@ -125,10 +128,10 @@ The backup retention window is a stated number, because Offboarding promises tha
 
 - **Uptime check.** An outside service requests a health endpoint every minute. The endpoint confirms the database answers.
 - **Requests and errors.** Logfire is extended from agent invocations to every HTTP request and unhandled exception.
-- **Logs.** Structured logs are shipped off the machine so they survive a restart.
+- **Logs.** Structured logs are shipped off the machine so they survive a restart. They go to Logfire, so no further vendor receives them.
 - **Alerts to the operator's phone** for three conditions: the site is down, the error rate jumps, or the nightly backup did not report success. The backup job reports to a monitor that alerts when the report does not arrive.
 
-Telemetry never contains PHI. Request tracing exports only named safe fields, the approach already used for agent invocations: no request bodies, no query strings, no Client details in error messages. A test proves the allowlist holds.
+Telemetry never contains PHI. Everything that leaves the machine exports only named safe fields, the approach already used for agent invocations: no request bodies, no query strings, no paths that carry identifiers, no client IP addresses, no error or response text, and no Client details. This applies to request traces, exception reports, and every shipped log, including the existing HTTP request log and audit log, which today record raw query strings, client IP addresses, and error detail. A test runs against each real exporter and fails if a field outside the allowlist is sent.
 
 ## Operator access
 
@@ -141,20 +144,24 @@ Telemetry never contains PHI. Request tracing exports only named safe fields, th
 
 **Accounts by invitation.** In Production and Staging, public registration is off. The operator creates an invitation after the Design Partner's BAA is signed, and the Broker sets their password and second factor from it. The Demo keeps open access.
 
+**Every endpoint requires sign-in.** Closing registration does not protect the API. The agent endpoints (`/compare`, `/translate`, `/calculate`, `/appeal`, `/verify`, `/estimate`) predate Broker accounts and accept requests with no sign-in. Every endpoint now requires a signed-in Broker unless it is on a short written list of public ones: health, sign-in, token refresh, accepting an invitation, and password recovery. A test calls every route anonymously and fails if one outside the list answers.
+
 **Two-factor sign-in.** Every Broker account in Production and Staging signs in with a password and an authenticator-app code, with one-time recovery codes. Resetting a lost second factor requires the operator to verify the Broker's identity through a channel other than email; the procedure is a runbook.
 
 **Offboarding** ([ADR 0010](../../adr/0010-offboarding-deletes-records-and-lets-backups-age-out.md)):
 
 1. The account is deactivated at once.
-2. The Broker receives an export of their Clients, Enrollments, Issues, Appeals, Tasks, Appointments, notes, Approvals, and Documents.
-3. Within 30 days their records are deleted from the database, the document store, and the search index. This includes decided Approvals, the one exception to their permanence under [ADR 0003](../../adr/0003-approvals-gate-only-software-initiated-changes.md).
+2. The Broker receives an export of everything HealthFlow holds for them. The export is defined from the full list of tables that belong to a Broker, not from a hand-picked subset: Clients, Enrollments, Issues, Appeals, Tasks, Appointments, notes, Approvals, Documents, Organizations and Contacts, decision records, action history, workspace activity, and Ask Conversations. A test compares that list against the schema, so a new Broker-owned table cannot be left out.
+3. Within 30 days their records are deleted from the database, the document store (every version of every Document), the search index, and stored sessions. This includes decided Approvals, the one exception to their permanence under [ADR 0003](../../adr/0003-approvals-gate-only-software-initiated-changes.md).
 4. Copies in backups expire with those backups.
 5. The audit trail is kept for six years, holding identifiers and actions only.
 6. The Broker receives written confirmation.
 
 The record of completed Offboardings is kept where a restore cannot erase it.
 
-**Sending data to Claude** ([ADR 0004](../../adr/0004-ask-healthflow-uses-client-pseudonyms.md)). A signed BAA with Anthropic is a launch condition. Redaction and Client pseudonyms stay. Three gaps in the redaction boundary are closed for every agent: ZIP codes are truncated to three digits, dates relating to a person are reduced to the year, and ages over 89 are reported as 90 or over. The agents that read free text or Documents (Draft Appeal, Explain Coverage, Ask HealthFlow) can be switched off per environment, so Production can launch without them if the BAA is late.
+**Sending data to Claude** ([ADR 0004](../../adr/0004-ask-healthflow-uses-client-pseudonyms.md)). A signed BAA with Anthropic is a launch condition. Redaction and Client pseudonyms stay. Three gaps in the redaction boundary are closed for every agent: ZIP codes are truncated to three digits and replaced with `000` where the three-digit area holds 20,000 or fewer people (from a current Census-based list kept in the repository), dates relating to a person are reduced to the year, and ages over 89 are reported as 90 or over. The agents that read free text or Documents (Draft Appeal, Explain Coverage, Ask HealthFlow) can be switched off per environment, so Production can launch without them if the BAA is late.
+
+**Document uploads are scanned.** Today's upload checks confirm a file is the type it claims to be; they are not malware detection, and the Documents design deferred that to this review. In Production and Staging an uploaded file is held in quarantine, scanned, and made available only if it passes. A file that fails, or cannot be scanned because the scanner is down, is never served. The scanner runs inside the environment's own boundary so no further vendor receives Documents; a hosted scanner would need its own BAA.
 
 ## Incidents and support
 
@@ -181,7 +188,7 @@ Each phase leaves the Demo working and deployable.
 | 0. Start the clocks | Anthropic BAA inquiry; find a healthcare lawyer; confirm the Fly Compliance Package. Protect `main`. |
 | 1. One database, stateless application | Postgres everywhere; Alembic with the baseline migration; sessions and limiter in Postgres; backfill as a release job; Redis removed; CI on Postgres. All on the Demo. |
 | 2. Staging and the pipeline | Staging app and database; build once and promote; S3 and SES; image scanning; the migration check. |
-| 3. Product changes for real data | Invitations; two-factor sign-in; Offboarding export and deletion; the redaction gaps; the per-environment agent switch; the telemetry allowlist. |
+| 3. Product changes for real data | Sign-in on every endpoint; invitations; two-factor sign-in; upload scanning; the Demo notice and nightly reset; Offboarding export and deletion; the redaction gaps; the per-environment agent switch; the telemetry allowlist. |
 | 4. Operations | Backups and the off-platform copy; key backup; alerts; runbooks; break-glass log; per-environment credentials. |
 | 5. Production and launch | Create Production with no real data; rehearse a full release and a restore drill; finish the risk analysis and policies; sign the contracts; complete the launch checklist; invite the first Design Partner. |
 
@@ -204,14 +211,18 @@ Engineering:
 
 - [ ] Production shares no database, bucket, secret, or key with any other environment
 - [ ] A release has been promoted from Staging to Production by digest, and rolled back, as a rehearsal
-- [ ] A backup has been restored and read successfully in a drill
+- [ ] A backup has been restored in a drill and decrypted with the keys held outside Fly, for every key version
 - [ ] `PHI_ENCRYPTION_KEY` and `JWT_SECRET` are backed up outside Fly
 - [ ] All three alerts have been triggered on purpose and reached the operator's phone
+- [ ] An anonymous request to every endpoint outside the public list is refused in Production
 - [ ] Public registration is off in Production and invitations work
 - [ ] Two-factor sign-in is enforced and the recovery procedure has been walked through
-- [ ] Offboarding has been run end to end on Staging
-- [ ] The redaction gaps are closed and tested
-- [ ] The telemetry allowlist test passes
+- [ ] Offboarding has been run end to end on Staging, and no version of an offboarded Document remains in the bucket
+- [ ] An uploaded file is unavailable until scanned, and a known test file is refused
+- [ ] A release has been verified on Staging with two machines running
+- [ ] The redaction gaps are closed and tested, including a sparsely populated ZIP area becoming `000`
+- [ ] The telemetry allowlist test passes for traces and for every shipped log
+- [ ] The Demo shows its invented-information notice and resets nightly
 - [ ] Two-factor sign-in is on for every operator account
 - [ ] Incident and breach runbooks are written
 
