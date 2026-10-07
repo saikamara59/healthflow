@@ -61,20 +61,47 @@ export default function EnrollmentsPage() {
   const [saving, setSaving] = useState(false)
   const [busy, setBusy] = useState(null)
   const [error, setError] = useState('')
+  const [clientError, setClientError] = useState('')
   const [documentRecord, setDocumentRecord] = useState(null)
   const formRef = useRef(null)
+  // Only the newest list request may update the page: the Status filter is
+  // usable while the initial list loads, and a late response must not replace a
+  // newer filter's result or clear its error.
+  const listGeneration = useRef(0)
+  // Refreshes after a save or action use the filter selected now, not the one
+  // captured when the action started, so they cannot replace a newer selection.
+  const filterRef = useRef('')
 
-  async function refresh(nextFilter = filter) {
+  async function refresh(nextFilter = filterRef.current) {
+    const generation = ++listGeneration.current
     const query = nextFilter ? `status=${encodeURIComponent(nextFilter)}` : ''
-    setEnrollments(await workspaceApi.listEnrollments(query))
+    const records = await workspaceApi.listEnrollments(query)
+    if (generation !== listGeneration.current) return
+    setEnrollments(records)
     setError('')
+  }
+
+  async function applyFilter(value) {
+    filterRef.current = value
+    setFilter(value)
+    const generation = listGeneration.current + 1
+    try {
+      await refresh(value)
+    } catch {
+      if (generation === listGeneration.current) setError('Enrollments could not be filtered.')
+    }
   }
 
   useEffect(() => {
     let alive = true
-    Promise.all([workspaceApi.listEnrollments(), workspaceApi.listLinkableClients()]).then(([records, clientData]) => {
-      if (alive) { setEnrollments(records); setClients(clientData); setError('') }
-    }).catch(() => { if (alive) setError('Enrollments could not be loaded.') })
+    const generation = ++listGeneration.current
+    workspaceApi.listEnrollments().then((records) => {
+      if (alive && generation === listGeneration.current) { setEnrollments(records); setError('') }
+    }).catch(() => { if (alive && generation === listGeneration.current) setError('Enrollments could not be loaded.') })
+    // Clients load on their own, with their own error: a newer filter must never
+    // hide a failure that leaves the Client picker empty.
+    workspaceApi.listLinkableClients().then((clientData) => { if (alive) setClients(clientData) })
+      .catch(() => { if (alive) setClientError('Clients could not be loaded, so a new Enrollment cannot choose a Client. Refresh to try again.') })
     return () => { alive = false }
   }, [])
 
@@ -136,8 +163,9 @@ export default function EnrollmentsPage() {
         <section className="card workspace-section">
           <div className="between ws-sec-head">
             <h2>Enrollment work</h2>
-            <label className="workspace-filter ws-inline-filter">Status<select value={filter} onChange={async (event) => { const value = event.target.value; setFilter(value); try { await refresh(value) } catch { setError('Enrollments could not be filtered.') } }}><option value="">All</option>{Object.entries(LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            <label className="workspace-filter ws-inline-filter">Status<select value={filter} onChange={(event) => applyFilter(event.target.value)}><option value="">All</option>{Object.entries(LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           </div>
+          {clientError && <p role="alert" className="workspace-error">{clientError}</p>}
           {error && <p role="alert" className="workspace-error">{error}</p>}
           {!enrollments && !error && <p role="status" className="workspace-empty">Loading enrollments…</p>}
           {enrollments && !enrollments.length && <p className="workspace-empty">No enrollments match this view.</p>}
