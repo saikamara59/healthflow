@@ -44,7 +44,10 @@ export default function ClaimsAppealPage() {
   // Working With narrows the Issues to that Client, unless a link chose an Issue.
   const { client: focus } = useWorkingWith();
   const narrowTo = linkedIssueId ? null : focus;
-  const shownIssues = issues.filter((issue) => !issue.client_archived && (!narrowTo || issue.client_id === narrowTo.id));
+  // An Issue the Broker just created here stays listed and selected, even for another Client.
+  const [createdIssueId, setCreatedIssueId] = useState('');
+  const shownIssues = issues.filter((issue) => !issue.client_archived
+    && (!narrowTo || issue.client_id === narrowTo.id || issue.id === createdIssueId));
 
   // Preselect the focused Client's Issue only when exactly one is open; never guess between several.
   useEffect(() => {
@@ -71,6 +74,7 @@ export default function ClaimsAppealPage() {
     try {
       const created = await workspaceApi.createIssue(newIssue);
       setIssues((current) => [created, ...current]);
+      setCreatedIssueId(created.id);
       setIssueId(created.id);
       setNewIssue({ client_id: '', title: '' });
       setError('');

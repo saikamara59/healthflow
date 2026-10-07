@@ -7,6 +7,7 @@ import Icon from '../components/ui/Icon';
 import Chip from '../components/ui/Chip';
 import Avatar from '../components/ui/Avatar';
 import useLayout from '../components/ui/useLayout';
+import { announceClientsChanged } from '../contexts/WorkingWithContext';
 
 const TABS = ['overview', 'coverage', 'medical', 'activity', 'edit'];
 
@@ -68,6 +69,7 @@ export default function ClientProfilePage() {
         income_level: editForm.income_level,
       });
       setClient(updated);
+      announceClientsChanged();
       setSaveMsg('Saved');
       setTimeout(() => setSaveMsg(''), 2000);
     } catch (err) {
@@ -82,6 +84,7 @@ export default function ClientProfilePage() {
     setSaveMsg('');
     try {
       setClient(await api.post(`/clients/${id}/archive`));
+      announceClientsChanged();
       setTab('overview');
     } catch (err) {
       setSaveMsg(`Error: ${err.message}`);
@@ -92,6 +95,7 @@ export default function ClientProfilePage() {
     setSaveMsg('');
     try {
       setClient(await api.post(`/clients/${id}/restore`));
+      announceClientsChanged();
     } catch (err) {
       setSaveMsg(`Error: ${err.message}`);
     }

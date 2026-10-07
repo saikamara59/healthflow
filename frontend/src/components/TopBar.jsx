@@ -38,7 +38,7 @@ function TeamBlock() {
 
 // "Working with" picker: the Broker's single Client focus (see WorkingWithContext).
 function WorkingWith() {
-  const { clientId, clients, setClientId, notice } = useWorkingWith();
+  const { clientId, clients, setClientId, notice, dismissNotice } = useWorkingWith();
   return (
     <div className={`ww${clientId ? ' on' : ''}`}>
       <UserFocus weight="duotone" size={16} aria-hidden="true" />
@@ -47,7 +47,12 @@ function WorkingWith() {
         <option value="">No client selected</option>
         {clients.map((client) => <option key={client.id} value={client.id}>{client.full_name}</option>)}
       </select>
-      {notice && <span className="ww-note" role="status">{notice}</span>}
+      {notice && (
+        <span className="ww-note" role="status">
+          {notice}
+          <button type="button" className="ww-note-close" aria-label="Dismiss" onClick={dismissNotice}>×</button>
+        </span>
+      )}
     </div>
   );
 }

@@ -7,6 +7,9 @@ import { workspaceApi } from '../api/workspace';
 // It lasts for the tab, and the tab stores only the Client id: never a name or
 // other details, since browser storage must not hold PHI.
 export const WORKING_WITH_KEY = 'hf_working_with';
+// Pages that edit, archive, or restore a Client announce it so the focus updates at once.
+export const CLIENTS_CHANGED_EVENT = 'healthflow:clients-changed';
+export const announceClientsChanged = () => window.dispatchEvent(new Event(CLIENTS_CHANGED_EVENT));
 
 const readStored = () => {
   try { return sessionStorage.getItem(WORKING_WITH_KEY) || ''; } catch { return ''; }
@@ -37,22 +40,31 @@ export function WorkingWithProvider({ children }) {
     setNotice('');
   }, []);
 
-  // Reload the Broker's active Clients on each page so an archive made elsewhere
-  // clears the focus. linkable=true never includes archived or other Brokers' Clients.
+  // Reload the Broker's active Clients on each page and whenever a page announces a
+  // Client change, so edits and archives reach the focus at once.
+  // linkable=true never includes archived or other Brokers' Clients.
+  const alive = useRef(true);
   useEffect(() => {
-    let alive = true;
+    alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
+  const reload = useCallback(() => {
     workspaceApi.listLinkableClients().then(async (rows) => {
-      if (!alive || !Array.isArray(rows)) return;
+      if (!alive.current || !Array.isArray(rows)) return;
       setClients(rows);
       const focused = clientIdRef.current;
       if (!focused || rows.some((row) => row.id === focused)) return;
       setClientId('');
       // Explain only an archive; an id that no longer resolves clears quietly.
       const gone = await api.get(`/clients/${encodeURIComponent(focused)}`).catch(() => null);
-      if (alive && gone?.archived_at) setNotice(`${gone.full_name} was archived, so Working With was cleared.`);
+      if (alive.current && gone?.archived_at) setNotice(`${gone.full_name} was archived, so Working With was cleared.`);
     }).catch(() => {});
-    return () => { alive = false; };
-  }, [pathname, setClientId]);
+  }, [setClientId]);
+  useEffect(() => { reload(); }, [pathname, reload]);
+  useEffect(() => {
+    window.addEventListener(CLIENTS_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(CLIENTS_CHANGED_EVENT, reload);
+  }, [reload]);
 
   const value = {
     clientId,
@@ -76,15 +88,17 @@ export function useWorkingWith() {
  */
 export function useWorkingWithPrefill(applyClient, onClear) {
   const { client } = useWorkingWith();
-  const focusId = client?.id || '';
+  // Keyed by id and last update, so an edited Client's fresh details are applied
+  // too, not just a change of Client.
+  const focusKey = client ? `${client.id}:${client.updated_at}` : '';
   const latest = useRef({ applyClient, onClear, client });
   latest.current = { applyClient, onClear, client };
   const applied = useRef(null);
   useEffect(() => {
-    if (focusId === applied.current) return;
+    if (focusKey === applied.current) return;
     const firstRun = applied.current === null;
-    applied.current = focusId;
-    if (focusId) latest.current.applyClient(latest.current.client);
+    applied.current = focusKey;
+    if (focusKey) latest.current.applyClient(latest.current.client);
     else if (!firstRun) latest.current.onClear?.();
-  }, [focusId]);
+  }, [focusKey]);
 }
