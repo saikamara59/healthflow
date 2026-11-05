@@ -51,6 +51,7 @@ _LOGFIRE_AGENT_EVENTS = {
     "translation": frozenset({"translate"}),
     "appeal": frozenset({"process_appeal", "process_denial_record"}),
     "temporal_awareness": frozenset({"generate_plan"}),
+    "ask_healthflow": frozenset({"claude_call"}),
 }
 _logfire_enabled = False
 
@@ -148,12 +149,16 @@ class InvocationLogger:
         agent: str,
         event_type: str,
         model: str | None = None,
+        record_error_message: bool = True,
     ) -> Iterator[_InvocationRecord]:
         """Wrap an agent operation. Yields a record the caller can mutate.
 
         On exit (success or exception), writes one row to agent_invocation_log
         with the elapsed duration_ms. Exceptions in the body propagate; the
         row write happens first.
+
+        Pass `record_error_message=False` when an exception message could
+        carry user text (Ask HealthFlow): only the exception type is kept.
         """
         record = _InvocationRecord(
             agent=agent,
@@ -169,7 +174,9 @@ class InvocationLogger:
         except BaseException as exc:
             # Capture the failure in the record before re-raising. Use
             # exception type + truncated message to keep `error` bounded.
-            record.error = f"{type(exc).__name__}: {exc}"[:512]
+            record.error = (
+                f"{type(exc).__name__}: {exc}" if record_error_message else type(exc).__name__
+            )[:512]
             raise
         finally:
             record.duration_ms = int((time.monotonic() - start) * 1000)

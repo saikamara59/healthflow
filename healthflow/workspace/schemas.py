@@ -390,3 +390,27 @@ class ApprovalResponse(BaseModel):
     decided_via: DecidedVia | None
     created_record_id: UUID | None
     created_at: datetime
+
+
+AskMessageRole = Literal["broker", "assistant"]
+
+
+class AskMessageResponse(BaseModel):
+    id: UUID
+    role: AskMessageRole
+    content: str
+    created_at: datetime
+
+
+class AskConversationSummary(BaseModel):
+    id: UUID
+    title: str | None
+    client_context: list[UUID]
+    created_at: datetime
+    last_message_at: datetime
+    expires_at: datetime
+
+
+class AskConversationDetail(AskConversationSummary):
+    messages: list[AskMessageResponse]
+    approval_ids: list[UUID]
