@@ -505,6 +505,31 @@ async def test_cleanup_works_through_a_backlog_in_batches(client, db_session, mo
     assert (await db_session.execute(select(AskConversation.id))).scalars().all() == [kept.id]
 
 
+@pytest.mark.asyncio
+async def test_cleanup_keeps_going_after_a_short_batch(client, db_session, monkeypatch):
+    # On Postgres, `LIMIT ... FOR UPDATE` returns fewer rows than the limit when
+    # a row it waited on was renewed meanwhile. A short batch isn't the end.
+    _, broker_id = await _broker(client, "ask-retention-short-batch@example.com")
+    monkeypatch.setattr(ask, "_PURGE_BATCH_SIZE", 2)
+    old = datetime.now(timezone.utc) - timedelta(days=120)
+    for n in range(5):
+        conversation = await _conversation(db_session, broker_id, messages=[("broker", f"Old {n}")])
+        conversation.last_message_at = old
+    await db_session.commit()
+    real_delete = ask._delete_conversations
+    calls = 0
+
+    async def first_batch_comes_back_short(db, *criteria, limit=None):
+        nonlocal calls
+        calls += 1
+        return await real_delete(db, *criteria, limit=1 if calls == 1 else limit)
+
+    monkeypatch.setattr(ask, "_delete_conversations", first_batch_comes_back_short)
+
+    assert await ask.purge_expired_conversations(db_session) == 5
+    assert (await db_session.execute(select(AskConversation.id))).scalars().all() == []
+
+
 class _FakeSession:
     async def __aenter__(self):
         return self

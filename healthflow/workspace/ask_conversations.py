@@ -244,6 +244,11 @@ async def purge_expired_conversations(db: AsyncSession, *, now: datetime | None 
     Runs across all Brokers, so it runs in an audited system context. Works in
     batches, each committed on its own, so a large backlog never holds one
     long transaction and its row locks.
+
+    It stops only at an empty batch, not a short one. On Postgres, `LIMIT`
+    with `FOR UPDATE` can return fewer rows than the limit while more are
+    expired: a row it waited on was renewed by a new message meanwhile, and
+    is skipped.
     """
     cutoff = (now or _utcnow()) - RETENTION
     deleted = 0
@@ -253,9 +258,9 @@ async def purge_expired_conversations(db: AsyncSession, *, now: datetime | None 
                 db, AskConversation.last_message_at <= cutoff, limit=_PURGE_BATCH_SIZE
             )
             await db.commit()
-            deleted += batch
-            if batch < _PURGE_BATCH_SIZE:
+            if not batch:
                 return deleted
+            deleted += batch
 
 
 async def run_retention_loop(
