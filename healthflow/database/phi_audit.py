@@ -35,6 +35,8 @@ from healthflow.database.models import (
     Appeal,
     Appointment,
     Approval,
+    AskConversation,
+    AskMessage,
     Client,
     Contact,
     Document,
@@ -67,6 +69,8 @@ _AUDITED_MODELS: frozenset[type] = frozenset({
     Issue,
     Appeal,
     Approval,
+    AskConversation,
+    AskMessage,
     WorkspaceActivity,
 })
 _AUDITED_TABLE_NAMES: dict[type, str] = {m: m.__tablename__ for m in _AUDITED_MODELS}

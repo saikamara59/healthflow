@@ -41,6 +41,7 @@ from healthflow.workspace.organizations_router import organizations_router
 from healthflow.workspace.activity_router import activity_router
 from healthflow.workspace.tasks_router import tasks_router
 from healthflow.workspace.approvals import approvals_router
+from healthflow.workspace.ask_conversations import ask_router
 from healthflow.workspace.appointments_router import appointments_router
 from healthflow.workspace.dashboard_router import dashboard_router
 from healthflow.workspace.enrollments_router import enrollments_router
@@ -82,13 +83,18 @@ async def lifespan(app: FastAPI):
                 )
                 await asyncio.sleep(60)
 
+    from healthflow.workspace.ask_conversations import run_retention_loop
+
     backfill_task = asyncio.create_task(backfill_in_background())
+    # ADR 0005: Ask Conversations are deleted 90 days after their last message.
+    retention_task = asyncio.create_task(run_retention_loop(async_session_factory))
     try:
         yield
     finally:
-        backfill_task.cancel()
-        with suppress(asyncio.CancelledError):
-            await backfill_task
+        for task in (backfill_task, retention_task):
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
 
 
 app = FastAPI(
@@ -156,6 +162,7 @@ app.include_router(organizations_router)
 app.include_router(activity_router)
 app.include_router(tasks_router)
 app.include_router(approvals_router)
+app.include_router(ask_router)
 app.include_router(appointments_router)
 app.include_router(dashboard_router)
 app.include_router(enrollments_router)

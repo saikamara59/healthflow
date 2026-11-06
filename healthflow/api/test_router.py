@@ -16,6 +16,9 @@ from healthflow.database.models import (
     Appeal,
     Appointment,
     Approval,
+    AskConversation,
+    AskMessage,
+    AskUsageDay,
     Broker,
     BrokerPreference,
     Contact,
@@ -63,6 +66,9 @@ async def reset_db(body: ResetRequest) -> dict:
                         delete(WorkspaceSearchToken).where(WorkspaceSearchToken.broker_id == broker.id)
                     )
                     for model in (
+                        AskMessage,
+                        AskConversation,
+                        AskUsageDay,
                         WorkspaceActivity,
                         Appeal,
                         Appointment,
