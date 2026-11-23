@@ -11,7 +11,7 @@ from fastapi import HTTPException
 from sqlalchemy import create_engine, select, text, update
 from sqlalchemy.orm import Session
 
-from healthflow.auth.tenant_context import TenantContextMissing, current_broker_id
+from healthflow.auth.tenant_context import TenantContextMissing, current_broker_id, current_endpoint
 from healthflow.database.models import (
     AgentInvocationLog,
     Approval,
@@ -376,6 +376,33 @@ async def test_reading_a_conversation_is_recorded_in_the_phi_access_log(client, 
         PhiAccessLog.broker_id == broker_id,
     ))).scalars()}
     assert {"ask_conversations", "ask_messages"} <= tables
+
+
+@pytest.mark.asyncio
+async def test_changing_client_context_is_recorded_in_the_phi_access_log(client, db_session):
+    # Adding and removing Clients edits the loaded conversation and flushes it,
+    # which never reaches the statement listener; the flush listener records it.
+    headers, broker_id = await _broker(client, "ask-audit-context@example.com")
+    marjorie = await _client_record(client, headers)
+    otis = await _client_record(client, headers, name="Otis Fernwood")
+    conversation = await _conversation(db_session, broker_id, [marjorie])
+
+    for endpoint, context in (("test: add Otis", [marjorie, otis]), ("test: remove Marjorie", [otis])):
+        endpoint_token = current_endpoint.set(endpoint)
+        try:
+            with _as_broker(broker_id):
+                await ask.set_client_context(db_session, conversation, context)
+            await db_session.commit()
+        finally:
+            current_endpoint.reset(endpoint_token)
+
+        updates = (await db_session.execute(select(PhiAccessLog).where(
+            PhiAccessLog.endpoint == endpoint, PhiAccessLog.operation == "update",
+        ))).scalars().all()
+        assert [(e.table_name, e.row_ids, e.broker_id) for e in updates] == [
+            ("ask_conversations", [str(conversation.id)], broker_id)
+        ]
+    assert conversation.client_context == [str(otis)]
 
 
 # ── Delete ──────────────────────────────────────────────────────────────────

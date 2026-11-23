@@ -479,3 +479,60 @@ async def test_document_metadata_access_is_audited_but_events_are_explicit(audit
     for entry in logs:
         assert entry.broker_id == broker.id
         assert entry.row_ids == [str(document.id if entry.table_name == "documents" else link.id)]
+
+
+async def _flush_entries(session, broker, endpoint, change):
+    """Apply `change` as the Broker, commit, and return audit entries for `endpoint`."""
+    token = current_broker_id.set(broker.id)
+    endpoint_token = current_endpoint.set(endpoint)
+    try:
+        await change()
+        await session.commit()
+    finally:
+        current_endpoint.reset(endpoint_token)
+        current_broker_id.reset(token)
+    with system_context("verify"):
+        return (await session.execute(
+            select(PhiAccessLog).where(PhiAccessLog.endpoint == endpoint)
+        )).scalars().all()
+
+
+@pytest.mark.anyio
+async def test_flush_listener_logs_attribute_changes_as_updates(audited_session):
+    # Editing a loaded row and flushing never reaches do_orm_execute.
+    session, broker, c1, _c2 = audited_session
+
+    async def change():
+        c1.full_name = "C One Renamed"
+        c1.zip_code = "10003"
+        await session.flush()
+
+    log = await _flush_entries(session, broker, "PATCH /clients/c1", change)
+
+    assert [(e.table_name, e.operation, e.row_ids) for e in log] == [("clients", "update", [str(c1.id)])]
+
+
+@pytest.mark.anyio
+async def test_flush_listener_skips_rows_set_to_their_existing_values(audited_session):
+    session, broker, c1, _c2 = audited_session
+
+    async def change():
+        c1.zip_code = c1.zip_code
+        await session.flush()
+
+    assert await _flush_entries(session, broker, "PATCH /clients/noop", change) == []
+
+
+@pytest.mark.anyio
+async def test_flush_listener_logs_session_delete(audited_session):
+    session, broker, _c1, c2 = audited_session
+
+    async def change():
+        await session.delete(c2)
+        await session.flush()
+
+    log = await _flush_entries(session, broker, "DELETE /clients/c2", change)
+
+    # The cascade also reads the Client's action history first; that read is audited too.
+    deletes = [(e.table_name, e.row_ids) for e in log if e.operation == "delete"]
+    assert deletes == [("clients", [str(c2.id)])]

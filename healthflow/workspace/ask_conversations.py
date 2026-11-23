@@ -349,6 +349,13 @@ async def consume_ask_message(db: AsyncSession, *, now: datetime | None = None) 
       INSERT skips the tenant filter, so a caller-supplied id would write a
       stray usage row for another Broker. The tenant-filtered UPDATE would
       then match no row, and the caller would get a false 429.
+
+    **Commit before calling Claude.** Until the caller commits, the increment
+    holds a lock: on Postgres, this Broker's usage row, so their next message
+    waits for the whole answer; on SQLite, the database's write lock, so
+    `ask_claude_call`'s log write, on its own connection, times out and the
+    invocation row is lost. This function doesn't commit itself, because that
+    would also commit whatever else the caller has pending.
     """
     broker_id = require_current_broker()
     now = now or _utcnow()
