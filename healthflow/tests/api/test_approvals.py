@@ -165,6 +165,7 @@ async def test_a_decided_approval_cannot_be_decided_again(client, db_session):
 
 
 @pytest.mark.asyncio
+@pytest.mark.separate_connections
 async def test_simultaneous_approvals_create_only_one_record(client, db_session):
     headers, broker_id = await _broker(client, "approvals-race@example.com")
     client_id = await _client_record(client, headers)
