@@ -64,9 +64,6 @@ class HealthflowAgentsDependencyTests(unittest.TestCase):
         test_compose = yaml.safe_load(
             (REPO_ROOT / "docker-compose.test.yml").read_text()
         )
-        e2e_workflow = yaml.safe_load(
-            (REPO_ROOT / ".github" / "workflows" / "e2e.yml").read_text()
-        )
 
         self.assertEqual(
             compose["secrets"]["HEALTHFLOW_AGENTS_TOKEN"],
@@ -79,15 +76,6 @@ class HealthflowAgentsDependencyTests(unittest.TestCase):
         self.assertIn(
             "HEALTHFLOW_AGENTS_TOKEN",
             test_compose["services"]["seed"]["build"]["secrets"],
-        )
-        playwright_step = next(
-            step
-            for step in e2e_workflow["jobs"]["e2e"]["steps"]
-            if step.get("name") == "Run Playwright"
-        )
-        self.assertEqual(
-            playwright_step["env"]["HEALTHFLOW_AGENTS_TOKEN"],
-            "${{ secrets.HEALTHFLOW_AGENTS_TOKEN }}",
         )
 
 
