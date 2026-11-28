@@ -3,3 +3,5 @@
 # entry fails the supply-chain tests so it is reviewed again.
 #
 # ID | expires (YYYY-MM-DD) | reason
+CVE-2026-114603 | 2027-01-22 | opentelemetry-api tracestate ReDoS; fix (1.45.1) is blocked because logfire 4.x caps opentelemetry-sdk <1.45 and healthflow-agents requires logfire<5. HealthFlow never extracts inbound trace context (no FastAPI/ASGI instrumentation) and uvicorn runs on h11 with a 16 KB header cap. Remove once healthflow-agents allows logfire 5.
+CVE-2026-126360 | 2027-01-22 | opentelemetry-api traceparent ReDoS; fix (1.45.2) is blocked by the same logfire<5 cap from healthflow-agents. Needs a newline inside a traceparent value, which HTTP headers cannot carry, and HealthFlow extracts no trace context from any carrier. Remove once healthflow-agents allows logfire 5.

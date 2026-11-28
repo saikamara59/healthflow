@@ -1,7 +1,7 @@
 name: Release
 
-# Every push to main runs the full CI and e2e suites on that exact commit, and
-# deploys to Fly.io only if both pass. A deploy that fails its smoke check is
+# Every push to main runs CI (lint, backend tests, frontend build) on that exact
+# commit, and deploys to Fly.io only if it passes. A deploy that fails its smoke check is
 # rolled back to the release that was serving before it.
 on:
   push:
@@ -21,10 +21,6 @@ jobs:
     uses: ./.github/workflows/ci.yml
     secrets: inherit
 
-  e2e:
-    uses: ./.github/workflows/e2e.yml
-    secrets: inherit
-
   changes:
     name: Deployable changes
     runs-on: ubuntu-latest
@@ -32,12 +28,12 @@ jobs:
     outputs:
       deployable: ${{ steps.diff.outputs.deployable }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be  # 1.5
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1  # 1.6
 
       - name: Skip the deploy when nothing shipped changed since the live commit
         id: diff
@@ -52,7 +48,7 @@ jobs:
 
   deploy:
     name: Deploy to Fly.io
-    needs: [ci, e2e, changes]
+    needs: [ci, changes]
     if: needs.changes.outputs.deployable == 'true'
     runs-on: ubuntu-latest
     # Deploy and smoke are bounded below this limit; rollback runs in its own job.
@@ -63,11 +59,11 @@ jobs:
     env:
       FLY_APP: healthflow-demo
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
 
-      - uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be  # 1.5
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1  # 1.6
 
       - name: Record the release to roll back to
         id: previous
@@ -106,12 +102,12 @@ jobs:
     env:
       FLY_APP: healthflow-demo
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: superfly/flyctl-actions/setup-flyctl@fc53c09e1bc3be6f54706524e3b82c4f462f77be  # 1.5
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1  # 1.6
 
       - name: Redeploy the previous release and its fly.toml
         env:

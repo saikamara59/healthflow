@@ -60,11 +60,24 @@ def anyio_backend():
     return "asyncio"
 
 
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "separate_connections: run on a file database so each request gets its own connection",
+    )
+
+
 @pytest_asyncio.fixture
-async def db_engine():
+async def db_engine(request, tmp_path):
     from healthflow.database.tenant_filter import install_raw_sql_guard
 
-    engine = create_async_engine("sqlite+aiosqlite:///", echo=False)
+    # In-memory SQLite runs every session on one shared connection, so requests
+    # sent at the same time share a transaction: one request's rollback undoes
+    # another's uncommitted work. Tests that race requests need a file database.
+    url = "sqlite+aiosqlite:///"
+    if request.node.get_closest_marker("separate_connections"):
+        url = f"sqlite+aiosqlite:///{tmp_path / 'test.db'}"
+    engine = create_async_engine(url, echo=False)
     install_raw_sql_guard(engine)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
