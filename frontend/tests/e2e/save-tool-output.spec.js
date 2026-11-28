@@ -51,6 +51,8 @@ test('Draft Appeal output is saved as a Document on the Issue Client only after 
   await page.route('**/appeal', (route) => route.fulfill({ json: appealResult('Letter for the Issue Client.') }))
 
   await page.goto(`/appeals?issue=${issue.id}`)
+  // Drafting needs the Issue list loaded; clicking earlier only shows "Choose an existing Issue".
+  await expect(page.getByLabel('Existing Issue')).toHaveValue(issue.id)
   await page.getByRole('button', { name: 'Use sample' }).click()
   await page.getByRole('button', { name: 'Analyze & draft' }).click()
   await expect(page.getByText('Letter for the Issue Client.')).toBeVisible()
@@ -122,6 +124,7 @@ test('A late Appeal letter is discarded after the Broker switches Issue', async 
   })
 
   await page.goto(`/appeals?issue=${first.issue.id}`)
+  await expect(page.getByLabel('Existing Issue')).toHaveValue(first.issue.id)
   await page.getByRole('button', { name: 'Use sample' }).click()
   await page.getByRole('button', { name: 'Analyze & draft' }).click()
   await requested
