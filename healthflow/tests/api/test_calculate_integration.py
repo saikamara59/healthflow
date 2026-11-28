@@ -1,8 +1,11 @@
+import pytest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from healthflow.main import app
 
 client = TestClient(app)
+# These tests cover what the route does; who may call it is in test_sign_in_required.py.
+pytestmark = pytest.mark.usefixtures("signed_in")
 
 
 @patch("healthflow.api.routes.build_cost_calculator_agent")

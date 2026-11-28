@@ -1,3 +1,4 @@
+import pytest
 from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
@@ -10,6 +11,8 @@ from healthflow.models.schemas import (
 )
 
 client = TestClient(app)
+# These tests cover what the route does; who may call it is in test_sign_in_required.py.
+pytestmark = pytest.mark.usefixtures("signed_in")
 
 
 def _make_plan_network_result(plan_name: str, plan_id: str) -> PlanNetworkResult:

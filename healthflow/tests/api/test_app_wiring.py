@@ -1,5 +1,7 @@
 import pytest
 
+from healthflow.main import app
+
 
 @pytest.mark.asyncio
 async def test_health_check_still_works(client):
@@ -44,20 +46,23 @@ async def test_clients_route_exists(client):
 
 @pytest.mark.asyncio
 async def test_existing_compare_route_still_exists(client):
-    """Existing Phase 1-5 routes should still be accessible."""
+    """Existing Phase 1-5 routes are still registered, and now require sign-in (OVE-187)."""
     response = await client.post("/compare", json={})
-    # Should be 422 (validation error), not 404
-    assert response.status_code == 422
+    # Should be 401 (not authenticated), not 404 (not found)
+    assert response.status_code == 401
 
 
-@pytest.mark.asyncio
-async def test_openapi_schema_includes_new_routes(client):
+def test_openapi_schema_includes_new_routes():
     """The OpenAPI schema should include auth and client routes."""
-    response = await client.get("/openapi.json")
-    assert response.status_code == 200
-    schema = response.json()
-    paths = schema["paths"]
+    paths = app.openapi()["paths"]
     assert "/auth/register" in paths
     assert "/auth/login" in paths
     assert "/auth/refresh" in paths
     assert "/clients" in paths
+
+
+@pytest.mark.asyncio
+async def test_api_docs_are_off_unless_turned_on(client):
+    """The docs pages list every route and skip the sign-in requirement, so they are off by default."""
+    for path in ("/openapi.json", "/docs", "/redoc"):
+        assert (await client.get(path)).status_code == 404, path

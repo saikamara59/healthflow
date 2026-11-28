@@ -90,7 +90,7 @@ cp .env.example .env          # Add your ANTHROPIC_API_KEY
 make docker-up                 # Backend + Frontend + Redis
 ```
 
-App at http://localhost (frontend) and http://localhost:8000/docs (API docs).
+App at http://localhost (frontend). Every API endpoint requires a signed-in Broker except a short public list in `healthflow/auth/sign_in_required.py`. The API docs at http://localhost:8000/docs are off by default; set `HEALTHFLOW_ENABLE_API_DOCS=1` in `.env` to turn them on locally.
 
 ---
 
@@ -216,6 +216,8 @@ or tracking on page load (`dnt=1` is set). To swap the clip, change `VIMEO_ID` a
 of `DemoVideoFrame` in `frontend/src/pages/HomePage.jsx`.
 
 ### AI-Powered Agents (Claude)
+
+Each agent endpoint requires a signed-in Broker, and its invocations are recorded against that Broker.
 
 | Feature | Endpoint | Description |
 |---------|----------|-------------|

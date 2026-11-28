@@ -18,14 +18,14 @@ os.environ.setdefault(
     str(Path(__file__).resolve().parent.parent / "healthflow_data.db"),
 )
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from healthflow.api.middleware import EndpointContextMiddleware, HTTPLoggingMiddleware
 from healthflow.api.case_middleware import CaseContextMiddleware
-from healthflow.api.optional_broker_middleware import OptionalBrokerContextMiddleware
 
 from healthflow.api.routes import router
 from healthflow.auth.router import auth_router
+from healthflow.auth.sign_in_required import require_sign_in
 from healthflow.auth.admin_router import admin_router
 from healthflow.api.drug_router import drug_router
 from healthflow.api.client_router import client_router
@@ -92,11 +92,22 @@ async def lifespan(app: FastAPI):
             await backfill_task
 
 
+# Interactive API docs list every route and its schema. They are Starlette
+# routes, so the sign-in requirement below cannot cover them: keep them off
+# unless a developer turns them on locally.
+_API_DOCS = os.getenv("HEALTHFLOW_ENABLE_API_DOCS") == "1"
+
 app = FastAPI(
     title="HealthFlow",
     description="AI-powered Medicare Advantage plan comparison service",
     version="0.2.0",
     lifespan=lifespan,
+    # Every route requires a signed-in Broker unless it is on the public list
+    # in healthflow/auth/sign_in_required.py (OVE-187).
+    dependencies=[Depends(require_sign_in)],
+    docs_url="/docs" if _API_DOCS else None,
+    redoc_url="/redoc" if _API_DOCS else None,
+    openapi_url="/openapi.json" if _API_DOCS else None,
 )
 
 # Explicit CORS allowlist. A wildcard origin must never be paired with
@@ -140,7 +151,6 @@ if os.path.isdir(_DIST_DIR):
 app.add_middleware(HTTPLoggingMiddleware)
 app.add_middleware(EndpointContextMiddleware)
 app.add_middleware(CaseContextMiddleware)
-app.add_middleware(OptionalBrokerContextMiddleware)
 
 app.include_router(router)
 app.include_router(auth_router)

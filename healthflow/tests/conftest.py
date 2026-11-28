@@ -49,6 +49,7 @@ import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from healthflow.auth.sign_in_required import require_sign_in
 from healthflow.database.models import Base
 from healthflow.database.config import get_db
 from healthflow.main import app
@@ -58,6 +59,22 @@ from healthflow.logs import server as server_log_module
 @pytest.fixture
 def anyio_backend():
     return "asyncio"
+
+
+@pytest.fixture
+def signed_in():
+    """Let a test's requests pass the app-wide sign-in requirement (OVE-187).
+
+    For tests about what an agent route does, not about who may call it. No
+    Broker is set, as before the requirement existed. The requirement itself is
+    tested in tests/api/test_sign_in_required.py, which must never use this.
+    """
+    async def _pass():
+        yield None
+
+    app.dependency_overrides[require_sign_in] = _pass
+    yield
+    app.dependency_overrides.pop(require_sign_in, None)
 
 
 def pytest_configure(config):
