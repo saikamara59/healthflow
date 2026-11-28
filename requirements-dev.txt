@@ -1,4 +1,4 @@
 -r requirements.txt
 
 # Keep repository linting reproducible after the development environment is installed.
-ruff==0.17.5
+ruff==0.17.6
