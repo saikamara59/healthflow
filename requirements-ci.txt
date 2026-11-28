@@ -1,5 +1,5 @@
 # Exact pins for the lightweight CI jobs that check configuration and scripts
 # without installing the private backend dependency.
 pytest==9.2.0
-pyyaml==6.0.3
+pyyaml==6.0.4
 pip-audit==2.10.1

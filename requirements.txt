@@ -20,7 +20,7 @@ olefile==0.47
 Pillow==13.0.0
 pypdf==6.21.4
 python-multipart==0.0.32
-pyyaml>=6.0
+pyyaml>=6.0.4
 
 # The four PydanticAI successor Ports plus the original AppealAgent, shared
 # contracts/tools, and PHI redaction layer. Logfire remains opt-in at runtime.
