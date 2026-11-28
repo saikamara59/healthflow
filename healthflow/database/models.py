@@ -448,6 +448,65 @@ class Approval(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
 
 
+class AskConversation(Base):
+    """One exchange between a Broker and Ask HealthFlow (ADR 0005).
+
+    Private to its Broker. Deleted 90 days after its last message, or sooner
+    when the Broker deletes it. Approvals it produced point back through
+    `Approval.source_id` (no foreign key), so deleting a conversation never
+    touches them; each Approval keeps its own excerpt.
+    """
+
+    __tablename__ = "ask_conversations"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    broker_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("brokers.id"), index=True, nullable=False
+    )
+    title: Mapped[str | None] = mapped_column(EncryptedString(), nullable=True)
+    # Client IDs the Broker added to this conversation, as strings.
+    client_context: Mapped[list] = mapped_column(EncryptedJSON(), default=list, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    last_message_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, index=True, nullable=False
+    )
+
+
+class AskMessage(Base):
+    """One message in an Ask Conversation, from the Broker or from Ask HealthFlow."""
+
+    __tablename__ = "ask_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    broker_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("brokers.id"), index=True, nullable=False
+    )
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("ask_conversations.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    content: Mapped[str] = mapped_column(EncryptedString(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+
+
+class AskUsageDay(Base):
+    """Ask messages a Broker sent on one day in their saved time zone.
+
+    Counts only, no PHI. Kept apart from the conversations so deleting a
+    conversation cannot reset the daily cap.
+    """
+
+    __tablename__ = "ask_usage_days"
+    __table_args__ = (Index("ux_ask_usage_days_broker_date", "broker_id", "usage_date", unique=True),)
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    broker_id: Mapped[uuid.UUID] = mapped_column(
+        GUID(), ForeignKey("brokers.id"), index=True, nullable=False
+    )
+    usage_date: Mapped[date] = mapped_column(Date, nullable=False)
+    message_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+
+
 class WorkspaceActivity(Base):
     __tablename__ = "workspace_activity"
 

@@ -7,8 +7,9 @@ statement and must see it already scoped):
   * do_orm_execute  — SELECT / UPDATE / DELETE. Observes results via
     Result.freeze() so it can capture row IDs and still return a usable
     result to the caller.
-  * after_flush     — INSERT. do_orm_execute never fires for unit-of-work
-    flushes, so freshly-inserted PHI rows are caught here.
+  * after_flush     — unit-of-work writes: rows inserted, changed through
+    their attributes, or removed with session.delete(). do_orm_execute
+    never fires for a flush, so these are caught here.
 
 phi_access_log itself is excluded from both listeners — writing an audit
 entry is a DB write, and watching the audit table would recurse forever.
@@ -35,6 +36,8 @@ from healthflow.database.models import (
     Appeal,
     Appointment,
     Approval,
+    AskConversation,
+    AskMessage,
     Client,
     Contact,
     Document,
@@ -67,6 +70,8 @@ _AUDITED_MODELS: frozenset[type] = frozenset({
     Issue,
     Appeal,
     Approval,
+    AskConversation,
+    AskMessage,
     WorkspaceActivity,
 })
 _AUDITED_TABLE_NAMES: dict[type, str] = {m: m.__tablename__ for m in _AUDITED_MODELS}
@@ -190,26 +195,34 @@ def _on_do_orm_execute_audit(orm_execute_state):
 
 
 def _on_after_flush_audit(session, flush_context):
-    """after_flush listener: audit INSERTs of PHI rows.
+    """after_flush listener: audit PHI rows a flush created, changed, or deleted.
 
-    do_orm_execute does not fire for unit-of-work flushes, so freshly-inserted
-    PHI rows are caught here via session.new. PhiAccessLog rows are skipped —
-    they are not in _AUDITED_MODELS — so writing an audit entry does not
-    recurse. Entries are grouped by model into one `create` entry per table.
+    do_orm_execute does not fire for unit-of-work flushes, so these writes are
+    caught here: `session.new` (create), `session.dirty` (update), and
+    `session.deleted` (delete). after_flush still sees the pre-flush lists.
+    An object is in `dirty` whenever any attribute was set, even to the same
+    value, so only rows with a real column change count as an update.
+    PhiAccessLog rows are skipped (not in _AUDITED_MODELS), so writing an
+    entry does not recurse. One entry per table and operation.
     """
-    by_model: dict[type, list[str]] = {}
-    for obj in session.new:
-        model = type(obj)
-        if model in _AUDITED_MODELS and hasattr(obj, "id"):
-            by_model.setdefault(model, []).append(str(obj.id))
-
-    for model, row_ids in by_model.items():
-        _write_audit_entry(
-            session,
-            table_name=_AUDITED_TABLE_NAMES[model],
-            operation="create",
-            row_ids=row_ids,
-        )
+    writes = (
+        ("create", session.new),
+        ("update", (obj for obj in session.dirty if session.is_modified(obj, include_collections=False))),
+        ("delete", session.deleted),
+    )
+    for operation, objects in writes:
+        by_model: dict[type, list[str]] = {}
+        for obj in objects:
+            model = type(obj)
+            if model in _AUDITED_MODELS and hasattr(obj, "id"):
+                by_model.setdefault(model, []).append(str(obj.id))
+        for model, row_ids in by_model.items():
+            _write_audit_entry(
+                session,
+                table_name=_AUDITED_TABLE_NAMES[model],
+                operation=operation,
+                row_ids=row_ids,
+            )
 
 
 def install_phi_audit(factory: async_sessionmaker) -> None:

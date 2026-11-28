@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm.attributes import flag_modified
 
 from healthflow.auth.tenant_context import system_context
-from healthflow.database.models import ActionHistory, Approval, Client, Feedback
+from healthflow.database.models import ActionHistory, Approval, AskConversation, AskMessage, Client, Feedback
 
 _BATCH_SIZE = 100
 
@@ -36,6 +36,8 @@ _ENCRYPTED_FIELDS: dict[type, tuple[str, ...]] = {
     ActionHistory: ("request_data", "response_summary"),
     Feedback: ("comment",),
     Approval: ("excerpt", "note", "proposed_values", "approved_values", "rejection_reason"),
+    AskConversation: ("title", "client_context"),
+    AskMessage: ("content",),
 }
 
 
