@@ -30,6 +30,7 @@ export default defineConfig({
       '/enrollments': proxyToBackend,
       '/issues': proxyToBackend,
       '/appeals': proxyToBackend,
+      '/tool-output': proxyToBackend,
       '/workspace': proxyToBackend,
       '/compare': proxyToBackend,
       '/calculate': proxyToBackend,

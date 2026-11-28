@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../api/client';
 import { useWorkingWith } from '../contexts/WorkingWithContext';
@@ -11,6 +11,7 @@ import Chip from '../components/ui/Chip';
 import AgentMarkdown from '../components/ui/AgentMarkdown';
 import PageHead from '../components/ui/PageHead';
 import useLayout from '../components/ui/useLayout';
+import SaveToolOutput from '../components/workspace/SaveToolOutput';
 import { RunSteps, SourceRow, ToolResults } from '../components/tools/ToolRun';
 import { TOOL_FLOWS } from '../components/tools/toolFlows';
 
@@ -41,6 +42,9 @@ export default function ClaimsAppealPage() {
   const [linkedIssueId] = useState(() => new URLSearchParams(location.search).get('issue') || '');
   const [issueId, setIssueId] = useState(linkedIssueId);
   const [newIssue, setNewIssue] = useState({ client_id: '', title: '' });
+  // Each run takes a ticket. Changing the Issue invalidates it, so a letter that
+  // arrives late is never shown, or saved as a Document, under a different Client.
+  const generation = useRef(0);
   // Working With narrows the Issues to that Client, unless a link chose an Issue.
   const { client: focus } = useWorkingWith();
   const narrowTo = linkedIssueId ? null : focus;
@@ -55,6 +59,13 @@ export default function ClaimsAppealPage() {
     const open = shownIssues.filter((issue) => issue.status !== 'resolved');
     setIssueId((current) => (shownIssues.some((issue) => issue.id === current) ? current : (open.length === 1 ? open[0].id : '')));
   }, [narrowTo?.id, issues]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    generation.current += 1;
+    setResult(null);
+    setSavedAppeal(null);
+    setRunning(false);
+  }, [issueId]);
 
   useEffect(() => {
     if (focus) setNewIssue((current) => ({ ...current, client_id: focus.id }));
@@ -94,11 +105,14 @@ export default function ClaimsAppealPage() {
       setError('Restore the Client before drafting a new Appeal. Historical Issues and Appeals remain available in Issues & Appeals.');
       return;
     }
+    const ticket = ++generation.current;
+    const isCurrent = () => ticket === generation.current;
     setError('');
     setRunning(true);
     setSavedAppeal(null);
     try {
       const currentIssue = await workspaceApi.getIssue(issueId);
+      if (!isCurrent()) return;
       if (currentIssue.client_archived) {
         setIssues((current) => current.map((item) => item.id === issueId ? currentIssue : item));
         setError('Restore the Client before drafting a new Appeal.');
@@ -114,21 +128,23 @@ export default function ClaimsAppealPage() {
         denial_text: denialText,
         additional_context: additionalContext,
       });
-      setResult(res);
+      // The draft still belongs to the Issue it was generated for, even if the
+      // Broker has moved on; only the on-screen state is tied to the current Issue.
+      if (isCurrent()) setResult({ ...res, client_id: issue.client_id });
       try {
         const saved = await workspaceApi.createAppeal({
           issue_id: issueId,
           title: `${APPEAL_TITLE_PREFIX}${issue.title.slice(0, MAX_APPEAL_TITLE - APPEAL_TITLE_PREFIX.length)}`,
           draft_text: res.appeal_letter,
         });
-        setSavedAppeal({ ...saved, client_id: issue.client_id });
+        if (isCurrent()) setSavedAppeal({ ...saved, client_id: issue.client_id });
       } catch {
-        setError('The Appeal was generated, but the draft could not be saved. Copy the letter before leaving this page and try again.');
+        if (isCurrent()) setError('The Appeal was generated, but the draft could not be saved. Copy the letter before leaving this page and try again.');
       }
     } catch (err) {
-      setError(err.message || 'Appeal generation failed');
+      if (isCurrent()) setError(err.message || 'Appeal generation failed');
     } finally {
-      setRunning(false);
+      if (isCurrent()) setRunning(false);
     }
   }
 
@@ -241,6 +257,7 @@ export default function ClaimsAppealPage() {
                   <div className="between"><h2><FileText size={19} weight="duotone" aria-hidden="true" className="ap-h-ic" /> Drafted appeal letter</h2><button className="btn sm" onClick={copyLetter}><CopySimple size={14} weight="duotone" /> {copied ? 'Copied' : 'Copy'}</button></div>
                   <div className="ap-letter"><AgentMarkdown>{result.appeal_letter}</AgentMarkdown></div>
                   <SourceRow items={flow.sources} />
+                  <SaveToolOutput source="draft_appeal" text={result.appeal_letter} fixedClientId={result.client_id} />
                 </section>
 
                 {result.disclaimer && <p className="ws-note">{result.disclaimer}</p>}
