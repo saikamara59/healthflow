@@ -6,6 +6,7 @@ import TopBar from '../components/TopBar';
 import AgentMarkdown from '../components/ui/AgentMarkdown';
 import PageHead from '../components/ui/PageHead';
 import useLayout from '../components/ui/useLayout';
+import SaveToolOutput from '../components/workspace/SaveToolOutput';
 import { RunStepsCompact, SourceRow } from '../components/tools/ToolRun';
 import { TOOL_FLOWS } from '../components/tools/toolFlows';
 
@@ -65,6 +66,11 @@ export default function CoverageTranslatorPage() {
   }
 
   const answered = messages.filter((m) => m.role === 'agent' && !m.error).length;
+  // Save as Document keeps the latest answer together with the question it answers.
+  const latestIndex = messages.findLastIndex((m) => m.role === 'agent' && !m.error);
+  const latestExchange = latestIndex > 0
+    ? `Question: ${messages[latestIndex - 1].body}\n\nAnswer: ${messages[latestIndex].body}`
+    : '';
 
   return (
     <MotionConfig reducedMotion="user">
@@ -109,6 +115,7 @@ export default function CoverageTranslatorPage() {
               {SUGGESTED.map((s) => <button key={s} type="button" className="btn sm" onClick={() => ask(s)} disabled={busy}>{s}</button>)}
             </div>
             {answered > 0 && <SourceRow items={flow.sources} />}
+            {!busy && <SaveToolOutput source="explain_coverage" text={latestExchange} label="Save latest answer as Document" />}
           </section>
         </div>
       </div>

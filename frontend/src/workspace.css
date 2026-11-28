@@ -92,3 +92,13 @@
 .document-row small { display: block; color: var(--ink-3); margin-top: 4px; }
 .document-links { padding-left: 16px; margin-top: 8px; }
 .document-links li { margin-block: 4px; }
+
+/* Save as Document for Tool output */
+.save-output { margin-top: 18px; }
+.save-output-review { margin-top: 12px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 12px; }
+.save-output-review h3 { margin: 0; font-size: 15px; }
+.save-output-review p { margin: 0; }
+.save-output-review select { display: block; width: 100%; margin-top: 6px; }
+.save-output-preview { display: block; width: 100%; min-height: 160px; font-family: var(--mono); font-size: 12.5px; }
+.save-output-confirm { display: flex; align-items: flex-start; gap: 8px; }
+.save-output-actions { display: flex; justify-content: flex-end; gap: 8px; }
