@@ -109,16 +109,28 @@ export default function ClaimsAppealPage() {
     const isCurrent = () => ticket === generation.current;
     setError('');
     setRunning(true);
+    // A previous letter never reappears after a run that stops early or fails.
+    setResult(null);
     setSavedAppeal(null);
     try {
+      // The fresh copy decides which Client the letter belongs to.
       const currentIssue = await workspaceApi.getIssue(issueId);
       if (!isCurrent()) return;
+      const refreshIssue = () => setIssues((current) => current.map((item) => item.id === issueId ? currentIssue : item));
       if (currentIssue.client_archived) {
-        setIssues((current) => current.map((item) => item.id === issueId ? currentIssue : item));
+        refreshIssue();
         setError('Restore the Client before drafting a new Appeal.');
         return;
       }
-      const issueContext = `Issue context: ${issue.title}`;
+      // If the Issue moved to another Client since this page loaded it, stop
+      // before drafting: nothing is generated or saved for a Client the Broker
+      // did not see. The refreshed list may also deselect it under Working With.
+      if (currentIssue.client_id !== issue.client_id) {
+        refreshIssue();
+        setError(`This Issue now belongs to ${currentIssue.client_name}. Check the Issue, then draft again.`);
+        return;
+      }
+      const issueContext = `Issue context: ${currentIssue.title}`;
       const additionalContext = [context, issueContext].filter(Boolean).join('\n\n');
       if (additionalContext.length > MAX_ADDITIONAL_CONTEXT) {
         setError('Additional context is too long for the selected Issue. Shorten it and try again.');
@@ -130,14 +142,14 @@ export default function ClaimsAppealPage() {
       });
       // The draft still belongs to the Issue it was generated for, even if the
       // Broker has moved on; only the on-screen state is tied to the current Issue.
-      if (isCurrent()) setResult({ ...res, client_id: issue.client_id });
+      if (isCurrent()) setResult({ ...res, client_id: currentIssue.client_id });
       try {
         const saved = await workspaceApi.createAppeal({
           issue_id: issueId,
-          title: `${APPEAL_TITLE_PREFIX}${issue.title.slice(0, MAX_APPEAL_TITLE - APPEAL_TITLE_PREFIX.length)}`,
+          title: `${APPEAL_TITLE_PREFIX}${currentIssue.title.slice(0, MAX_APPEAL_TITLE - APPEAL_TITLE_PREFIX.length)}`,
           draft_text: res.appeal_letter,
         });
-        if (isCurrent()) setSavedAppeal({ ...saved, client_id: issue.client_id });
+        if (isCurrent()) setSavedAppeal({ ...saved, client_id: currentIssue.client_id });
       } catch {
         if (isCurrent()) setError('The Appeal was generated, but the draft could not be saved. Copy the letter before leaving this page and try again.');
       }

@@ -68,6 +68,44 @@ test('Draft Appeal output is saved as a Document on the Issue Client only after 
   expect(saves).toEqual([{ source: 'draft_appeal', client_id: client.id, text: 'Letter for the Issue Client.', confirmed: true }])
 })
 
+test('Draft Appeal stops when the Issue moved to another Client after the page loaded', async ({ authedPage: page }) => {
+  await page.goto('/today')
+  const { issue } = await createClientWithIssue(page, 'Original Issue Client', 'Moved Issue')
+  const { client: newOwner } = await createClientWithIssue(page, 'Current Issue Client', 'Other Issue')
+  const saves = await captureSaves(page)
+  const letters = ['Letter drafted for the original Client.', 'Letter for the moved Issue.']
+  let drafts = 0
+  await page.route('**/appeal', (route) => route.fulfill({ json: appealResult(letters[drafts++]) }))
+
+  await page.goto(`/appeals?issue=${issue.id}`)
+  await expect(page.getByLabel('Existing Issue')).toHaveValue(issue.id)
+  await page.getByRole('button', { name: 'Use sample' }).click()
+  await page.getByRole('button', { name: 'Analyze & draft' }).click()
+  await expect(page.getByText(letters[0])).toBeVisible()
+
+  // Another tab moves the Issue to a different Client after this page loaded its Issues.
+  const moved = await page.request.put(`/issues/${issue.id}`, { headers: await authHeaders(page), data: { client_id: newOwner.id } })
+  expect(moved.ok()).toBe(true)
+
+  await page.getByRole('button', { name: 'Analyze & draft' }).click()
+  await expect(page.getByRole('alert')).toContainText('This Issue now belongs to Current Issue Client')
+  expect(drafts).toBe(1)
+  // The earlier letter does not reappear under the Issue's new Client.
+  await expect(page.getByText(letters[0])).toHaveCount(0)
+
+  // With the refreshed Issue, drafting again uses its current Client.
+  await page.getByRole('button', { name: 'Analyze & draft' }).click()
+  await expect(page.getByText('Letter for the moved Issue.')).toBeVisible()
+  await page.getByRole('button', { name: 'Save as Document' }).click()
+  const review = page.getByRole('form', { name: 'Review Document save' })
+  await expect(review.getByText('Current Issue Client')).toBeVisible()
+  await review.getByRole('checkbox').check()
+  await review.getByRole('button', { name: 'Confirm and save' }).click()
+
+  await expect(page.getByRole('status').filter({ hasText: 'Saved as a protected Document' })).toBeVisible()
+  expect(saves.map((save) => save.client_id)).toEqual([newOwner.id])
+})
+
 test('A late Appeal letter is discarded after the Broker switches Issue', async ({ authedPage: page }) => {
   await page.goto('/today')
   const first = await createClientWithIssue(page, 'Late Letter Client A', 'Issue A')
